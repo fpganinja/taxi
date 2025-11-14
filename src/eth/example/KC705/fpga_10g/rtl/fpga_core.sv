@@ -462,12 +462,6 @@ sfp_sync_reset_inst (
     .out(sfp_rst)
 );
 
-wire sfp_tx_p_int[1];
-wire sfp_tx_n_int[1];
-
-assign sfp_tx_p = sfp_tx_p_int[0];
-assign sfp_tx_n = sfp_tx_n_int[0];
-
 // synthesis translate_off
 `define SIM
 // synthesis translate_on
@@ -574,10 +568,10 @@ sfp_mac_inst (
     /*
      * Serial data
      */
-    .xcvr_txp(sfp_tx_p_int),
-    .xcvr_txn(sfp_tx_n_int),
-    .xcvr_rxp('{1{sfp_rx_p}}),
-    .xcvr_rxn('{1{sfp_rx_n}}),
+    .xcvr_txp('{sfp_tx_p}),
+    .xcvr_txn('{sfp_tx_n}),
+    .xcvr_rxp('{sfp_rx_p}),
+    .xcvr_rxn('{sfp_rx_n}),
 
     /*
      * MAC clocks

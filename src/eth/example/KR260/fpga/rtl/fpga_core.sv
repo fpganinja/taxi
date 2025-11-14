@@ -395,16 +395,6 @@ end else begin : sfp_mac
         .out(sfp_rst)
     );
 
-    wire eth_gty_tx_p[1];
-    wire eth_gty_tx_n[1];
-    wire eth_gty_rx_p[1];
-    wire eth_gty_rx_n[1];
-
-    assign sfp_tx_p = eth_gty_tx_p[0];
-    assign sfp_tx_n = eth_gty_tx_n[0];
-    assign eth_gty_rx_p[0] = sfp_rx_p;
-    assign eth_gty_rx_n[0] = sfp_rx_n;
-
     taxi_apb_if #(
         .ADDR_W(18),
         .DATA_W(16)
@@ -469,10 +459,10 @@ end else begin : sfp_mac
         /*
          * Serial data
          */
-        .xcvr_txp(eth_gty_tx_p),
-        .xcvr_txn(eth_gty_tx_n),
-        .xcvr_rxp(eth_gty_rx_p),
-        .xcvr_rxn(eth_gty_rx_n),
+        .xcvr_txp('{sfp_tx_p}),
+        .xcvr_txn('{sfp_tx_n}),
+        .xcvr_rxp('{sfp_rx_p}),
+        .xcvr_rxn('{sfp_rx_n}),
 
         /*
          * MAC clocks

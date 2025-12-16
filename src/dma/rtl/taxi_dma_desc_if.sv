@@ -60,8 +60,10 @@ interface taxi_dma_desc_if #(
     modport req_src (
         output req_src_addr,
         output req_src_sel,
+        output req_src_asid,
         output req_dst_addr,
         output req_dst_sel,
+        output req_dst_asid,
         output req_imm,
         output req_imm_en,
         output req_len,
@@ -76,8 +78,10 @@ interface taxi_dma_desc_if #(
     modport req_snk (
         input  req_src_addr,
         input  req_src_sel,
+        input  req_src_asid,
         input  req_dst_addr,
         input  req_dst_sel,
+        input  req_dst_asid,
         input  req_imm,
         input  req_imm_en,
         input  req_len,

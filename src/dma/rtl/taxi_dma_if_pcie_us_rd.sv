@@ -997,7 +997,7 @@ always_comb begin
                     cpl_status_next = s_axis_rc.tdata[45:43]; // completion status
                     //s_axis_rc.tdata[46]; // poisoned completion
                     //s_axis_rc.tdata[63:48]; // requester ID
-                    pcie_tag_next = s_axis_rc.tdata[71:64]; // tag
+                    pcie_tag_next = PCIE_TAG_W'(s_axis_rc.tdata[71:64]); // tag
                     //s_axis_rc.tdata[87:72]; // completer ID
                     //s_axis_rc.tdata[91:89]; // tc
                     //s_axis_rc.tdata[94:92]; // attr
@@ -1228,7 +1228,7 @@ always_comb begin
             s_axis_rc_tready_next = init_done_reg && &ram_wr_cmd_ready_int && !status_fifo_full_reg;
 
             if (s_axis_rc.tready && s_axis_rc.tvalid) begin
-                pcie_tag_next = s_axis_rc.tdata[7:0]; // tag
+                pcie_tag_next = PCIE_TAG_W'(s_axis_rc.tdata[7:0]); // tag
                 //s_axis_rc.tdata[23:8]; // completer ID
                 //s_axis_rc.tdata[27:25]; // attr
                 //s_axis_rc.tdata[30:28]; // tc

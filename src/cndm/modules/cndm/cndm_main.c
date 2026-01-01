@@ -240,6 +240,8 @@ static int __init cndm_init(void)
 static void __exit cndm_exit(void)
 {
 	pci_unregister_driver(&cndm_driver);
+
+	ida_destroy(&cndm_instance_ida);
 }
 
 module_init(cndm_init);

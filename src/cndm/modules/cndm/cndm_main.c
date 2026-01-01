@@ -37,13 +37,88 @@ static void cndm_free_id(struct cndm_dev *cdev)
 	ida_free(&cndm_instance_ida, cdev->id);
 }
 
+static void cndm_common_remove(struct cndm_dev *cdev);
+
+static int cndm_common_probe(struct cndm_dev *cdev)
+{
+	struct devlink *devlink = priv_to_devlink(cdev);
+	struct device *dev = cdev->dev;
+	int ret = 0;
+	int k;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	devlink_register(devlink);
+#else
+	devlink_register(devlink, dev);
+#endif
+
+	cdev->port_count = ioread32(cdev->bar + 0x0100);
+	cdev->port_offset = ioread32(cdev->bar + 0x0104);
+	cdev->port_stride = ioread32(cdev->bar + 0x0108);
+
+	dev_info(dev, "Port count: %d", cdev->port_count);
+	dev_info(dev, "Port offset: 0x%x", cdev->port_offset);
+	dev_info(dev, "Port stride: 0x%x", cdev->port_stride);
+
+	for (k = 0; k < cdev->port_count; k++) {
+		struct net_device *ndev;
+
+		ndev = cndm_create_netdev(cdev, k, cdev->bar + cdev->port_offset + (cdev->port_stride*k));
+		if (IS_ERR_OR_NULL(ndev)) {
+			ret = PTR_ERR(ndev);
+			goto fail_netdev;
+		}
+
+		cdev->ndev[k] = ndev;
+	}
+
+fail_netdev:
+	cdev->misc_dev.minor = MISC_DYNAMIC_MINOR;
+	cdev->misc_dev.name = cdev->name;
+	cdev->misc_dev.fops = &cndm_fops;
+	cdev->misc_dev.parent = dev;
+
+	ret = misc_register(&cdev->misc_dev);
+	if (ret) {
+		cdev->misc_dev.this_device = NULL;
+		dev_err(dev, "misc_register failed: %d", ret);
+		goto fail;
+
+	}
+
+	dev_info(dev, "Registered device %s", cdev->name);
+
+	return 0;
+
+fail:
+	cndm_common_remove(cdev);
+	return ret;
+}
+
+static void cndm_common_remove(struct cndm_dev *cdev)
+{
+	struct devlink *devlink = priv_to_devlink(cdev);
+	int k;
+
+	if (cdev->misc_dev.this_device)
+		misc_deregister(&cdev->misc_dev);
+
+	for (k = 0; k < 32; k++) {
+		if (cdev->ndev[k]) {
+			cndm_destroy_netdev(cdev->ndev[k]);
+			cdev->ndev[k] = NULL;
+		}
+	}
+
+	devlink_unregister(devlink);
+}
+
 static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct device *dev = &pdev->dev;
 	struct devlink *devlink;
 	struct cndm_dev *cdev;
 	int ret = 0;
-	int k;
 
 	dev_info(dev, DRIVER_NAME " PCI probe");
 	dev_info(dev, "Corundum device driver");
@@ -102,58 +177,13 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto fail_init_irq;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-	devlink_register(devlink);
-#else
-	devlink_register(devlink, dev);
-#endif
-
-	cdev->port_count = ioread32(cdev->bar + 0x0100);
-	cdev->port_offset = ioread32(cdev->bar + 0x0104);
-	cdev->port_stride = ioread32(cdev->bar + 0x0108);
-
-	dev_info(dev, "Port count: %d", cdev->port_count);
-	dev_info(dev, "Port offset: 0x%x", cdev->port_offset);
-	dev_info(dev, "Port stride: 0x%x", cdev->port_stride);
-
-	for (k = 0; k < cdev->port_count; k++) {
-		struct net_device *ndev;
-
-		ndev = cndm_create_netdev(cdev, k, cdev->bar + cdev->port_offset + (cdev->port_stride*k));
-		if (IS_ERR_OR_NULL(ndev)) {
-			ret = PTR_ERR(ndev);
-			goto fail_netdev;
-		}
-
-		cdev->ndev[k] = ndev;
-	}
-
-	cdev->misc_dev.minor = MISC_DYNAMIC_MINOR;
-	cdev->misc_dev.name = cdev->name;
-	cdev->misc_dev.fops = &cndm_fops;
-	cdev->misc_dev.parent = dev;
-
-	ret = misc_register(&cdev->misc_dev);
-	if (ret) {
-		cdev->misc_dev.this_device = NULL;
-		dev_err(dev, "misc_register failed: %d", ret);
-		goto fail_miscdev;
-
-	}
-
-	dev_info(dev, "Registered device %s", cdev->name);
+	ret = cndm_common_probe(cdev);
+	if (ret)
+		goto fail_common;
 
 	return 0;
 
-fail_miscdev:
-fail_netdev:
-	for (k = 0; k < 32; k++) {
-		if (cdev->ndev[k]) {
-			cndm_destroy_netdev(cdev->ndev[k]);
-			cdev->ndev[k] = NULL;
-		}
-	}
-	devlink_unregister(devlink);
+fail_common:
 	cndm_irq_deinit_pcie(cdev);
 fail_init_irq:
 fail_map_bars:
@@ -175,20 +205,11 @@ static void cndm_pci_remove(struct pci_dev *pdev)
 	struct device *dev = &pdev->dev;
 	struct cndm_dev *cdev = pci_get_drvdata(pdev);
 	struct devlink *devlink = priv_to_devlink(cdev);
-	int k;
 
 	dev_info(dev, DRIVER_NAME " PCI remove");
 
-	if (cdev->misc_dev.this_device)
-		misc_deregister(&cdev->misc_dev);
+	cndm_common_remove(cdev);
 
-	for (k = 0; k < 32; k++) {
-		if (cdev->ndev[k]) {
-			cndm_destroy_netdev(cdev->ndev[k]);
-			cdev->ndev[k] = NULL;
-		}
-	}
-	devlink_unregister(devlink);
 	cndm_irq_deinit_pcie(cdev);
 	if (cdev->bar)
 		pci_iounmap(pdev, cdev->bar);

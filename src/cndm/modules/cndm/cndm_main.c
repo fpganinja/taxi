@@ -52,9 +52,9 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	devlink_register(devlink, dev);
 #endif
 
-	cdev->port_count = ioread32(cdev->bar + 0x0100);
-	cdev->port_offset = ioread32(cdev->bar + 0x0104);
-	cdev->port_stride = ioread32(cdev->bar + 0x0108);
+	cdev->port_count = ioread32(cdev->hw_addr + 0x0100);
+	cdev->port_offset = ioread32(cdev->hw_addr + 0x0104);
+	cdev->port_stride = ioread32(cdev->hw_addr + 0x0108);
 
 	dev_info(dev, "Port count: %d", cdev->port_count);
 	dev_info(dev, "Port offset: 0x%x", cdev->port_offset);
@@ -63,7 +63,7 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	for (k = 0; k < cdev->port_count; k++) {
 		struct net_device *ndev;
 
-		ndev = cndm_create_netdev(cdev, k, cdev->bar + cdev->port_offset + (cdev->port_stride*k));
+		ndev = cndm_create_netdev(cdev, k, cdev->hw_addr + cdev->port_offset + (cdev->port_stride*k));
 		if (IS_ERR_OR_NULL(ndev)) {
 			ret = PTR_ERR(ndev);
 			goto fail_netdev;
@@ -155,17 +155,18 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto fail_regions;
 	}
 
-	cdev->bar_len = pci_resource_len(pdev, 0);
+	cdev->hw_regs_size = pci_resource_len(pdev, 0);
+	cdev->hw_regs_phys = pci_resource_start(pdev, 0);
 
-	dev_info(dev, "BAR size: %llu", cdev->bar_len);
-	cdev->bar = pci_ioremap_bar(pdev, 0);
-	if (!cdev->bar) {
+	dev_info(dev, "Control BAR size: %llu", cdev->hw_regs_size);
+	cdev->hw_addr = pci_ioremap_bar(pdev, 0);
+	if (!cdev->hw_addr) {
 		ret = -ENOMEM;
-		dev_err(dev, "Failed to map BAR 0");
+		dev_err(dev, "Failed to map control BAR");
 		goto fail_map_bars;
 	}
 
-	if (ioread32(cdev->bar + 0x0000) == 0xffffffff) {
+	if (ioread32(cdev->hw_addr + 0x0000) == 0xffffffff) {
 		ret = -EIO;
 		dev_err(dev, "Device needs to be reset");
 		goto fail_map_bars;
@@ -187,8 +188,8 @@ fail_common:
 	cndm_irq_deinit_pcie(cdev);
 fail_init_irq:
 fail_map_bars:
-	if (cdev->bar)
-		pci_iounmap(pdev, cdev->bar);
+	if (cdev->hw_addr)
+		pci_iounmap(pdev, cdev->hw_addr);
 	pci_release_regions(pdev);
 fail_regions:
 	pci_clear_master(pdev);
@@ -211,8 +212,8 @@ static void cndm_pci_remove(struct pci_dev *pdev)
 	cndm_common_remove(cdev);
 
 	cndm_irq_deinit_pcie(cdev);
-	if (cdev->bar)
-		pci_iounmap(pdev, cdev->bar);
+	if (cdev->hw_addr)
+		pci_iounmap(pdev, cdev->hw_addr);
 	pci_release_regions(pdev);
 	pci_clear_master(pdev);
 	pci_disable_device(pdev);

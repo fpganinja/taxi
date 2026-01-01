@@ -45,8 +45,9 @@ struct cndm_dev {
 
 	struct net_device *ndev[32];
 
-	void __iomem *bar;
-	resource_size_t bar_len;
+	resource_size_t hw_regs_size;
+	phys_addr_t hw_regs_phys;
+	void __iomem *hw_addr;
 
 	u32 port_count;
 	u32 port_offset;

@@ -13,6 +13,7 @@ Authors:
 
 #include <linux/kernel.h>
 #include <linux/pci.h>
+#include <linux/miscdevice.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ptp_clock_kernel.h>
@@ -27,6 +28,8 @@ struct cndm_dev {
 
 	unsigned int id;
 	char name[16];
+
+	struct miscdevice misc_dev;
 
 	struct net_device *ndev[32];
 
@@ -134,6 +137,9 @@ void cndm_devlink_free(struct devlink *devlink);
 irqreturn_t cndm_irq(int irqn, void *data);
 struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __iomem *hw_addr);
 void cndm_destroy_netdev(struct net_device *ndev);
+
+// cndm_dev.c
+extern const struct file_operations cndm_fops;
 
 // cndm_tx.c
 int cndm_free_tx_buf(struct cndm_priv *priv);

@@ -6,6 +6,7 @@ ifneq ($(KERNELRELEASE),)
 obj-m += cndm.o
 cndm-y += cndm_main.o
 cndm-y += cndm_devlink.o
+cndm-y += cndm_dev.o
 cndm-y += cndm_netdev.o
 cndm-y += cndm_tx.o
 cndm-y += cndm_rx.o

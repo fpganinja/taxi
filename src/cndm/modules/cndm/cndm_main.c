@@ -135,8 +135,24 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		cdev->ndev[k] = ndev;
 	}
 
+	cdev->misc_dev.minor = MISC_DYNAMIC_MINOR;
+	cdev->misc_dev.name = cdev->name;
+	cdev->misc_dev.fops = &cndm_fops;
+	cdev->misc_dev.parent = dev;
+
+	ret = misc_register(&cdev->misc_dev);
+	if (ret) {
+		cdev->misc_dev.this_device = NULL;
+		dev_err(dev, "misc_register failed: %d", ret);
+		goto fail_miscdev;
+
+	}
+
+	dev_info(dev, "Registered device %s", cdev->name);
+
 	return 0;
 
+fail_miscdev:
 fail_netdev:
 	for (k = 0; k < 32; k++) {
 		if (cdev->ndev[k]) {
@@ -169,6 +185,9 @@ static void cndm_pci_remove(struct pci_dev *pdev)
 	int k;
 
 	dev_info(dev, DRIVER_NAME " PCI remove");
+
+	if (cdev->misc_dev.this_device)
+		misc_deregister(&cdev->misc_dev);
 
 	for (k = 0; k < 32; k++) {
 		if (cdev->ndev[k]) {

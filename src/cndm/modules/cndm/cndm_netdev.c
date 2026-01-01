@@ -56,19 +56,18 @@ static const struct net_device_ops cndm_netdev_ops = {
 	.ndo_start_xmit = cndm_start_xmit,
 };
 
-irqreturn_t cndm_irq(int irqn, void *data)
+static int cndm_netdev_irq(struct notifier_block *nb, unsigned long action, void *data)
 {
-	struct net_device *ndev = data;
-	struct cndm_priv *priv = netdev_priv(ndev);
+	struct cndm_priv *priv = container_of(nb, struct cndm_priv, irq_nb);
 
-	netdev_dbg(ndev, "Interrupt");
+	netdev_dbg(priv->ndev, "Interrupt");
 
 	if (priv->port_up) {
 		napi_schedule_irqoff(&priv->tx_napi);
 		napi_schedule_irqoff(&priv->rx_napi);
 	}
 
-	return IRQ_HANDLED;
+	return NOTIFY_DONE;
 }
 
 struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __iomem *hw_addr)
@@ -210,6 +209,15 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __io
 
 	priv->registered = 1;
 
+	priv->irq_nb.notifier_call = cndm_netdev_irq;
+	priv->irq = cdev->irq[port % cdev->irq_count];
+	ret = atomic_notifier_chain_register(&priv->irq->nh, &priv->irq_nb);
+	if (ret) {
+		priv->irq = NULL;
+		goto fail;
+	}
+
+
 	return ndev;
 
 fail:
@@ -226,6 +234,11 @@ void cndm_destroy_netdev(struct net_device *ndev)
 	iowrite32(0x00000000, priv->hw_addr + 0x100);
 	iowrite32(0x00000000, priv->hw_addr + 0x400);
 	iowrite32(0x00000000, priv->hw_addr + 0x300);
+
+	if (priv->irq)
+		atomic_notifier_chain_unregister(&priv->irq->nh, &priv->irq_nb);
+
+	priv->irq = NULL;
 
 	if (priv->registered)
 		unregister_netdev(ndev);

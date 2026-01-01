@@ -22,6 +22,15 @@ Authors:
 #define DRIVER_NAME "cndm"
 #define DRIVER_VERSION "0.1"
 
+#define CNDM_MAX_IRQ 256
+
+struct cndm_irq {
+	int index;
+	int irqn;
+	char name[16+3];
+	struct atomic_notifier_head nh;
+};
+
 struct cndm_dev {
 	struct pci_dev *pdev;
 	struct device *dev;
@@ -30,6 +39,9 @@ struct cndm_dev {
 	char name[16];
 
 	struct miscdevice misc_dev;
+
+	int irq_count;
+	struct cndm_irq *irq[CNDM_MAX_IRQ];
 
 	struct net_device *ndev[32];
 
@@ -70,6 +82,9 @@ struct cndm_priv {
 	size_t txq_region_len;
 	void *txq_region;
 	dma_addr_t txq_region_addr;
+
+	struct cndm_irq *irq;
+	struct notifier_block irq_nb;
 
 	struct cndm_tx_info *tx_info;
 	struct cndm_rx_info *rx_info;
@@ -133,8 +148,11 @@ struct cndm_cpl {
 struct devlink *cndm_devlink_alloc(struct device *dev);
 void cndm_devlink_free(struct devlink *devlink);
 
+// cndm_irq.c
+int cndm_irq_init_pcie(struct cndm_dev *cdev);
+void cndm_irq_deinit_pcie(struct cndm_dev *cdev);
+
 // cndm_netdev.c
-irqreturn_t cndm_irq(int irqn, void *data);
 struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __iomem *hw_addr);
 void cndm_destroy_netdev(struct net_device *ndev);
 

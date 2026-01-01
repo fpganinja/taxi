@@ -96,10 +96,10 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto fail_map_bars;
 	}
 
-	ret = pci_alloc_irq_vectors(pdev, 1, 32, PCI_IRQ_MSI | PCI_IRQ_MSIX);
-	if (ret < 0) {
-		dev_err(dev, "Failed to allocate IRQs");
-		goto fail_map_bars;
+	ret = cndm_irq_init_pcie(cdev);
+	if (ret) {
+		dev_err(dev, "Failed to set up interrupts");
+		goto fail_init_irq;
 	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
@@ -122,13 +122,6 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ndev = cndm_create_netdev(cdev, k, cdev->bar + cdev->port_offset + (cdev->port_stride*k));
 		if (IS_ERR_OR_NULL(ndev)) {
 			ret = PTR_ERR(ndev);
-			goto fail_netdev;
-		}
-
-		ret = pci_request_irq(pdev, k, cndm_irq, 0, ndev, DRIVER_NAME);
-		if (ret < 0) {
-			dev_err(dev, "Failed to request IRQ");
-			cndm_destroy_netdev(ndev);
 			goto fail_netdev;
 		}
 
@@ -156,13 +149,13 @@ fail_miscdev:
 fail_netdev:
 	for (k = 0; k < 32; k++) {
 		if (cdev->ndev[k]) {
-			pci_free_irq(pdev, k, cdev->ndev[k]);
 			cndm_destroy_netdev(cdev->ndev[k]);
 			cdev->ndev[k] = NULL;
 		}
 	}
 	devlink_unregister(devlink);
-	pci_free_irq_vectors(pdev);
+	cndm_irq_deinit_pcie(cdev);
+fail_init_irq:
 fail_map_bars:
 	if (cdev->bar)
 		pci_iounmap(pdev, cdev->bar);
@@ -191,13 +184,12 @@ static void cndm_pci_remove(struct pci_dev *pdev)
 
 	for (k = 0; k < 32; k++) {
 		if (cdev->ndev[k]) {
-			pci_free_irq(pdev, k, cdev->ndev[k]);
 			cndm_destroy_netdev(cdev->ndev[k]);
 			cdev->ndev[k] = NULL;
 		}
 	}
 	devlink_unregister(devlink);
-	pci_free_irq_vectors(pdev);
+	cndm_irq_deinit_pcie(cdev);
 	if (cdev->bar)
 		pci_iounmap(pdev, cdev->bar);
 	pci_release_regions(pdev);

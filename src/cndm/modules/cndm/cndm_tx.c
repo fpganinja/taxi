@@ -111,10 +111,6 @@ int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	netdev_dbg(ndev, "Got packet for TX");
 
-	// TODO workaround for MAC padding bug
-	if (skb_put_padto(skb, 60))
-		goto tx_drop;
-
 	if (skb->len < ETH_HLEN) {
 		netdev_warn(ndev, "Dropping short frame");
 		goto tx_drop;

@@ -390,7 +390,7 @@ async def run_test(dut):
         pkt = await tb.sfp_sinks[k].recv()
         tb.log.info("Got TX packet: %s", pkt)
 
-        assert pkt.get_payload().startswith(data)
+        assert pkt.get_payload() == data.ljust(60, b'\x00')
         assert pkt.check_fcs()
 
         await tb.sfp_sources[k].send(pkt)
@@ -398,7 +398,7 @@ async def run_test(dut):
         pkt = await driver.ports[k].recv()
         tb.log.info("Got RX packet: %s", pkt)
 
-        assert bytes(pkt).startswith(data)
+        assert bytes(pkt) == data.ljust(60, b'\x00')
 
     tb.log.info("Multiple small packets")
 
@@ -415,7 +415,7 @@ async def run_test(dut):
 
         tb.log.info("Got RX packet: %s", pkt)
 
-        assert bytes(pkt).startswith(pkts[k])
+        assert bytes(pkt) == pkts[k].ljust(60, b'\x00')
 
     tb.loopback_enable = False
 
@@ -434,7 +434,7 @@ async def run_test(dut):
 
         tb.log.info("Got RX packet: %s", pkt)
 
-        assert bytes(pkt) == pkts[k]
+        assert bytes(pkt) == pkts[k].ljust(60, b'\x00')
 
     tb.loopback_enable = False
 

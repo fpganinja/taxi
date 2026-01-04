@@ -324,7 +324,6 @@ always_comb begin
         if (PTP_TS_EN) begin
             m_axis_tx_cpl_ts_next = ptp_ts;
         end
-        m_axis_tx_cpl_tag_next = s_axis_tx.tid;
         if (TX_CPL_CTRL_IN_TUSER) begin
             m_axis_tx_cpl_valid_next = (s_axis_tx.tuser >> 1) == 0;
         end else begin
@@ -426,6 +425,8 @@ always_comb begin
 
                 s_tdata_next = s_axis_tx_tdata_masked;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
+
+                m_axis_tx_cpl_tag_next = s_axis_tx.tid;
 
                 if (s_axis_tx.tvalid && cfg_tx_enable) begin
                     // XGMII start and preamble

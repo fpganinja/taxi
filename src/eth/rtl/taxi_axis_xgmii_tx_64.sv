@@ -160,7 +160,7 @@ logic s_axis_tx_tready_reg = 1'b0, s_axis_tx_tready_next;
 
 logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_reg = '0;
 logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_adj_reg = '0;
-logic [TX_TAG_W-1:0] m_axis_tx_cpl_tag_reg = '0;
+logic [TX_TAG_W-1:0] m_axis_tx_cpl_tag_reg = '0, m_axis_tx_cpl_tag_next;
 logic m_axis_tx_cpl_valid_reg = 1'b0;
 logic m_axis_tx_cpl_valid_int_reg = 1'b0;
 logic m_axis_tx_cpl_ts_borrow_reg = 1'b0;
@@ -355,6 +355,8 @@ always_comb begin
     s_tdata_next = s_tdata_reg;
     s_empty_next = s_empty_reg;
 
+    m_axis_tx_cpl_tag_next = m_axis_tx_cpl_tag_reg;
+
     // XGMII idle
     xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
     xgmii_txc_next = {CTRL_W{1'b1}};
@@ -447,6 +449,8 @@ always_comb begin
 
                 s_tdata_next = s_axis_tx_tdata_masked;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
+
+                m_axis_tx_cpl_tag_next = s_axis_tx.tid;
 
                 if (s_axis_tx.tvalid && s_axis_tx.tready) begin
                     // XGMII start, preamble, and SFD
@@ -708,6 +712,7 @@ always_ff @(posedge clk) begin
 
     s_axis_tx_tready_reg <= s_axis_tx_tready_next;
 
+    m_axis_tx_cpl_tag_reg <= m_axis_tx_cpl_tag_next;
     m_axis_tx_cpl_valid_reg <= 1'b0;
     m_axis_tx_cpl_valid_int_reg <= 1'b0;
 
@@ -754,7 +759,6 @@ always_ff @(posedge clk) begin
                 end
                 start_packet_reg <= 2'b01;
             end
-            m_axis_tx_cpl_tag_reg <= s_axis_tx.tid;
             if (TX_CPL_CTRL_IN_TUSER) begin
                 if (PTP_TS_FMT_TOD) begin
                     m_axis_tx_cpl_valid_int_reg <= (s_axis_tx.tuser >> 1) == 0;

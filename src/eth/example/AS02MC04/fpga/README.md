@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This example design targets the Cisco Alibaba AS02MC04 FPGA board.
+This example design targets the Alibaba AS02MC04 FPGA board.
 
 The design places looped-back MACs on the SFP+ cages.
 

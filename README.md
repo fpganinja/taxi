@@ -2,7 +2,7 @@
 
 [![Regression Tests](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml/badge.svg)](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml)
 
-AXI, AXI stream, Ethernet, and PCIe components in System Verilog.
+The home of Corundum, Zircon, and XFCP, plus AXI, AXI stream, Ethernet, and PCIe components in System Verilog.
 
 GitHub repository: https://github.com/fpganinja/taxi
 
@@ -10,7 +10,7 @@ Documentation: https://docs.fpga.taxi/
 
 ## Introduction
 
-The goal of the Taxi transport library is to provide a set of performant, easy-to-use building blocks in modern System Verilog facilitating data transport and interfacing, both internally via AXI and AXI stream, and externally via Ethernet, PCI express, UART, and I2C.  The building blocks are accompanied by testbenches and simulation models utilizing Cocotb and Verilator.
+The goal of the Taxi transport library is to provide a set of performant, easy-to-use building blocks in modern System Verilog facilitating data transport and interfacing, both internally via AXI, AXI stream, and APB, and externally via Ethernet, PCI express, UART, and I2C.  This project is also the home of the next-generation version of the Corundum open-souce NIC and platform for in-network compute, as well as the Zircon open-source IP stack.  The building blocks are accompanied by testbenches and simulation models utilizing Cocotb and Verilator.
 
 This library is currently under development; more components will be added over time as they are developed.
 
@@ -22,7 +22,58 @@ Under the strongly-reciprocal CERN OHL, you must provide the source code of the 
 
 To facilitate the dual-license model, contributions to the project can only be accepted under a contributor license agreement.
 
-## Components
+## Corundum NIC
+
+Corundum is an open-source, high-performance FPGA-based NIC and platform for in-network compute.  Features include a high performance datapath, 10G/25G/100G Ethernet, PCI express gen 3+, a custom, high performance, tightly-integrated PCIe DMA engine, many (1000+) transmit, receive, completion, and event queues, scatter/gather DMA, MSI/MSI-X interrupts, per-port transmit scheduling, flow hashing, RSS, checksum offloading, and native IEEE 1588 PTP timestamping.  A Linux driver is included that integrates with the Linux networking stack.  Development and debugging is facilitated by an extensive simulation framework that covers the entire system from a simulation model of the driver and PCI express interface on the host side and Ethernet interfaces on the network side.
+
+Several variants of Corundum are planned, sharing the same host interface and device driver but targeting different optimization points:
+
+*  corundum-micro: size-optimized for applications like SoCs and low-bandwidth NICs, supporting several ports at 1 Gbps up to 10-25 Gbps
+*  corundum-lite: middle of the road design, supporting multiple ports at 10G/25G or one port at 100G, up to around 100 Gbps aggregate
+*  corundum-ng: intended for high-performance packet processing with deep pipelines and segmented internal interfaces, supporting operation at up to 400 Gbps aggregate
+*  corundum-proto: simplified design with simplified driver, intended for educational purposes only
+
+Planned features include a DPDK driver, SR-IOV, AF_XDP, white rabbit/IEEE 1588 HA, and Zircon stack integration.
+
+Note that Corundum is still under active development and may not ready for production use; additional functionality and improvements to performance and flexibility will be made over time.
+
+## Zircon IP stack
+
+The Zircon IP stack implements IPv4, IPv6, and UDP support from 1 Gbps to 100 Gbps.  It handles parsing and deparsing the packet headers, inserting and removing VLAN tags, computing and verifying header and payload checksums, matching RX packet fields against configured rules, and multiplexing between multiple internal application interfaces.  The stack can be configured to pass packets to application logic either umodified, with VLAN tags stripped, with simplified headers, or with only the payloads.
+
+Planned features include support for TCP, RDMA, and integration with Corundum.
+
+Note that Zircon is still under active development and may not ready for production use; additional functionality and improvements to performance and flexibility will be made over time.
+
+## Ethernet MAC and PHY
+
+The Taxi transport library contains several Ethernet MAC and PCS variants, covering link rates from 10 Mbps to 25 Gbps.  The MAC modules support LFC and PFC pause frames, PTP timestamping, frame length enforcement, FCS computation and verification, and statistics reporting.  Wrappers for low-speed operation support MII, GMII, and RGMII PHY-attach protocols for use with an external PHY chip.  Wrappers for 10G/25G include device-specific transceiver instances for a fully-integrated solution.  Logic is available for a 10G/25G MAC, 10G/25G PCS, and 10G/25G "fused" MAC+PCS, with reduced latency and resource consumption.
+
+The 10G/25G MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+ supports GTX, GTH, and GTY transceivers.  On UltraScale and UltraScale+ devices, it can be configured for either a 32-bit or 64-bit datapath via the DATA_W parameter.  The 32-bit datapath supports 10G only, while the 64-bit datapath can be used for either 10G or 25G.  TCL scripts for generating the GT cores are provided for both 10G and 25G and for several common reference clocks.  The core supports operation in either a normal latency mode or a low latency mode via the CFG_LOW_LATENCY paremter, which affects the clock frequency and transceiver configuration (async gearbox vs. sync gearbox and buffer bypass).  The low latency mode has a slightly higher clock frequency and resource consumption, so it is not recommended unless you really need to shave off a new nanoseconds of latency, or you need highest possible time sync precision.  On 7-series, the core only supports 32-bit low-latency mode.  The wrapper also provides an APB interface for configuring the transceivers and QPLLs.
+
+The 10G/25G MAC and PCS logic is also highly optimized for both size and timing performance, with 60 instances fitting comfortably on an XCVU9P -2 on the HTG9200 board, fully utilizing 15 QSFP28 (9 on the board plus 6 via FMC+, 60 lanes total).  With the low-latency MACs, statistics collection, loopback FIFOs, and XFCP, the footprint is about 15% of the device LUTs at 25G (about 3000 LUTs and 2500 FFs per channel) and about 10% of the device LUTs at 10G (about 2000 LUTs and 2100 FFs per channel).  The 10G configuration closes timing on the KC705 (single SFP+, 1 lane total) with an XC7K325T -2 at 322.265625 MHz, and the 25G configuration closes timing on the XUSP3S (quad QSFP38, 16 lanes total) with an XCVU095 -2 at 402.83203125 MHz.
+
+Planned features include 1000BASE-X, SGMII, USXGMII, dynamic rate switching, AN, integrated PTP TD logic, better integration of the PTP TD subsystem, and white rabbit/IEEE 1588 HA support.
+
+## Statistics collection subsystem
+
+The statistics collection subsystem provides a mechanism for aggregating statistical information from multiple components in a design.  The statistics collector module accepts inputs in the form of increment values, accumulates those in an internal RAM, and periodically dumps the counter values via AXI stream where they can be merged and easily passed between clock domains.  The statistics counter module accepts the counter values and accumulates them in a larger RAM (BRAM or URAM), providing an AXI-lite register interface to read the counters.  The statistics collection subsystem can also distribute and collect informational strings along with the counter values, which can facilitate debugging and automatic discovery of implemented statistics channels.  Statistics collector modules are integrated into several library components, like the Ethernet MACs, for ease of integration.
+
+## PTP time distribution subsystem
+
+The PTP time distribution subsystem provides a low-overhead method for precisely distributing and synchronizing a central PTP hardware clock (PHC) into multiple destination clock domains, potentially spread out across the target device.  The PTP TD subsystem derives the 96-bit ToD clock from the 64-bit relative clock, enabling timestamp capture and manipulation to be done efficiently with a trucated relative timestamp which can be expanded to a full 96-bit ToD timestamp where the full resolution is needed.  The PTP TD PHC module supports non-precision setting as well as precision atomic ofsetting of the clock, and uses a 32-bit extended fractional ns accumulator with an additional rational remainder to eliminate round-off error for common reference clock periods.  The PTP TD PHC is connected to the leaf clocks through a single wire that carries serial data used to synchronize the leaf clocks, as well as a common reference clock.  The leaf clocks can insert a configurable number pipeline registers and automatically compensate for the resulting delay.  The leaf clock modules reconstruct the PTP time from the PHC locally in the PTP reference clock domain, then use a digital PLL to synthesize and deskew a new PTP time source in the destination clock domain.
+
+Planned features include better integration into the MAC and PCS logic for ease of use and to compensate for transceiver gearbox delay variance, DDMTD for picosecond-level precision, and white rabbit/IEEE 1588 HA support.
+
+## XFCP
+
+The Extensible FPGA control platform (XFCP) is a framework that enables simple interfacing between an FPGA design in verilog and control software.  XFCP uses a source-routed packet switched bus over AXI stream to interconnect components in an FPGA design, eliminating the need to assign and manage addresses, enabling simple bus enumeration, and vastly reducing dependencies between the FPGA design and the control software.  XFCP currently supports operation over UART.  XFCP includes an interface modules for UART, a parametrizable arbiter to enable simultaneous use of multiple interfaces, a parametrizable switch to connect multiple on-FPGA components, bridges for interfacing with various devices including AXI, AXI-lite, APB, and I2C, and a Python framework for enumerating XFCP buses and controlling connected devices.
+
+Planned features include support for UDP via the Zircon stack.
+
+## List of library components
+
+The Taxi transport library contains many smaller components that can be composed to build larger designs.
 
 *  APB
     *  SV interface for APB

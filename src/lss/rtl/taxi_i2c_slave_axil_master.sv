@@ -223,14 +223,17 @@ assign axis_rx.tready = axis_rx_ready_reg;
 
 assign m_axil_wr.awaddr = addr_reg;
 assign m_axil_wr.awprot = 3'b010;
+assign m_axil_wr.awuser = '0;
 assign m_axil_wr.awvalid = m_axil_awvalid_reg;
 assign m_axil_wr.wdata = data_reg;
 assign m_axil_wr.wstrb = m_axil_wstrb_reg;
+assign m_axil_wr.wuser = '0;
 assign m_axil_wr.wvalid = m_axil_wvalid_reg;
 assign m_axil_wr.bready = m_axil_bready_reg;
 
 assign m_axil_rd.araddr = addr_reg;
 assign m_axil_rd.arprot = 3'b010;
+assign m_axil_rd.aruser = '0;
 assign m_axil_rd.arvalid = m_axil_arvalid_reg;
 assign m_axil_rd.rready = m_axil_rready_reg;
 

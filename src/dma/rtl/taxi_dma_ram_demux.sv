@@ -52,7 +52,7 @@ wr_inst (
     /*
      * RAM interface (towards RAM)
      */
-    .ram_wr(ram_wr),
+    .ram_wr(ram_wr)
 );
 
 taxi_dma_ram_demux_rd #(

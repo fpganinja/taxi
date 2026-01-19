@@ -151,9 +151,6 @@ I/O pin.  This would prevent devices from stretching the clock period.
 
 */
 
-// TODO REMOVE THIS
-/* verilator lint_off WIDTHTRUNC */
-
 localparam DATA_W = m_axil_wr.DATA_W;
 localparam ADDR_W = m_axil_wr.ADDR_W;
 localparam STRB_W = m_axil_wr.STRB_W;
@@ -171,15 +168,19 @@ localparam ADDR_W_ADJ = ADDR_W+WORD_PART_ADDR_W;
 
 localparam ADDR_WORD_W = (ADDR_W_ADJ+7)/8;
 
+
 // check configuration
-if (BYTE_LANES * BYTE_SIZE != DATA_W)
+if (BYTE_LANES * BYTE_SIZE != DATA_W) begin : check_data_width
     $fatal(0, "Error: AXI data width not evenly divisible (instance %m)");
+end
 
-if (2**$clog2(BYTE_LANES) != BYTE_LANES)
+if (2**$clog2(BYTE_LANES) != BYTE_LANES) begin : check_byte_lanes
     $fatal(0, "Error: AXI word width must be even power of two (instance %m)");
+end
 
-if (8*2**$clog2(BYTE_SIZE/8) != BYTE_SIZE)
+if (8*2**$clog2(BYTE_SIZE/8) != BYTE_SIZE) begin : check_byte_size
     $fatal(0, "Error: AXI word size must be a power of two multiple of 8 bits (instance %m)");
+end
 
 localparam [2:0]
     STATE_IDLE = 3'd0,
@@ -189,6 +190,7 @@ localparam [2:0]
     STATE_WRITE_1 = 3'd4,
     STATE_WRITE_2 = 3'd5;
 
+/* verilator lint_off PROCASSINIT */
 logic [2:0] state_reg = STATE_IDLE, state_next;
 
 logic [7:0] count_reg = '0, count_next;
@@ -211,6 +213,7 @@ taxi_axis_if #(.DATA_W(8)) axis_rx();
 
 logic [7:0] axis_tx_reg = '0, axis_tx_next;
 logic axis_tx_valid_reg = 1'b0, axis_tx_valid_next;
+
 assign axis_tx.tdata = axis_tx_reg;
 assign axis_tx.tvalid = axis_tx_valid_reg;
 assign axis_tx.tlast = 1'b1;
@@ -219,6 +222,7 @@ assign axis_tx.tdest = '0;
 assign axis_tx.tuser = '0;
 
 logic axis_rx_ready_reg = 1'b0, axis_rx_ready_next;
+/* verilator lint_on PROCASSINIT */
 assign axis_rx.tready = axis_rx_ready_reg;
 
 assign m_axil_wr.awaddr = addr_reg;
@@ -354,7 +358,7 @@ always_comb begin
                 // store word
                 data_next[8*count_reg +: 8] = axis_rx.tdata;
                 count_next = count_reg + 1;
-                m_axil_wstrb_next[count_reg >> ((BYTE_SIZE/8)-1)] = 1'b1;
+                m_axil_wstrb_next[2'(count_reg >> ((BYTE_SIZE/8)-1))] = 1'b1;
                 if (count_reg == 8'((STRB_W*BYTE_SIZE/8)-1) || axis_rx.tlast) begin
                     // have full word or at end of block, start write operation
                     count_next = 0;
@@ -454,7 +458,9 @@ i2c_slave_inst (
     .sda_o(i2c_sda_o),
 
     // Status
+    /* verilator lint_off PINCONNECTEMPTY */
     .busy(),
+    /* verilator lint_on PINCONNECTEMPTY */
     .bus_address(bus_address),
     .bus_addressed(bus_addressed),
     .bus_active(bus_active),

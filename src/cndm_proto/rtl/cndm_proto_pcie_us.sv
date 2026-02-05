@@ -177,6 +177,8 @@ logic [7:0] pcie_tx_fc_nph_av;
 logic [7:0] pcie_tx_fc_ph_av;
 logic [11:0] pcie_tx_fc_pd_av;
 
+logic ext_tag_en;
+
 assign cfg_fc_sel = 3'b100;
 
 taxi_dma_desc_if #(
@@ -335,7 +337,7 @@ dma_if_inst (
      */
     .read_enable(1'b1),
     .write_enable(1'b1),
-    .ext_tag_en(1'b0), // TODO
+    .ext_tag_en(ext_tag_en),
     .rcb_128b(cfg_rcb_status[0]),
     .requester_id('0),
     .requester_id_en(1'b0),
@@ -383,6 +385,36 @@ dma_if_inst (
     .stat_wr_op_tbl_full(stat_wr_op_tbl_full),
     .stat_wr_tx_limit(stat_wr_tx_limit),
     .stat_wr_tx_stall(stat_wr_tx_stall)
+);
+
+taxi_pcie_us_cfg #(
+    .PF_COUNT(1),
+    .VF_COUNT(0),
+    .VF_OFFSET(m_axis_pcie_rq.USER_W == 60 ? 64 : 4),
+    .PCIE_CAP_OFFSET(m_axis_pcie_rq.USER_W == 60 ? 12'h0C0 : 12'h070)
+)
+cfg_inst (
+    .clk(pcie_clk),
+    .rst(pcie_rst),
+
+    /*
+     * Configuration outputs
+     */
+    .ext_tag_en(ext_tag_en),
+    .max_read_req_size(),
+    .max_payload_size(),
+
+    /*
+     * Interface to Ultrascale PCIe IP core
+     */
+    .cfg_mgmt_addr(cfg_mgmt_addr),
+    .cfg_mgmt_function_number(cfg_mgmt_function_number),
+    .cfg_mgmt_write(cfg_mgmt_write),
+    .cfg_mgmt_write_data(cfg_mgmt_write_data),
+    .cfg_mgmt_byte_enable(cfg_mgmt_byte_enable),
+    .cfg_mgmt_read(cfg_mgmt_read),
+    .cfg_mgmt_read_data(cfg_mgmt_read_data),
+    .cfg_mgmt_read_write_done(cfg_mgmt_read_write_done)
 );
 
 // MSI interrupts

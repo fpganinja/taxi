@@ -684,7 +684,7 @@ always_comb begin
 
     if (status_fifo_rd_ptr_reg != status_fifo_wr_ptr_reg) begin
         // status FIFO not empty
-        if (m_axi.bready && m_axi.bvalid) begin
+        if (m_axi_wr.bready && m_axi_wr.bvalid) begin
             // got write completion, pop and return status
             wr_desc_sts_len_next = status_fifo_len[status_fifo_rd_ptr_reg[STATUS_FIFO_AW-1:0]];
             wr_desc_sts_tag_next = status_fifo_tag[status_fifo_rd_ptr_reg[STATUS_FIFO_AW-1:0]];

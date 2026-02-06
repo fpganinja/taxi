@@ -140,14 +140,14 @@ class TB:
             # pcie_tfc_npd_av=dut.pcie_tfc_npd_av,
 
             # Configuration Management Interface
-            # cfg_mgmt_addr=dut.cfg_mgmt_addr,
-            # cfg_mgmt_function_number=dut.cfg_mgmt_function_number,
-            # cfg_mgmt_write=dut.cfg_mgmt_write,
-            # cfg_mgmt_write_data=dut.cfg_mgmt_write_data,
-            # cfg_mgmt_byte_enable=dut.cfg_mgmt_byte_enable,
-            # cfg_mgmt_read=dut.cfg_mgmt_read,
-            # cfg_mgmt_read_data=dut.cfg_mgmt_read_data,
-            # cfg_mgmt_read_write_done=dut.cfg_mgmt_read_write_done,
+            cfg_mgmt_addr=dut.cfg_mgmt_addr,
+            cfg_mgmt_function_number=dut.cfg_mgmt_function_number,
+            cfg_mgmt_write=dut.cfg_mgmt_write,
+            cfg_mgmt_write_data=dut.cfg_mgmt_write_data,
+            cfg_mgmt_byte_enable=dut.cfg_mgmt_byte_enable,
+            cfg_mgmt_read=dut.cfg_mgmt_read,
+            cfg_mgmt_read_data=dut.cfg_mgmt_read_data,
+            cfg_mgmt_read_write_done=dut.cfg_mgmt_read_write_done,
             # cfg_mgmt_debug_access
 
             # Configuration Status Interface

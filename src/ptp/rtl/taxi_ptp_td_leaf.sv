@@ -422,7 +422,7 @@ always_comb begin
         // time integral of error
         case (dst_gain_sel_reg && !dst_sync_locked_reg)
             1'd0: {dst_ovf, dst_err_int_next} = $signed({1'b0, dst_err_int_reg}) + (PHASE_ACC_W+2)'($signed(sample_acc_sync_reg));
-            1'd1: {dst_ovf, dst_err_int_next} = $signed({1'b0, dst_err_int_reg}) + (PHASE_ACC_W+2)'($signed(sample_acc_sync_reg) * 2**7);
+            1'd1: {dst_ovf, dst_err_int_next} = $signed({1'b0, dst_err_int_reg}) + (PHASE_ACC_W+2)'($signed(sample_acc_sync_reg) * 2**5);
         endcase
 
         // saturate
@@ -436,8 +436,8 @@ always_comb begin
 
         // compute output
         case (dst_gain_sel_reg && !dst_sync_locked_reg)
-            1'd0: {dst_ovf, dst_phase_inc_next} = $signed({1'b0, dst_err_int_reg}) + ($signed(sample_acc_sync_reg) * 2**4);
-            1'd1: {dst_ovf, dst_phase_inc_next} = $signed({1'b0, dst_err_int_reg}) + ($signed(sample_acc_sync_reg) * 2**11);
+            1'd0: {dst_ovf, dst_phase_inc_next} = $signed({1'b0, dst_err_int_reg}) + ($signed(sample_acc_sync_reg) * 2**5);
+            1'd1: {dst_ovf, dst_phase_inc_next} = $signed({1'b0, dst_err_int_reg}) + ($signed(sample_acc_sync_reg) * 2**9);
         endcase
 
         // saturate

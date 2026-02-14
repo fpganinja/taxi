@@ -741,7 +741,7 @@ always_comb begin
             ts_rel_ns_next[TS_REL_NS_W-1:9] = ts_rel_ns_reg[TS_REL_NS_W-1:9] + 1;
         end
 
-        if (dst_update_reg && !dst_sync_reg && dst_rel_shadow_valid_reg && (dst_load_cnt_reg == 0)) begin
+        if (dst_rel_shadow_valid_reg && dst_rel_ns_shadow_reg[8] == ts_rel_ns_reg[8] && (dst_load_cnt_reg == 0)) begin
             // check timestamp MSBs
             if (dst_rel_step_shadow_reg || ts_rel_load_ts_reg) begin
                 // input stepped
@@ -789,7 +789,7 @@ always_comb begin
             end
         end
 
-        if (dst_update_reg && !dst_sync_reg && dst_tod_shadow_valid_reg && (dst_load_cnt_reg == 0)) begin
+        if (dst_tod_shadow_valid_reg && dst_tod_ns_shadow_reg[8] == ts_tod_ns_reg[8] && (dst_load_cnt_reg == 0)) begin
             // check timestamp MSBs
             if (dst_tod_step_shadow_reg || ts_tod_load_ts_reg) begin
                 // input stepped

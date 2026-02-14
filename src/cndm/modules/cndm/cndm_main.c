@@ -63,6 +63,8 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	if (cdev->port_count > ARRAY_SIZE(cdev->ndev))
 		cdev->port_count = ARRAY_SIZE(cdev->ndev);
 
+	cndm_register_phc(cdev);
+
 	for (k = 0; k < cdev->port_count; k++) {
 		struct net_device *ndev;
 
@@ -112,6 +114,8 @@ static void cndm_common_remove(struct cndm_dev *cdev)
 			cdev->ndev[k] = NULL;
 		}
 	}
+
+	cndm_unregister_phc(cdev);
 
 	devlink_unregister(devlink);
 }

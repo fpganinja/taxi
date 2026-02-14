@@ -52,6 +52,67 @@ static int cndm_close(struct net_device *ndev)
 	return 0;
 }
 
+static int cndm_hwtstamp_set(struct net_device *ndev, struct ifreq *ifr)
+{
+	struct cndm_priv *priv = netdev_priv(ndev);
+	struct hwtstamp_config hwts_config;
+
+	if (copy_from_user(&hwts_config, ifr->ifr_data, sizeof(hwts_config)))
+		return -EFAULT;
+
+	if (hwts_config.flags)
+		return -EINVAL;
+
+	switch (hwts_config.tx_type) {
+	case HWTSTAMP_TX_OFF:
+	case HWTSTAMP_TX_ON:
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	switch (hwts_config.rx_filter) {
+	case HWTSTAMP_FILTER_NONE:
+		break;
+	case HWTSTAMP_FILTER_ALL:
+	case HWTSTAMP_FILTER_SOME:
+	case HWTSTAMP_FILTER_PTP_V1_L4_EVENT:
+	case HWTSTAMP_FILTER_PTP_V1_L4_SYNC:
+	case HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
+	case HWTSTAMP_FILTER_NTP_ALL:
+		hwts_config.rx_filter = HWTSTAMP_FILTER_ALL;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	memcpy(&priv->hwts_config, &hwts_config, sizeof(hwts_config));
+
+	if (copy_to_user(ifr->ifr_data, &hwts_config, sizeof(hwts_config)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int cndm_hwtstamp_get(struct net_device *ndev, struct ifreq *ifr)
+{
+	struct cndm_priv *priv = netdev_priv(ndev);
+
+	if (copy_to_user(ifr->ifr_data, &priv->hwts_config, sizeof(priv->hwts_config)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int cndm_set_mac(struct net_device *ndev, void *addr)
 {
 	struct sockaddr *saddr = addr;
@@ -70,12 +131,29 @@ static int cndm_set_mac(struct net_device *ndev, void *addr)
 	return 0;
 }
 
+static int cndm_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
+{
+	switch (cmd) {
+	case SIOCSHWTSTAMP:
+		return cndm_hwtstamp_set(ndev, ifr);
+	case SIOCGHWTSTAMP:
+		return cndm_hwtstamp_get(ndev, ifr);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static const struct net_device_ops cndm_netdev_ops = {
 	.ndo_open = cndm_open,
 	.ndo_stop = cndm_close,
 	.ndo_start_xmit = cndm_start_xmit,
 	.ndo_validate_addr = eth_validate_addr,
 	.ndo_set_mac_address = cndm_set_mac,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	.ndo_eth_ioctl = cndm_ioctl,
+#else
+	.ndo_do_ioctl = cndm_ioctl,
+#endif
 };
 
 static int cndm_netdev_irq(struct notifier_block *nb, unsigned long action, void *data)
@@ -123,6 +201,10 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __io
 	ndev->addr_len = ETH_ALEN;
 
 	eth_hw_addr_random(ndev);
+
+	priv->hwts_config.flags = 0;
+	priv->hwts_config.tx_type = HWTSTAMP_TX_OFF;
+	priv->hwts_config.rx_filter = HWTSTAMP_FILTER_NONE;
 
 	ndev->netdev_ops = &cndm_netdev_ops;
 	ndev->ethtool_ops = &cndm_ethtool_ops;

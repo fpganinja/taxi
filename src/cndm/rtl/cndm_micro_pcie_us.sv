@@ -23,6 +23,10 @@ module cndm_micro_pcie_us #(
     // device family
     parameter string FAMILY = "virtexuplus",
     parameter PORTS = 2,
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0,
+    parameter PTP_CLK_PER_NS_NUM = 512,
+    parameter PTP_CLK_PER_NS_DENOM = 165,
     parameter RQ_SEQ_NUM_W = 6,
     parameter BAR0_APERTURE = 24
 )
@@ -79,6 +83,24 @@ module cndm_micro_pcie_us #(
     output wire [1:0]               cfg_interrupt_msi_tph_type,
     output wire [7:0]               cfg_interrupt_msi_tph_st_tag,
     output wire [7:0]               cfg_interrupt_msi_function_number,
+
+    /*
+     * PTP
+     */
+    input  wire logic               ptp_clk = 1'b0,
+    input  wire logic               ptp_rst = 1'b0,
+    input  wire logic               ptp_sample_clk = 1'b0,
+    input  wire logic               ptp_td_sdi = 1'b0,
+    output wire logic               ptp_td_sdo,
+    output wire logic               ptp_pps,
+    output wire logic               ptp_pps_str,
+    output wire logic               ptp_sync_locked,
+    output wire logic [63:0]        ptp_sync_ts_rel,
+    output wire logic               ptp_sync_ts_rel_step,
+    output wire logic [95:0]        ptp_sync_ts_tod,
+    output wire logic               ptp_sync_ts_tod_step,
+    output wire logic               ptp_sync_pps,
+    output wire logic               ptp_sync_pps_str,
 
     /*
      * Ethernet
@@ -455,7 +477,11 @@ msi_inst (
 );
 
 cndm_micro_core #(
-    .PORTS(PORTS)
+    .PORTS(PORTS),
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
+    .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
+    .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM)
 )
 core_inst (
     .clk(pcie_clk),
@@ -478,6 +504,24 @@ core_inst (
     .dma_ram_rd(dma_ram),
 
     .irq(irq),
+
+    /*
+     * PTP
+     */
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sdi),
+    .ptp_td_sdo(ptp_td_sdo),
+    .ptp_pps(ptp_pps),
+    .ptp_pps_str(ptp_pps_str),
+    .ptp_sync_locked(ptp_sync_locked),
+    .ptp_sync_ts_rel(ptp_sync_ts_rel),
+    .ptp_sync_ts_rel_step(ptp_sync_ts_rel_step),
+    .ptp_sync_ts_tod(ptp_sync_ts_tod),
+    .ptp_sync_ts_tod_step(ptp_sync_ts_tod_step),
+    .ptp_sync_pps(ptp_sync_pps),
+    .ptp_sync_pps_str(ptp_sync_pps_str),
 
     /*
      * Ethernet

@@ -143,14 +143,19 @@ static int cndm_process_rx_cq(struct net_device *ndev, int napi_budget)
 
 		if (len < ETH_HLEN) {
 			netdev_warn(priv->ndev, "Dropping short frame (len %d)", len);
+			__free_pages(page, 0);
 			goto rx_drop;
 		}
 
 		skb = napi_get_frags(&priv->rx_napi);
 		if (!skb) {
 			netdev_err(priv->ndev, "Failed to allocate skb %d", index);
-			break;
+			__free_pages(page, 0);
+			goto rx_drop;
 		}
+
+		// RX hardware timestamp
+		skb_hwtstamps(skb)->hwtstamp = cndm_read_cpl_ts(priv, cpl);
 
 		__skb_fill_page_desc(skb, 0, page, 0, len);
 

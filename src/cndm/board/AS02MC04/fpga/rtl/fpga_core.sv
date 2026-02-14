@@ -24,6 +24,8 @@ module fpga_core #
     // device family
     parameter string FAMILY = "kintexuplus",
     parameter RQ_SEQ_NUM_W = 6,
+    // PTP configuration
+    parameter logic PTP_TS_EN = 1'b1,
     // 10G/25G MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
@@ -114,6 +116,9 @@ module fpga_core #
     output wire [7:0]   cfg_interrupt_msi_function_number
 );
 
+localparam logic PTP_TS_FMT_TOD = 1'b0;
+localparam PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 48;
+
 // SFP+
 wire sfp_tx_clk[2];
 wire sfp_tx_rst[2];
@@ -126,7 +131,7 @@ assign sfp_led[0] = !sfp_rx_status[0];
 assign sfp_led[1] = !sfp_rx_status[1];
 assign led = '1;
 assign led_r = 1'b1;
-assign led_g = 1'b1;
+// assign led_g = 1'b1;
 
 localparam HB_COUNT = 62500000;
 localparam CL_HB_COUNT = $clog2(HB_COUNT);
@@ -160,8 +165,8 @@ assign sfp_mgt_refclk_out = sfp_mgt_refclk_bufg;
 wire sfp_rst;
 
 taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_tx[2]();
-taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) axis_sfp_tx_cpl[2]();
-taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_rx[2]();
+taxi_axis_if #(.DATA_W(PTP_TS_W), .KEEP_W(1), .ID_W(8)) axis_sfp_tx_cpl[2]();
+taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1+PTP_TS_W)) axis_sfp_rx[2]();
 taxi_axis_if #(.DATA_W(16), .KEEP_W(1), .KEEP_EN(0), .LAST_EN(0), .USER_EN(1), .USER_W(1), .ID_EN(1), .ID_W(8)) axis_sfp_stat();
 
 if (SIM) begin
@@ -207,6 +212,15 @@ taxi_apb_if #(
 )
 gt_apb_ctrl();
 
+wire ptp_clk = sfp_mgt_refclk_bufg;
+wire ptp_rst = sfp_rst;
+wire ptp_sample_clk = clk_125mhz;
+wire ptp_td_sd;
+wire ptp_pps;
+wire ptp_pps_str;
+
+assign led_g = ptp_pps_str;
+
 taxi_eth_mac_25g_us #(
     .SIM(SIM),
     .VENDOR(VENDOR),
@@ -230,9 +244,11 @@ taxi_eth_mac_25g_us #(
     .PADDING_EN(1'b1),
     .DIC_EN(1'b1),
     .MIN_FRAME_LEN(64),
-    .PTP_TS_EN(1'b0),
-    .PTP_TS_FMT_TOD(1'b1),
-    .PTP_TS_W(96),
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TD_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
+    .PTP_TS_W(PTP_TS_W),
+    .PTP_TD_SDI_PIPELINE(2),
     .PRBS31_EN(1'b0),
     .TX_SERDES_PIPELINE(1),
     .RX_SERDES_PIPELINE(1),
@@ -284,7 +300,6 @@ sfp_mac_inst (
     .tx_clk(sfp_tx_clk),
     .tx_rst_in('{2{1'b0}}),
     .tx_rst_out(sfp_tx_rst),
-    .ptp_sample_clk('{2{1'b0}}),
 
     /*
      * Transmit interface (AXI stream)
@@ -300,10 +315,18 @@ sfp_mac_inst (
     /*
      * PTP clock
      */
-    .tx_ptp_ts('{2{'0}}),
-    .tx_ptp_ts_step('{2{1'b0}}),
-    .rx_ptp_ts('{2{'0}}),
-    .rx_ptp_ts_step('{2{1'b0}}),
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sd),
+    .tx_ptp_ts_in('{2{'0}}),
+    .tx_ptp_ts_out(),
+    .tx_ptp_ts_step_out(),
+    .tx_ptp_locked(),
+    .rx_ptp_ts_in('{2{'0}}),
+    .rx_ptp_ts_out(),
+    .rx_ptp_ts_step_out(),
+    .rx_ptp_locked(),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
@@ -440,6 +463,9 @@ cndm_micro_pcie_us #(
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
     .PORTS(2),
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_CLK_PER_NS_NUM(32),
+    .PTP_CLK_PER_NS_DENOM(5),
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
     .BAR0_APERTURE(24)
 )
@@ -496,6 +522,23 @@ cndm_inst (
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
     .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * PTP
+     */
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdo(ptp_td_sd),
+    .ptp_pps(ptp_pps),
+    .ptp_pps_str(ptp_pps_str),
+    .ptp_sync_locked(),
+    .ptp_sync_ts_rel(),
+    .ptp_sync_ts_rel_step(),
+    .ptp_sync_ts_tod(),
+    .ptp_sync_ts_tod_step(),
+    .ptp_sync_pps(),
+    .ptp_sync_pps_str(),
 
     /*
      * Ethernet

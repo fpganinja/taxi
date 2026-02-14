@@ -16,7 +16,8 @@ Authors:
  * Corundum-micro port module
  */
 module cndm_micro_port #(
-    parameter logic PTP_TS_EN = 1'b1
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0
 )
 (
     input  wire logic         clk,
@@ -39,6 +40,13 @@ module cndm_micro_port #(
     taxi_dma_ram_if.rd_slv    dma_ram_rd,
 
     output wire logic         irq,
+
+    /*
+     * PTP
+     */
+    input  wire logic         ptp_clk = 1'b0,
+    input  wire logic         ptp_rst = 1'b0,
+    input  wire logic         ptp_td_sdi = 1'b0,
 
     /*
      * Ethernet
@@ -454,7 +462,7 @@ taxi_axis_if #(
     .KEEP_EN(mac_axis_tx_cpl.KEEP_EN),
     .KEEP_W(mac_axis_tx_cpl.KEEP_W),
     .USER_EN(1),
-    .USER_W(1)
+    .USER_W(mac_axis_tx_cpl.USER_W)
 )
 mac_tx_cpl_int();
 
@@ -507,11 +515,19 @@ tx_cpl_fifo (
 );
 
 cndm_micro_tx #(
-    .PTP_TS_EN(PTP_TS_EN)
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD)
 )
 tx_inst (
     .clk(clk),
     .rst(rst),
+
+    /*
+     * PTP
+     */
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_td_sdi(ptp_td_sdi),
 
     /*
      * DMA
@@ -530,7 +546,7 @@ tx_inst (
 taxi_axis_if #(
     .DATA_W(mac_axis_rx.DATA_W),
     .USER_EN(1),
-    .USER_W(1)
+    .USER_W(mac_axis_rx.USER_W)
 ) mac_rx_int();
 
 taxi_axis_async_fifo #(
@@ -582,11 +598,19 @@ rx_fifo (
 );
 
 cndm_micro_rx #(
-    .PTP_TS_EN(PTP_TS_EN)
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD)
 )
 rx_inst (
     .clk(clk),
     .rst(rst),
+
+    /*
+     * PTP
+     */
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_td_sdi(ptp_td_sdi),
 
     /*
      * DMA

@@ -16,11 +16,19 @@ Authors:
  * Corundum-micro receive datapath
  */
 module cndm_micro_rx #(
-    parameter logic PTP_TS_EN = 1'b1
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0
 )
 (
     input  wire logic         clk,
     input  wire logic         rst,
+
+    /*
+     * PTP
+     */
+    input  wire logic         ptp_clk = 1'b0,
+    input  wire logic         ptp_rst = 1'b0,
+    input  wire logic         ptp_td_sdi = 1'b0,
 
     /*
      * DMA
@@ -50,7 +58,7 @@ taxi_dma_desc_if #(
     .ID_EN(0),
     .DEST_EN(0),
     .USER_EN(1),
-    .USER_W(1)
+    .USER_W(rx_data.USER_W)
 ) dma_desc();
 
 localparam [2:0]
@@ -64,6 +72,84 @@ logic [2:0] state_reg = STATE_IDLE;
 logic desc_req_reg = 1'b0;
 
 assign desc_req = desc_req_reg;
+
+wire [95:0] rx_ptp_ts;
+wire rx_ptp_ts_valid;
+
+if (PTP_TS_EN) begin
+
+    if (PTP_TS_FMT_TOD) begin
+
+        assign rx_ptp_ts = dma_desc.sts_user[dma_desc.USER_W-1:1];
+        assign rx_ptp_ts_valid = dma_desc.sts_valid;
+
+    end else begin
+
+        taxi_axis_if #(
+            .DATA_W(48),
+            .KEEP_EN(0),
+            .KEEP_W(1),
+            .STRB_EN(0),
+            .LAST_EN(0),
+            .ID_EN(0),
+            .DEST_EN(0),
+            .USER_EN(1),
+            .USER_W(1)
+        ) ptp_ts_rel();
+
+        assign ptp_ts_rel.tdata = dma_desc.sts_user[dma_desc.USER_W-1:1];
+        assign ptp_ts_rel.tuser = dma_desc.sts_user[0];
+        assign ptp_ts_rel.tvalid = dma_desc.sts_valid;
+
+        taxi_axis_if #(
+            .DATA_W(96),
+            .KEEP_EN(0),
+            .KEEP_W(1),
+            .STRB_EN(0),
+            .LAST_EN(0),
+            .ID_EN(0),
+            .DEST_EN(0),
+            .USER_EN(1),
+            .USER_W(1)
+        ) ptp_ts_tod();
+
+        assign rx_ptp_ts = ptp_ts_tod.tdata;
+        assign rx_ptp_ts_valid = ptp_ts_tod.tvalid;
+
+        taxi_ptp_td_rel2tod #(
+            .TS_FNS_W(16),
+            .TS_REL_NS_W(ptp_ts_rel.DATA_W-16),
+            .TS_TOD_S_W(48),
+            .TS_REL_W(ptp_ts_rel.DATA_W),
+            .TS_TOD_W(96),
+            .TD_SDI_PIPELINE(2)
+        )
+        rel2tod_inst (
+            .clk(clk),
+            .rst(rst),
+
+            /*
+            * PTP clock interface
+            */
+            .ptp_clk(ptp_clk),
+            .ptp_rst(ptp_rst),
+            .ptp_td_sdi(ptp_td_sdi),
+
+            /*
+            * Timestamp conversion
+            */
+            .s_axis_ts_rel(ptp_ts_rel),
+            .m_axis_ts_tod(ptp_ts_tod)
+        );
+
+    end
+
+end else begin
+
+    assign rx_ptp_ts = '0;
+    assign rx_ptp_ts_valid = 1'b0;
+
+end
 
 always_ff @(posedge clk) begin
     desc_req_reg <= 1'b0;
@@ -103,6 +189,12 @@ always_ff @(posedge clk) begin
     axis_cpl.tuser <= '0;
     axis_cpl.tlast <= 1'b1;
     axis_cpl.tvalid <= axis_cpl.tvalid && !axis_cpl.tready;
+
+    if (rx_ptp_ts_valid) begin
+        axis_cpl.tdata[127:112] <= rx_ptp_ts[63:48]; // sec
+        axis_cpl.tdata[95:64]   <= rx_ptp_ts[47:16]; // ns
+        axis_cpl.tdata[111:96]  <= rx_ptp_ts[15:0];  // fns
+    end
 
     case (state_reg)
         STATE_IDLE: begin

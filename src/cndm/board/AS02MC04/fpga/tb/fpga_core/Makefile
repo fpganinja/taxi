@@ -40,6 +40,7 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 export PARAM_SIM := "1'b1"
 export PARAM_VENDOR := "\"XILINX\""
 export PARAM_FAMILY := "\"kintexuplus\""
+export PARAM_PTP_TS_EN := "1'b1"
 export PARAM_CFG_LOW_LATENCY := "1'b1"
 export PARAM_COMBINED_MAC_PCS := "1'b1"
 export PARAM_MAC_DATA_W := "64"

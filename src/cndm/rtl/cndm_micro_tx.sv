@@ -16,11 +16,19 @@ Authors:
  * Corundum-micro transmit datapath
  */
 module cndm_micro_tx #(
-    parameter logic PTP_TS_EN = 1'b1
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0
 )
 (
     input  wire logic         clk,
     input  wire logic         rst,
+
+    /*
+     * PTP
+     */
+    input  wire logic         ptp_clk = 1'b0,
+    input  wire logic         ptp_rst = 1'b0,
+    input  wire logic         ptp_td_sdi = 1'b0,
 
     /*
      * DMA
@@ -65,6 +73,68 @@ logic [2:0] state_reg = STATE_IDLE;
 logic desc_req_reg = 1'b0;
 
 assign desc_req = desc_req_reg;
+
+wire [95:0] tx_cpl_ptp_ts;
+wire tx_cpl_valid;
+
+if (PTP_TS_EN) begin
+
+    if (PTP_TS_FMT_TOD) begin
+
+        assign tx_cpl_ptp_ts = tx_cpl.tdata;
+        assign tx_cpl_valid = tx_cpl.tvalid;
+
+    end else begin
+
+        taxi_axis_if #(
+            .DATA_W(96),
+            .KEEP_EN(0),
+            .KEEP_W(1),
+            .STRB_EN(0),
+            .LAST_EN(0),
+            .ID_EN(0),
+            .DEST_EN(0),
+            .USER_EN(1),
+            .USER_W(1)
+        ) tx_cpl_tod();
+
+        assign tx_cpl_ptp_ts = tx_cpl_tod.tdata;
+        assign tx_cpl_valid = tx_cpl_tod.tvalid;
+
+        taxi_ptp_td_rel2tod #(
+            .TS_FNS_W(16),
+            .TS_REL_NS_W(tx_cpl.DATA_W-16),
+            .TS_TOD_S_W(48),
+            .TS_REL_W(tx_cpl.DATA_W),
+            .TS_TOD_W(96),
+            .TD_SDI_PIPELINE(2)
+        )
+        rel2tod_inst (
+            .clk(clk),
+            .rst(rst),
+
+            /*
+            * PTP clock interface
+            */
+            .ptp_clk(ptp_clk),
+            .ptp_rst(ptp_rst),
+            .ptp_td_sdi(ptp_td_sdi),
+
+            /*
+            * Timestamp conversion
+            */
+            .s_axis_ts_rel(tx_cpl),
+            .m_axis_ts_tod(tx_cpl_tod)
+        );
+
+    end
+
+end else begin
+
+    assign tx_cpl_ptp_ts = '0;
+    assign tx_cpl_valid = tx_cpl.tvalid;
+
+end
 
 always_ff @(posedge clk) begin
     desc_req_reg <= 1'b0;
@@ -118,6 +188,8 @@ always_ff @(posedge clk) begin
             dma_desc.req_src_addr <= '0;
             dma_desc.req_len <= axis_desc.tdata[47:32];
 
+            axis_cpl.tdata[47:32] <= axis_desc.tdata[47:32];
+
             if (axis_desc.tvalid && axis_desc.tready) begin
                 if (axis_desc.tuser) begin
                     // failed to read desc
@@ -135,7 +207,10 @@ always_ff @(posedge clk) begin
             end
         end
         STATE_TX_DATA: begin
-            if (dma_desc.sts_valid) begin
+            axis_cpl.tdata[127:112] <= tx_cpl_ptp_ts[63:48]; // sec
+            axis_cpl.tdata[95:64]   <= tx_cpl_ptp_ts[47:16]; // ns
+            axis_cpl.tdata[111:96]  <= tx_cpl_ptp_ts[15:0];  // fns
+            if (tx_cpl_valid) begin
                 axis_cpl.tvalid <= 1'b1;
                 state_reg <= STATE_IDLE;
             end

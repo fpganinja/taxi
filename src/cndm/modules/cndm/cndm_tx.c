@@ -43,7 +43,9 @@ int cndm_free_tx_buf(struct cndm_priv *priv)
 static int cndm_process_tx_cq(struct net_device *ndev, int napi_budget)
 {
 	struct cndm_priv *priv = netdev_priv(ndev);
+	struct cndm_tx_info *tx_info;
 	struct cndm_cpl *cpl;
+	struct skb_shared_hwtstamps hwts;
 	int done = 0;
 
 	u32 cq_cons_ptr;
@@ -64,6 +66,14 @@ static int cndm_process_tx_cq(struct net_device *ndev, int napi_budget)
 		dma_rmb();
 
 		index = cons_ptr & priv->txq_mask;
+		tx_info = &priv->tx_info[index];
+
+		// TX hardware timestamp
+		if (unlikely(tx_info->ts_requested)) {
+			netdev_dbg(priv->ndev, "%s: TX TS requested", __func__);
+			hwts.hwtstamp = cndm_read_cpl_ts(priv, cpl);
+			skb_tstamp_tx(tx_info->skb, &hwts);
+		}
 
 		cndm_free_tx_desc(priv, index, napi_budget);
 
@@ -100,6 +110,7 @@ int cndm_poll_tx_cq(struct napi_struct *napi, int budget)
 
 int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
+	struct skb_shared_info *shinfo = skb_shinfo(skb);
 	struct cndm_priv *priv = netdev_priv(ndev);
 	struct device *dev = priv->dev;
 	u32 index;
@@ -123,6 +134,14 @@ int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	tx_desc = (struct cndm_desc *)(priv->txq_region + index*16);
 	tx_info = &priv->tx_info[index];
 
+	// TX hardware timestamp
+	tx_info->ts_requested = 0;
+	if (unlikely(shinfo->tx_flags & SKBTX_HW_TSTAMP)) {
+		netdev_dbg(ndev, "%s: TX TS requested", __func__);
+		shinfo->tx_flags |= SKBTX_IN_PROGRESS;
+		tx_info->ts_requested = 1;
+	}
+
 	len = skb_headlen(skb);
 
 	dma_addr = dma_map_single(dev, skb->data, len, DMA_TO_DEVICE);
@@ -142,6 +161,8 @@ int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	netdev_dbg(ndev, "Write desc index %d len %d", index, len);
 
 	priv->txq_prod++;
+
+	skb_tx_timestamp(skb);
 
 	if (priv->txq_prod - priv->txq_cons >= 128) {
 		netdev_dbg(ndev, "TX ring full");

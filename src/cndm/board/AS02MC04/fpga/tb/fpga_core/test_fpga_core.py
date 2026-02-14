@@ -486,6 +486,7 @@ def test_fpga_core(request, mac_data_w):
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"kintexuplus\""
+    parameters['PTP_TS_EN'] = "1'b1"
     parameters['CFG_LOW_LATENCY'] = "1'b1"
     parameters['COMBINED_MAC_PCS'] = "1'b1"
     parameters['MAC_DATA_W'] = mac_data_w

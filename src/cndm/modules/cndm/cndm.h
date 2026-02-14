@@ -14,6 +14,7 @@ Authors:
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/miscdevice.h>
+#include <linux/net_tstamp.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ptp_clock_kernel.h>
@@ -52,7 +53,7 @@ struct cndm_dev {
 	u32 port_offset;
 	u32 port_stride;
 
-	void __iomem *ptp_regs;
+	void __iomem *phc_regs;
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_clock_info;
 };
@@ -61,6 +62,7 @@ struct cndm_tx_info {
 	struct sk_buff *skb;
 	dma_addr_t dma_addr;
 	u32 len;
+	int ts_requested;
 };
 
 struct cndm_rx_info {
@@ -85,6 +87,10 @@ struct cndm_priv {
 
 	struct cndm_irq *irq;
 	struct notifier_block irq_nb;
+
+	struct hwtstamp_config hwts_config;
+	u64 ts_s;
+	u8 ts_valid;
 
 	struct cndm_tx_info *tx_info;
 	struct cndm_rx_info *rx_info;
@@ -140,7 +146,9 @@ struct cndm_desc {
 struct cndm_cpl {
 	__u8 rsvd[4];
 	__le32 len;
-	__u8 rsvd2[7];
+	__le32 ts_ns;
+	__le16 ts_fns;
+	__u8 ts_s;
 	__u8 phase;
 };
 
@@ -161,6 +169,11 @@ extern const struct file_operations cndm_fops;
 
 // cndm_ethtool.c
 extern const struct ethtool_ops cndm_ethtool_ops;
+
+// cndm_ptp.c
+ktime_t cndm_read_cpl_ts(struct cndm_priv *priv, const struct cndm_cpl *cpl);
+void cndm_register_phc(struct cndm_dev *cdev);
+void cndm_unregister_phc(struct cndm_dev *cdev);
 
 // cndm_tx.c
 int cndm_free_tx_buf(struct cndm_priv *priv);

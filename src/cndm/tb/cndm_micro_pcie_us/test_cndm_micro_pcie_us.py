@@ -271,6 +271,10 @@ class TB:
 
         self.dev.functions[0].configure_bar(0, 2**int(dut.uut.axil_ctrl_bar.ADDR_W))
 
+        # PTP
+        cocotb.start_soon(Clock(dut.ptp_clk, 3.102, units="ns").start())
+        cocotb.start_soon(Clock(dut.ptp_sample_clk, 8, units="ns").start())
+
         # Ethernet
         self.port_mac = []
 
@@ -291,6 +295,9 @@ class TB:
                 rx_clk=dut.mac_rx_clk[k],
                 rx_rst=dut.mac_rx_rst[k],
                 rx_bus=AxiStreamBus.from_entity(dut.mac_axis_rx[k]),
+                tx_ptp_time=dut.mac_axis_tx[k].tid, # TODO
+                tx_ptp_ts=dut.mac_axis_tx_cpl[k].tdata, # TODO
+                tx_ptp_ts_valid=dut.mac_axis_tx_cpl[k].tvalid, # TODO
                 ifg=12, speed=eth_speed
             )
             self.port_mac.append(mac)
@@ -347,6 +354,8 @@ class TB:
 
     async def init(self):
 
+        self.dut.ptp_rst.setimmediatevalue(0)
+
         for mac in self.port_mac:
             mac.rx.reset.setimmediatevalue(0)
             mac.tx.reset.setimmediatevalue(0)
@@ -357,12 +366,16 @@ class TB:
         for k in range(10):
             await RisingEdge(self.dut.pcie_clk)
 
+        self.dut.ptp_rst.value = 1
+
         for mac in self.port_mac:
             mac.rx.reset.value = 1
             mac.tx.reset.value = 1
 
         for k in range(10):
             await RisingEdge(self.dut.pcie_clk)
+
+        self.dut.ptp_rst.value = 0
 
         for mac in self.port_mac:
             mac.rx.reset.value = 0
@@ -499,6 +512,10 @@ def test_cndm_micro_pcie_us(request, mac_data_w):
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"virtexuplus\""
     parameters['PORTS'] = 2
+    parameters["PTP_TS_EN"] = 1
+    parameters["PTP_TS_FMT_TOD"] = 0
+    parameters["PTP_CLK_PER_NS_NUM"] = 512
+    parameters["PTP_CLK_PER_NS_DENOM"] = 165
     parameters['MAC_DATA_W'] = mac_data_w
     parameters['AXIS_PCIE_DATA_W'] = 256
     parameters['BAR0_APERTURE'] = 24

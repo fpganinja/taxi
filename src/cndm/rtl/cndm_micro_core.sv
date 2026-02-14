@@ -16,10 +16,11 @@ Authors:
  * Corundum-micro core logic
  */
 module cndm_micro_core #(
-    parameter PORTS = 2//,
-    // parameter logic PTP_TS_EN = 1'b1,
-    // parameter PTP_CLK_PER_NS_NUM = 512,
-    // parameter PTP_CLK_PER_NS_DENOM = 165
+    parameter PORTS = 2,
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0,
+    parameter PTP_CLK_PER_NS_NUM = 512,
+    parameter PTP_CLK_PER_NS_DENOM = 165
 )
 (
     input  wire logic              clk,
@@ -46,19 +47,20 @@ module cndm_micro_core #(
     /*
      * PTP
      */
-    // input  wire logic              ptp_clk = 1'b0,
-    // input  wire logic              ptp_rst = 1'b0,
-    // input  wire logic              ptp_sample_clk = 1'b0,
-    // output wire logic              ptp_td_sdo,
-    // output wire logic              ptp_pps,
-    // output wire logic              ptp_pps_str,
-    // output wire logic              ptp_sync_locked,
-    // output wire logic [63:0]       ptp_sync_ts_rel,
-    // output wire logic              ptp_sync_ts_rel_step,
-    // output wire logic [95:0]       ptp_sync_ts_tod,
-    // output wire logic              ptp_sync_ts_tod_step,
-    // output wire logic              ptp_sync_pps,
-    // output wire logic              ptp_sync_pps_str,
+    input  wire logic              ptp_clk = 1'b0,
+    input  wire logic              ptp_rst = 1'b0,
+    input  wire logic              ptp_sample_clk = 1'b0,
+    input  wire logic              ptp_td_sdi = 1'b0,
+    output wire logic              ptp_td_sdo,
+    output wire logic              ptp_pps,
+    output wire logic              ptp_pps_str,
+    output wire logic              ptp_sync_locked,
+    output wire logic [63:0]       ptp_sync_ts_rel,
+    output wire logic              ptp_sync_ts_rel_step,
+    output wire logic [95:0]       ptp_sync_ts_tod,
+    output wire logic              ptp_sync_ts_tod_step,
+    output wire logic              ptp_sync_pps,
+    output wire logic              ptp_sync_pps_str,
 
     /*
      * Ethernet
@@ -84,8 +86,7 @@ localparam RAM_SEG_DATA_W = dma_ram_wr.SEG_DATA_W;
 localparam RAM_SEG_BE_W = dma_ram_wr.SEG_BE_W;
 localparam RAM_SEL_W = dma_ram_wr.SEL_W;
 
-localparam PORT_OFFSET = 1;
-// localparam PORT_OFFSET = PTP_TS_EN ? 2 : 1;
+localparam PORT_OFFSET = PTP_TS_EN ? 2 : 1;
 
 taxi_axil_if #(
     .DATA_W(s_axil_wr.DATA_W),
@@ -182,8 +183,7 @@ always_ff @(posedge clk) begin
 
         case ({s_axil_ctrl[0].araddr[15:2], 2'b00})
             16'h0100: s_axil_rdata_reg <= PORTS; // port count
-            16'h0104: s_axil_rdata_reg <= 32'h00010000; // port offset
-            // 16'h0104: s_axil_rdata_reg <= PTP_TS_EN ? 32'h00020000 : 32'h00010000; // port offset
+            16'h0104: s_axil_rdata_reg <= PTP_TS_EN ? 32'h00020000 : 32'h00010000; // port offset
             16'h0108: s_axil_rdata_reg <= 32'h00010000; // port stride
             default: begin end
         endcase
@@ -199,47 +199,54 @@ always_ff @(posedge clk) begin
     end
 end
 
-// if (PTP_TS_EN) begin : ptp
+if (PTP_TS_EN) begin : ptp
 
-//     cndm_micro_ptp #(
-//         .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
-//         .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM)
-//     )
-//     ptp_inst (
-//         .clk(clk),
-//         .rst(rst),
+    taxi_ptp_td_phc_axil #(
+        .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
+        .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM)
+    )
+    ptp_inst (
+        .clk(clk),
+        .rst(rst),
 
-//         /*
-//          * Control register interface
-//          */
-//         .s_axil_wr(s_axil_ctrl[1]),
-//         .s_axil_rd(s_axil_ctrl[1]),
+        /*
+         * Control register interface
+         */
+        .s_axil_wr(s_axil_ctrl[1]),
+        .s_axil_rd(s_axil_ctrl[1]),
 
-//         /*
-//          * PTP
-//          */
-//         .ptp_clk(ptp_clk),
-//         .ptp_rst(ptp_rst),
-//         .ptp_sample_clk(ptp_sample_clk),
-//         .ptp_td_sdo(ptp_td_sdo),
-//         .ptp_pps(ptp_pps),
-//         .ptp_pps_str(ptp_pps_str),
-//         .ptp_sync_locked(ptp_sync_locked),
-//         .ptp_sync_ts_rel(ptp_sync_ts_rel),
-//         .ptp_sync_ts_rel_step(ptp_sync_ts_rel_step),
-//         .ptp_sync_ts_tod(ptp_sync_ts_tod),
-//         .ptp_sync_ts_tod_step(ptp_sync_ts_tod_step),
-//         .ptp_sync_pps(ptp_sync_pps),
-//         .ptp_sync_pps_str(ptp_sync_pps_str)
-//     );
+        /*
+         * PTP
+         */
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_sample_clk(ptp_sample_clk),
+        .ptp_td_sdo(ptp_td_sdo),
+        .ptp_pps(ptp_pps),
+        .ptp_pps_str(ptp_pps_str),
+        .ptp_sync_locked(ptp_sync_locked),
+        .ptp_sync_ts_rel(ptp_sync_ts_rel),
+        .ptp_sync_ts_rel_step(ptp_sync_ts_rel_step),
+        .ptp_sync_ts_tod(ptp_sync_ts_tod),
+        .ptp_sync_ts_tod_step(ptp_sync_ts_tod_step),
+        .ptp_sync_pps(ptp_sync_pps),
+        .ptp_sync_pps_str(ptp_sync_pps_str)
+    );
 
-// end else begin : ptp
+end else begin : ptp
 
-//     assign ptp_td_sdo = 1'b0;
-//     assign ptp_pps = 1'b0;
-//     assign ptp_pps_str = 1'b0;
+    assign ptp_td_sdo = 1'b0;
+    assign ptp_pps = 1'b0;
+    assign ptp_pps_str = 1'b0;
+    assign ptp_sync_locked = 1'b0;
+    assign ptp_sync_ts_rel = '0;
+    assign ptp_sync_ts_rel_step = 1'b0;
+    assign ptp_sync_ts_tod = '0;
+    assign ptp_sync_ts_tod_step = 1'b0;
+    assign ptp_sync_pps = 1'b0;
+    assign ptp_sync_pps_str = 1'b0;
 
-// end
+end
 
 taxi_dma_desc_if #(
     .SRC_ADDR_W(dma_rd_desc_req.SRC_ADDR_W),
@@ -325,7 +332,8 @@ dma_mux_inst (
 for (genvar p = 0; p < PORTS; p = p + 1) begin : port
 
     cndm_micro_port #(
-        // .PTP_TS_EN(PTP_TS_EN)
+        .PTP_TS_EN(PTP_TS_EN),
+        .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD)
     )
     port_inst (
         .clk(clk),
@@ -348,6 +356,13 @@ for (genvar p = 0; p < PORTS; p = p + 1) begin : port
         .dma_ram_rd(dma_ram_int[p]),
 
         .irq(irq[p]),
+
+        /*
+         * PTP
+         */
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_td_sdi(ptp_td_sdo),
 
         /*
          * Ethernet

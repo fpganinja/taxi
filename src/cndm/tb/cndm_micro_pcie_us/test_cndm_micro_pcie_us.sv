@@ -22,6 +22,10 @@ module test_cndm_micro_pcie_us #
     parameter string VENDOR = "XILINX",
     parameter string FAMILY = "virtexuplus",
     parameter PORTS = 2,
+    parameter logic PTP_TS_EN = 1'b1,
+    parameter logic PTP_TS_FMT_TOD = 1'b0,
+    parameter PTP_CLK_PER_NS_NUM = 512,
+    parameter PTP_CLK_PER_NS_DENOM = 165,
     parameter MAC_DATA_W = 32,
     parameter AXIS_PCIE_DATA_W = 256,
     parameter AXIS_PCIE_RC_USER_W = AXIS_PCIE_DATA_W < 512 ? 75 : 161,
@@ -32,6 +36,8 @@ module test_cndm_micro_pcie_us #
     /* verilator lint_on WIDTHTRUNC */
 )
 ();
+
+localparam PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 48;
 
 localparam AXIS_PCIE_KEEP_W = (AXIS_PCIE_DATA_W/32);
 localparam RQ_SEQ_NUM_W = AXIS_PCIE_RQ_USER_W == 60 ? 4 : 6;
@@ -122,6 +128,20 @@ logic [1:0]   cfg_interrupt_msi_tph_type;
 logic [7:0]   cfg_interrupt_msi_tph_st_tag;
 logic [7:0]   cfg_interrupt_msi_function_number;
 
+logic        ptp_rst;
+logic        ptp_clk;
+logic        ptp_sample_clk;
+logic        ptp_td_sdo;
+logic        ptp_pps;
+logic        ptp_pps_str;
+logic        ptp_sync_locked;
+logic [63:0] ptp_sync_ts_rel;
+logic        ptp_sync_ts_rel_step;
+logic [95:0] ptp_sync_ts_tod;
+logic        ptp_sync_ts_tod_step;
+logic        ptp_sync_pps;
+logic        ptp_sync_pps_str;
+
 logic mac_tx_clk[PORTS];
 logic mac_tx_rst[PORTS];
 
@@ -136,7 +156,7 @@ logic mac_rx_clk[PORTS];
 logic mac_rx_rst[PORTS];
 
 taxi_axis_if #(
-    .DATA_W(96),
+    .DATA_W(PTP_TS_W),
     .KEEP_W(1),
     .ID_W(8)
 ) mac_axis_tx_cpl[PORTS]();
@@ -145,7 +165,7 @@ taxi_axis_if #(
     .DATA_W(MAC_DATA_W),
     .ID_W(8),
     .USER_EN(1),
-    .USER_W(1)
+    .USER_W(PTP_TS_W+1)
 ) mac_axis_rx[PORTS]();
 
 cndm_micro_pcie_us #(
@@ -153,6 +173,9 @@ cndm_micro_pcie_us #(
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
     .PORTS(PORTS),
+    .PTP_TS_EN(PTP_TS_EN),
+    .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
+    .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM),
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
     .BAR0_APERTURE(BAR0_APERTURE)
 )
@@ -209,6 +232,23 @@ uut (
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
     .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * PTP
+     */
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdo(ptp_td_sdo),
+    .ptp_pps(ptp_pps),
+    .ptp_pps_str(ptp_pps_str),
+    .ptp_sync_locked(ptp_sync_locked),
+    .ptp_sync_ts_rel(ptp_sync_ts_rel),
+    .ptp_sync_ts_rel_step(ptp_sync_ts_rel_step),
+    .ptp_sync_ts_tod(ptp_sync_ts_tod),
+    .ptp_sync_ts_tod_step(ptp_sync_ts_tod_step),
+    .ptp_sync_pps(ptp_sync_pps),
+    .ptp_sync_pps_str(ptp_sync_pps_str),
 
     /*
      * Ethernet: SFP+

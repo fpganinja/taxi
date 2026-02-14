@@ -23,6 +23,8 @@ module fpga #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "kintexuplus",
+    // PTP configuration
+    parameter logic PTP_TS_EN = 1'b1,
     // 10G/25G MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
@@ -491,6 +493,7 @@ fpga_core #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
+    .PTP_TS_EN(PTP_TS_EN),
     .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .MAC_DATA_W(MAC_DATA_W)

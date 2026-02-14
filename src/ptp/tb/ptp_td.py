@@ -102,6 +102,12 @@ class PtpTdSource(Reset):
             p += Decimal(self.drift_num) / Decimal(self.drift_denom)
         return p / Decimal(2**32)
 
+    def get_delay_cycles(self):
+        return 14*17+self.td_delay-1
+
+    def get_delay_ns(self):
+        return self.get_delay_cycles() * self.get_period_ns()
+
     def set_ts_tod(self, ts_s, ts_ns, ts_fns):
         self.ts_tod_s = int(ts_s)
         self.ts_tod_ns = int(ts_ns)
@@ -123,7 +129,7 @@ class PtpTdSource(Reset):
         self.set_ts_tod_ns(Decimal(t).scaleb(9, self.ctx))
 
     def set_ts_tod_sim_time(self):
-        self.set_ts_tod_ns(Decimal(get_sim_time('fs')).scaleb(-6))
+        self.set_ts_tod_ns(Decimal(get_sim_time('fs')).scaleb(-6) + self.get_delay_ns())
 
     def get_ts_tod(self):
         ts_tod_s, ts_tod_ns, ts_rel_ns, ts_fns = self.timestamp_delay[0]
@@ -161,7 +167,7 @@ class PtpTdSource(Reset):
         self.set_ts_rel_ns(Decimal(t).scaleb(9, self.ctx))
 
     def set_ts_rel_sim_time(self):
-        self.set_ts_rel_ns(Decimal(get_sim_time('fs')).scaleb(-6))
+        self.set_ts_rel_ns(Decimal(get_sim_time('fs')).scaleb(-6) + self.get_delay_ns())
 
     def get_ts_rel(self):
         ts_tod_s, ts_tod_ns, ts_rel_ns, ts_fns = self.timestamp_delay[0]

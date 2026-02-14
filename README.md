@@ -47,13 +47,13 @@ Note that Zircon is still under active development and may not ready for product
 
 ## Ethernet MAC and PHY
 
-The Taxi transport library contains several Ethernet MAC and PCS variants, covering link rates from 10 Mbps to 25 Gbps.  The MAC modules support LFC and PFC pause frames, PTP timestamping, frame length enforcement, FCS computation and verification, and statistics reporting.  Wrappers for low-speed operation support MII, GMII, and RGMII PHY-attach protocols for use with an external PHY chip.  Wrappers for 10G/25G include device-specific transceiver instances for a fully-integrated solution.  Logic is available for a 10G/25G MAC, 10G/25G PCS, and 10G/25G "fused" MAC+PCS, with reduced latency and resource consumption.
+The Taxi transport library contains several Ethernet MAC and PCS variants, covering link rates from 10 Mbps to 25 Gbps.  The MAC modules support LFC and PFC pause frames, PTP timestamping, frame length enforcement, FCS computation and verification, and statistics reporting.  PTP TD leaf clocks and statistics collection components are also integrated, configurable via instance parameters.  Wrappers for low-speed operation support MII, GMII, and RGMII PHY-attach protocols for use with an external PHY chip.  Wrappers for 10G/25G include device-specific transceiver instances for a fully-integrated solution.  Logic is available for a 10G/25G MAC, 10G/25G PCS, and 10G/25G "fused" MAC+PCS, with reduced latency and resource consumption.
 
 The 10G/25G MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+ supports GTX, GTH, and GTY transceivers.  On UltraScale and UltraScale+ devices, it can be configured for either a 32-bit or 64-bit datapath via the DATA_W parameter.  The 32-bit datapath supports 10G only, while the 64-bit datapath can be used for either 10G or 25G.  TCL scripts for generating the GT cores are provided for both 10G and 25G and for several common reference clocks.  The core supports operation in either a normal latency mode or a low latency mode via the CFG_LOW_LATENCY paremter, which affects the clock frequency and transceiver configuration (async gearbox vs. sync gearbox and buffer bypass).  The low latency mode has a slightly higher clock frequency and resource consumption, so it is not recommended unless you really need to shave off a new nanoseconds of latency, or you need highest possible time sync precision.  On 7-series, the core only supports 32-bit low-latency mode.  The wrapper also provides an APB interface for configuring the transceivers and QPLLs.
 
 The 10G/25G MAC and PCS logic is also highly optimized for both size and timing performance, with 60 instances fitting comfortably on an XCVU9P -2 on the HTG9200 board, fully utilizing 15 QSFP28 (9 on the board plus 6 via FMC+, 60 lanes total).  With the low-latency MACs, statistics collection, loopback FIFOs, and XFCP, the footprint is about 15% of the device LUTs at 25G (about 3000 LUTs and 2500 FFs per channel) and about 10% of the device LUTs at 10G (about 2000 LUTs and 2100 FFs per channel).  The 10G configuration closes timing on the KC705 (single SFP+, 1 lane total) with an XC7K325T -2 at 322.265625 MHz, and the 25G configuration closes timing on the XUSP3S (quad QSFP38, 16 lanes total) with an XCVU095 -2 at 402.83203125 MHz.
 
-Planned features include 1000BASE-X, SGMII, USXGMII, dynamic rate switching, AN, integrated PTP TD logic, better integration of the PTP TD subsystem, and white rabbit/IEEE 1588 HA support.
+Planned features include 1000BASE-X, SGMII, USXGMII, dynamic rate switching, AN, better integration of the PTP TD subsystem, and white rabbit/IEEE 1588 HA support.
 
 ## Statistics collection subsystem
 
@@ -191,6 +191,8 @@ The Taxi transport library contains many smaller components that can be composed
     *  PTP period output
     *  PTP TD leaf clock
     *  PTP TD PHC
+    *  PTP TD PHC wrapper with APB register interface
+    *  PTP TD PHC wrapper with AXI lite register interface
     *  PTP TD relative-to-ToD converter
 *  Statistics collection subsystem
     *  Statistics collector

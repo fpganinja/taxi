@@ -286,6 +286,7 @@ always_ff @(posedge clk) begin
 
     if (s_apb.penable && s_apb.psel && !s_apb_pready_reg) begin
         s_apb_pready_reg <= 1'b1;
+        s_apb_prdata_reg <= '0;
 
         if (s_apb.pwrite) begin
             case (7'({s_apb.paddr >> 2, 2'b00}))

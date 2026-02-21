@@ -36,8 +36,8 @@ module pyrite_pcie_us_vpd_bpi #
     parameter logic [3:0] FLASH_SEG_DEFAULT = 1,
     parameter logic [3:0] FLASH_SEG_FALLBACK = 0,
     parameter logic [31:0] FLASH_SEG0_SIZE = 32'h00000000,
-    parameter FLASH_ADDR_W = 16,
-    parameter FLASH_DATA_W = 23,
+    parameter FLASH_DATA_W = 16,
+    parameter FLASH_ADDR_W = 23,
     parameter FLASH_RGN_W = 1
 )
 (
@@ -215,9 +215,9 @@ always_ff @(posedge clk) begin
                 end
                 8'h54: begin
                     // BPI flash ctrl: address
-                    {flash_region_reg, flash_addr_reg} <= vpd_apb_int[1].pwdata;
+                    {flash_region_reg, flash_addr_reg} <= (FLASH_ADDR_W+FLASH_RGN_W)'(vpd_apb_int[1].pwdata);
                 end
-                8'h58: flash_dq_o_reg <= vpd_apb_int[1].pwdata; // BPI flash ctrl: data
+                8'h58: flash_dq_o_reg <= FLASH_DATA_W'(vpd_apb_int[1].pwdata); // BPI flash ctrl: data
                 default: begin end
             endcase
         end
@@ -257,9 +257,9 @@ always_ff @(posedge clk) begin
             end
             8'h54: begin
                 // BPI flash ctrl: address
-                vpd_apb_prdata_reg <= {flash_region_reg, flash_addr_reg};
+                vpd_apb_prdata_reg <= 32'({flash_region_reg, flash_addr_reg});
             end
-            8'h58: vpd_apb_prdata_reg <= flash_dq_i; // BPI flash ctrl: data
+            8'h58: vpd_apb_prdata_reg <= 32'(flash_dq_i); // BPI flash ctrl: data
             default: begin end
         endcase
     end

@@ -101,20 +101,20 @@ always_comb begin
     end
 
     if (cfg_ext_read_received) begin
-        if (cfg_ext_register_number == (CAP_OFFSET >> 2)) begin
+        if (cfg_ext_register_number == 10'(CAP_OFFSET >> 2)) begin
             cfg_ext_read_data_next[7:0] = CAP_ID;
             cfg_ext_read_data_next[15:8] = CAP_NEXT;
             cfg_ext_read_data_next[30:16] = addr_reg;
             cfg_ext_read_data_next[31] = flag_reg;
             cfg_ext_read_data_valid_next = 1'b1;
-        end else if (cfg_ext_register_number == (CAP_OFFSET >> 2)+1) begin
+        end else if (cfg_ext_register_number == 10'(CAP_OFFSET >> 2)+1) begin
             cfg_ext_read_data_next = data_reg;
             cfg_ext_read_data_valid_next = 1'b1;
         end
     end
 
     if (cfg_ext_write_received && !m_apb_psel_reg) begin
-        if (cfg_ext_register_number == (CAP_OFFSET >> 2)) begin
+        if (cfg_ext_register_number == 10'(CAP_OFFSET >> 2)) begin
             addr_next = cfg_ext_write_data[30:16];
             flag_next = cfg_ext_write_data[31];
 
@@ -127,7 +127,7 @@ always_comb begin
                 m_apb_psel_next = 1'b1;
                 m_apb_pwrite_next = 1'b0;
             end
-        end else if (cfg_ext_register_number == (CAP_OFFSET >> 2)+1) begin
+        end else if (cfg_ext_register_number == 10'(CAP_OFFSET >> 2)+1) begin
             data_next = cfg_ext_write_data;
         end
     end

@@ -205,13 +205,19 @@ end else begin
         dma_req_src_addr_int = current_req_src_addr;
         dma_req_src_sel_int = DMA_SRC_SEL_W'(current_req_src_sel);
         if (EXTEND_SEL && SRC_SEL_EN) begin
+            // workaround verilator bug - unreachable by parameter value
+            /* verilator lint_off SELRANGE */
             dma_req_src_sel_int[DMA_SRC_SEL_W-1:DMA_SRC_SEL_W-CL_PORTS] = grant_index;
+            /* verilator lint_on SELRANGE */
         end
         dma_req_src_asid_int = current_req_src_asid;
         dma_req_dst_addr_int = current_req_dst_addr;
         dma_req_dst_sel_int = DMA_DST_SEL_W'(current_req_dst_sel);
         if (EXTEND_SEL && DST_SEL_EN) begin
+            // workaround verilator bug - unreachable by parameter value
+            /* verilator lint_off SELRANGE */
             dma_req_dst_sel_int[DMA_DST_SEL_W-1:DMA_DST_SEL_W-CL_PORTS] = grant_index;
+            /* verilator lint_on SELRANGE */
         end
         dma_req_dst_asid_int = current_req_dst_asid;
         dma_req_imm_int = current_req_imm;

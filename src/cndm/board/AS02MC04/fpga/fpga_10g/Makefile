@@ -23,6 +23,7 @@ SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
+SYN_FILES += $(TAXI_SRC_DIR)/pyrite/rtl/pyrite_pcie_us_vpd_qspi.f
 
 # XDC files
 XDC_FILES = ../fpga.xdc

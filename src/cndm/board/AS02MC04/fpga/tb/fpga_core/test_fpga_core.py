@@ -477,6 +477,7 @@ def test_fpga_core(request, mac_data_w):
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_async_fifo.f"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_reset.sv"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_signal.sv"),
+        os.path.join(taxi_src_dir, "pyrite", "rtl", "pyrite_pcie_us_vpd_qspi.f"),
     ]
 
     verilog_sources = process_f_files(verilog_sources)
@@ -486,9 +487,17 @@ def test_fpga_core(request, mac_data_w):
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"kintexuplus\""
-    parameters['PTP_TS_EN'] = "1'b1"
-    parameters['CFG_LOW_LATENCY'] = "1'b1"
-    parameters['COMBINED_MAC_PCS'] = "1'b1"
+
+    # PTP configuration
+    parameters['PTP_TS_EN'] = 1
+
+    # AXI lite interface configuration (control)
+    parameters['AXIL_CTRL_DATA_W'] = 32
+    parameters['AXIL_CTRL_ADDR_W'] = 24
+
+    # MAC configuration
+    parameters['CFG_LOW_LATENCY'] = 1
+    parameters['COMBINED_MAC_PCS'] = 1
     parameters['MAC_DATA_W'] = mac_data_w
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}

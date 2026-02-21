@@ -29,6 +29,7 @@ VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/pyrite/rtl/pyrite_pcie_us_vpd_qspi.f
 
 # handle file list files
 process_f_file = $(call process_f_files,$(addprefix $(dir $1),$(shell cat $1)))
@@ -40,9 +41,17 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 export PARAM_SIM := "1'b1"
 export PARAM_VENDOR := "\"XILINX\""
 export PARAM_FAMILY := "\"kintexuplus\""
-export PARAM_PTP_TS_EN := "1'b1"
-export PARAM_CFG_LOW_LATENCY := "1'b1"
-export PARAM_COMBINED_MAC_PCS := "1'b1"
+
+# PTP configuration
+export PARAM_PTP_TS_EN := 1
+
+# AXI lite interface configuration (control)
+export PARAM_AXIL_CTRL_DATA_W := 32
+export PARAM_AXIL_CTRL_ADDR_W := 24
+
+# MAC configuration
+export PARAM_CFG_LOW_LATENCY := 1
+export PARAM_COMBINED_MAC_PCS := 1
 export PARAM_MAC_DATA_W := "64"
 
 ifeq ($(SIM), icarus)

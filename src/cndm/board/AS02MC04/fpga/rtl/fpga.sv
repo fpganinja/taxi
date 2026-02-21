@@ -23,9 +23,25 @@ module fpga #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "kintexuplus",
+
+    // FW ID
+    parameter FPGA_ID = 32'h4A63093,
+    parameter FW_ID = 32'h0000C001,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1ded_0009,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
+
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
-    // 10G/25G MAC configuration
+
+    // AXI lite interface configuration (control)
+    parameter AXIL_CTRL_DATA_W = 32,
+    parameter AXIL_CTRL_ADDR_W = 24,
+
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter MAC_DATA_W = 64
@@ -74,6 +90,8 @@ module fpga #
 );
 
 // Clock and reset
+wire pcie_user_clk;
+wire pcie_user_rst;
 
 wire clk_100mhz_ibufg;
 
@@ -189,6 +207,175 @@ sync_reset_125mhz_inst (
     .out(rst_125mhz_int)
 );
 
+// Flash
+wire qspi_clk_int;
+wire [3:0] qspi_dq_int;
+wire [3:0] qspi_dq_i_int;
+wire [3:0] qspi_dq_o_int;
+wire [3:0] qspi_dq_oe_int;
+wire qspi_cs_int;
+
+reg qspi_clk_reg;
+reg [3:0] qspi_dq_o_reg;
+reg [3:0] qspi_dq_oe_reg;
+reg qspi_cs_reg;
+
+always_ff @(posedge pcie_user_clk) begin
+    qspi_clk_reg <= qspi_clk_int;
+    qspi_dq_o_reg <= qspi_dq_o_int;
+    qspi_dq_oe_reg <= qspi_dq_oe_int;
+    qspi_cs_reg <= qspi_cs_int;
+end
+
+taxi_sync_signal #(
+    .WIDTH(8),
+    .N(2)
+)
+flash_sync_inst (
+    .clk(pcie_user_clk),
+    .in({qspi_dq_int}),
+    .out({qspi_dq_i_int})
+);
+
+STARTUPE3
+startupe3_inst (
+    .CFGCLK(),
+    .CFGMCLK(),
+    .DI(qspi_dq_int),
+    .DO(qspi_dq_o_reg),
+    .DTS(~qspi_dq_oe_reg),
+    .EOS(),
+    .FCSBO(qspi_cs_reg),
+    .FCSBTS(1'b0),
+    .GSR(1'b0),
+    .GTS(1'b0),
+    .KEYCLEARB(1'b1),
+    .PACK(1'b0),
+    .PREQ(),
+    .USRCCLKO(qspi_clk_reg),
+    .USRCCLKTS(1'b0),
+    .USRDONEO(1'b0),
+    .USRDONETS(1'b1)
+);
+
+// FPGA boot
+wire fpga_boot;
+wire fpga_boot_sync;
+
+taxi_sync_signal #(
+    .WIDTH(1),
+    .N(2)
+)
+fpga_boot_sync_inst (
+    .clk(clk_125mhz_int),
+    .in({fpga_boot}),
+    .out({fpga_boot_sync})
+);
+
+wire icap_avail;
+logic [2:0] icap_state_reg = 0;
+logic icap_csib_reg = 1'b1;
+logic icap_rdwrb_reg = 1'b0;
+logic [31:0] icap_di_reg = 32'hffffffff;
+
+wire [31:0] icap_di_rev;
+
+assign icap_di_rev[ 7] = icap_di_reg[ 0];
+assign icap_di_rev[ 6] = icap_di_reg[ 1];
+assign icap_di_rev[ 5] = icap_di_reg[ 2];
+assign icap_di_rev[ 4] = icap_di_reg[ 3];
+assign icap_di_rev[ 3] = icap_di_reg[ 4];
+assign icap_di_rev[ 2] = icap_di_reg[ 5];
+assign icap_di_rev[ 1] = icap_di_reg[ 6];
+assign icap_di_rev[ 0] = icap_di_reg[ 7];
+
+assign icap_di_rev[15] = icap_di_reg[ 8];
+assign icap_di_rev[14] = icap_di_reg[ 9];
+assign icap_di_rev[13] = icap_di_reg[10];
+assign icap_di_rev[12] = icap_di_reg[11];
+assign icap_di_rev[11] = icap_di_reg[12];
+assign icap_di_rev[10] = icap_di_reg[13];
+assign icap_di_rev[ 9] = icap_di_reg[14];
+assign icap_di_rev[ 8] = icap_di_reg[15];
+
+assign icap_di_rev[23] = icap_di_reg[16];
+assign icap_di_rev[22] = icap_di_reg[17];
+assign icap_di_rev[21] = icap_di_reg[18];
+assign icap_di_rev[20] = icap_di_reg[19];
+assign icap_di_rev[19] = icap_di_reg[20];
+assign icap_di_rev[18] = icap_di_reg[21];
+assign icap_di_rev[17] = icap_di_reg[22];
+assign icap_di_rev[16] = icap_di_reg[23];
+
+assign icap_di_rev[31] = icap_di_reg[24];
+assign icap_di_rev[30] = icap_di_reg[25];
+assign icap_di_rev[29] = icap_di_reg[26];
+assign icap_di_rev[28] = icap_di_reg[27];
+assign icap_di_rev[27] = icap_di_reg[28];
+assign icap_di_rev[26] = icap_di_reg[29];
+assign icap_di_rev[25] = icap_di_reg[30];
+assign icap_di_rev[24] = icap_di_reg[31];
+
+always_ff @(posedge clk_125mhz_int) begin
+    case (icap_state_reg)
+        0: begin
+            icap_state_reg <= 0;
+            icap_csib_reg <= 1'b1;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'hffffffff; // dummy word
+
+            if (fpga_boot_sync && icap_avail) begin
+                icap_state_reg <= 1;
+                icap_csib_reg <= 1'b0;
+                icap_rdwrb_reg <= 1'b0;
+                icap_di_reg <= 32'hffffffff; // dummy word
+            end
+        end
+        1: begin
+            icap_state_reg <= 2;
+            icap_csib_reg <= 1'b0;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'hAA995566; // sync word
+        end
+        2: begin
+            icap_state_reg <= 3;
+            icap_csib_reg <= 1'b0;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'h20000000; // type 1 noop
+        end
+        3: begin
+            icap_state_reg <= 4;
+            icap_csib_reg <= 1'b0;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'h30008001; // write 1 word to CMD
+        end
+        4: begin
+            icap_state_reg <= 5;
+            icap_csib_reg <= 1'b0;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'h0000000F; // IPROG
+        end
+        5: begin
+            icap_state_reg <= 0;
+            icap_csib_reg <= 1'b0;
+            icap_rdwrb_reg <= 1'b0;
+            icap_di_reg <= 32'h20000000; // type 1 noop
+        end
+    endcase
+end
+
+ICAPE3
+icape3_inst (
+    .AVAIL(icap_avail),
+    .CLK(clk_125mhz_int),
+    .CSIB(icap_csib_reg),
+    .I(icap_di_rev),
+    .O(),
+    .PRDONE(),
+    .PRERROR(),
+    .RDWRB(icap_rdwrb_reg)
+);
+
 // PCIe
 localparam AXIS_PCIE_DATA_W = 256;
 localparam AXIS_PCIE_KEEP_W = (AXIS_PCIE_DATA_W/32);
@@ -201,11 +388,8 @@ localparam RC_STRADDLE = 1'b0; // AXIS_PCIE_DATA_W >= 256;
 localparam RQ_SEQ_NUM_W = AXIS_PCIE_RQ_USER_W == 60 ? 4 : 6;
 localparam RQ_SEQ_NUM_EN = 1;
 
-localparam PCIE_TAG_CNT = 64;
+localparam PCIE_TAG_CNT = AXIS_PCIE_RQ_USER_W == 60 ? 64 : 256;
 localparam BAR0_APERTURE = 24;
-
-logic pcie_user_clk;
-logic pcie_user_rst;
 
 taxi_axis_if #(
     .DATA_W(AXIS_PCIE_DATA_W),
@@ -264,6 +448,15 @@ wire [11:0] cfg_fc_npd;
 wire [7:0]  cfg_fc_cplh;
 wire [11:0] cfg_fc_cpld;
 wire [2:0]  cfg_fc_sel;
+
+wire         cfg_ext_read_received;
+wire         cfg_ext_write_received;
+wire [9:0]   cfg_ext_register_number;
+wire [7:0]   cfg_ext_function_number;
+wire [31:0]  cfg_ext_write_data;
+wire [3:0]   cfg_ext_write_byte_enable;
+wire [31:0]  cfg_ext_read_data;
+wire         cfg_ext_read_data_valid;
 
 // wire [3:0]   cfg_interrupt_msix_enable;
 // wire [3:0]   cfg_interrupt_msix_mask;
@@ -437,6 +630,15 @@ pcie4_uscale_plus_inst (
 
     .cfg_link_training_enable(1'b1),
 
+    .cfg_ext_read_received(cfg_ext_read_received),
+    .cfg_ext_write_received(cfg_ext_write_received),
+    .cfg_ext_register_number(cfg_ext_register_number),
+    .cfg_ext_function_number(cfg_ext_function_number),
+    .cfg_ext_write_data(cfg_ext_write_data),
+    .cfg_ext_write_byte_enable(cfg_ext_write_byte_enable),
+    .cfg_ext_read_data(cfg_ext_read_data),
+    .cfg_ext_read_data_valid(cfg_ext_read_data_valid),
+
     .cfg_interrupt_int(4'd0),
     .cfg_interrupt_pending(4'd0),
     .cfg_interrupt_sent(),
@@ -493,7 +695,28 @@ fpga_core #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
+
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
+
+    // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
+
+    // PCIe interface configuration
+    .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
+
+    // AXI lite interface configuration (control)
+    .AXIL_CTRL_DATA_W(AXIL_CTRL_DATA_W),
+    .AXIL_CTRL_ADDR_W(AXIL_CTRL_ADDR_W),
+
+    // MAC configuration
     .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .MAC_DATA_W(MAC_DATA_W)
@@ -565,6 +788,15 @@ core_inst (
     .cfg_fc_cpld(cfg_fc_cpld),
     .cfg_fc_sel(cfg_fc_sel),
 
+    .cfg_ext_read_received(cfg_ext_read_received),
+    .cfg_ext_write_received(cfg_ext_write_received),
+    .cfg_ext_register_number(cfg_ext_register_number),
+    .cfg_ext_function_number(cfg_ext_function_number),
+    .cfg_ext_write_data(cfg_ext_write_data),
+    .cfg_ext_write_byte_enable(cfg_ext_write_byte_enable),
+    .cfg_ext_read_data(cfg_ext_read_data),
+    .cfg_ext_read_data_valid(cfg_ext_read_data_valid),
+
     // .cfg_interrupt_msix_enable(cfg_interrupt_msix_enable),
     // .cfg_interrupt_msix_mask(cfg_interrupt_msix_mask),
     // .cfg_interrupt_msix_vf_enable(cfg_interrupt_msix_vf_enable),
@@ -593,7 +825,17 @@ core_inst (
     .cfg_interrupt_msi_tph_present(cfg_interrupt_msi_tph_present),
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
-    .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number)
+    .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * QSPI flash
+     */
+    .fpga_boot(fpga_boot),
+    .qspi_clk(qspi_clk_int),
+    .qspi_dq_i(qspi_dq_i_int),
+    .qspi_dq_o(qspi_dq_o_int),
+    .qspi_dq_oe(qspi_dq_oe_int),
+    .qspi_cs(qspi_cs_int)
 );
 
 endmodule

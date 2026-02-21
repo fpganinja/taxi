@@ -21,14 +21,32 @@ module test_fpga_core #
     parameter logic SIM = 1'b0,
     parameter string VENDOR = "XILINX",
     parameter string FAMILY = "kintexuplus",
+
+    // FW ID
+    parameter FPGA_ID = 32'h4A63093,
+    parameter FW_ID = 32'h0000C001,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1ded_0009,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
+
+    // PTP configuration
+    parameter logic PTP_TS_EN = 1'b1,
+
+    // PCIe interface configuration
     parameter AXIS_PCIE_DATA_W = 256,
     parameter AXIS_PCIE_RC_USER_W = AXIS_PCIE_DATA_W < 512 ? 75 : 161,
     parameter AXIS_PCIE_RQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 62 : 137,
     parameter AXIS_PCIE_CQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 85 : 183,
     parameter AXIS_PCIE_CC_USER_W = AXIS_PCIE_DATA_W < 512 ? 33 : 81,
-    // PTP configuration
-    parameter logic PTP_TS_EN = 1'b1,
-    // 10G/25G MAC configuration
+
+    // AXI lite interface configuration (control)
+    parameter AXIL_CTRL_DATA_W = 32,
+    parameter AXIL_CTRL_ADDR_W = 24,
+
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter MAC_DATA_W = 64
@@ -117,6 +135,15 @@ logic [7:0]  cfg_fc_cplh;
 logic [11:0] cfg_fc_cpld;
 logic [2:0]  cfg_fc_sel;
 
+logic        cfg_ext_read_received;
+logic        cfg_ext_write_received;
+logic [9:0]  cfg_ext_register_number;
+logic [7:0]  cfg_ext_function_number;
+logic [31:0] cfg_ext_write_data;
+logic [3:0]  cfg_ext_write_byte_enable;
+logic [31:0] cfg_ext_read_data;
+logic        cfg_ext_read_data_valid;
+
 logic [3:0]   cfg_interrupt_msi_enable;
 logic [11:0]  cfg_interrupt_msi_mmenable;
 logic         cfg_interrupt_msi_mask_update;
@@ -134,14 +161,39 @@ logic [1:0]   cfg_interrupt_msi_tph_type;
 logic [7:0]   cfg_interrupt_msi_tph_st_tag;
 logic [7:0]   cfg_interrupt_msi_function_number;
 
+logic        fpga_boot;
+logic        qspi_clk;
+logic [3:0]  qspi_dq_i;
+logic [3:0]  qspi_dq_o;
+logic [3:0]  qspi_dq_oe;
+logic        qspi_cs;
+
 fpga_core #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
-    .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
+
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
+
     // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
-    // 10G/25G MAC configuration
+
+    // PCIe interface configuration
+    .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
+
+    // AXI lite interface configuration (control)
+    .AXIL_CTRL_DATA_W(AXIL_CTRL_DATA_W),
+    .AXIL_CTRL_ADDR_W(AXIL_CTRL_ADDR_W),
+
+    // MAC configuration
     .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .MAC_DATA_W(MAC_DATA_W)
@@ -199,6 +251,15 @@ uut (
     .cfg_fc_cpld(cfg_fc_cpld),
     .cfg_fc_sel(cfg_fc_sel),
 
+    .cfg_ext_read_received(cfg_ext_read_received),
+    .cfg_ext_write_received(cfg_ext_write_received),
+    .cfg_ext_register_number(cfg_ext_register_number),
+    .cfg_ext_function_number(cfg_ext_function_number),
+    .cfg_ext_write_data(cfg_ext_write_data),
+    .cfg_ext_write_byte_enable(cfg_ext_write_byte_enable),
+    .cfg_ext_read_data(cfg_ext_read_data),
+    .cfg_ext_read_data_valid(cfg_ext_read_data_valid),
+
     .cfg_interrupt_msi_enable(cfg_interrupt_msi_enable),
     .cfg_interrupt_msi_mmenable(cfg_interrupt_msi_mmenable),
     .cfg_interrupt_msi_mask_update(cfg_interrupt_msi_mask_update),
@@ -228,7 +289,17 @@ uut (
     .sfp_mgt_refclk_out(sfp_mgt_refclk_out),
     .sfp_npres(sfp_npres),
     .sfp_tx_fault(sfp_tx_fault),
-    .sfp_los(sfp_los)
+    .sfp_los(sfp_los),
+
+    /*
+     * QSPI flash
+     */
+    .fpga_boot(fpga_boot),
+    .qspi_clk(qspi_clk),
+    .qspi_dq_i(qspi_dq_i),
+    .qspi_dq_o(qspi_dq_o),
+    .qspi_dq_oe(qspi_dq_oe),
+    .qspi_cs(qspi_cs)
 );
 
 endmodule

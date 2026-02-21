@@ -23,10 +23,28 @@ module fpga_core #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "kintexuplus",
-    parameter RQ_SEQ_NUM_W = 6,
+
+    // FW ID
+    parameter FPGA_ID = 32'h4A63093,
+    parameter FW_ID = 32'h0000C001,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1ded_0009,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
+
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
-    // 10G/25G MAC configuration
+
+    // PCIe interface configuration
+    parameter RQ_SEQ_NUM_W = 6,
+
+    // AXI lite interface configuration (control)
+    parameter AXIL_CTRL_DATA_W = 32,
+    parameter AXIL_CTRL_ADDR_W = 24,
+
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter MAC_DATA_W = 64
@@ -98,6 +116,15 @@ module fpga_core #
     input  wire logic [11:0]              cfg_fc_cpld,
     output wire logic [2:0]               cfg_fc_sel,
 
+    input  wire logic                     cfg_ext_read_received,
+    input  wire logic                     cfg_ext_write_received,
+    input  wire logic [9:0]               cfg_ext_register_number,
+    input  wire logic [7:0]               cfg_ext_function_number,
+    input  wire logic [31:0]              cfg_ext_write_data,
+    input  wire logic [3:0]               cfg_ext_write_byte_enable,
+    output wire logic [31:0]              cfg_ext_read_data,
+    output wire logic                     cfg_ext_read_data_valid,
+
     input  wire logic [3:0]               cfg_interrupt_msi_enable,
     input  wire logic [11:0]              cfg_interrupt_msi_mmenable,
     input  wire logic                     cfg_interrupt_msi_mask_update,
@@ -113,11 +140,76 @@ module fpga_core #
     output wire logic                     cfg_interrupt_msi_tph_present,
     output wire logic [1:0]               cfg_interrupt_msi_tph_type,
     output wire logic [7:0]               cfg_interrupt_msi_tph_st_tag,
-    output wire logic [7:0]               cfg_interrupt_msi_function_number
+    output wire logic [7:0]               cfg_interrupt_msi_function_number,
+
+    /*
+     * QSPI flash
+     */
+    output wire logic                     fpga_boot,
+    output wire logic                     qspi_clk,
+    input  wire logic [3:0]               qspi_dq_i,
+    output wire logic [3:0]               qspi_dq_o,
+    output wire logic [3:0]               qspi_dq_oe,
+    output wire logic                     qspi_cs
 );
 
 localparam logic PTP_TS_FMT_TOD = 1'b0;
 localparam PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 48;
+
+// flashing via PCIe VPD
+pyrite_pcie_us_vpd_qspi #(
+    .VPD_CAP_ID(8'h03),
+    .VPD_CAP_OFFSET(8'hB0),
+    .VPD_CAP_NEXT(8'h00),
+
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
+
+    // Flash
+    .FLASH_SEG_COUNT(2),
+    .FLASH_SEG_DEFAULT(1),
+    .FLASH_SEG_FALLBACK(0),
+    .FLASH_SEG0_SIZE(32'h00000000),
+    .FLASH_DATA_W(4),
+    .FLASH_DUAL_QSPI(1'b0)
+)
+pyrite_inst (
+    .clk(pcie_clk),
+    .rst(pcie_rst),
+
+    /*
+     * PCIe
+     */
+    .cfg_ext_read_received(cfg_ext_read_received),
+    .cfg_ext_write_received(cfg_ext_write_received),
+    .cfg_ext_register_number(cfg_ext_register_number),
+    .cfg_ext_function_number(cfg_ext_function_number),
+    .cfg_ext_write_data(cfg_ext_write_data),
+    .cfg_ext_write_byte_enable(cfg_ext_write_byte_enable),
+    .cfg_ext_read_data(cfg_ext_read_data),
+    .cfg_ext_read_data_valid(cfg_ext_read_data_valid),
+
+    /*
+     * QSPI flash
+     */
+    .fpga_boot(fpga_boot),
+    .qspi_clk(qspi_clk),
+    .qspi_0_dq_i(qspi_dq_i),
+    .qspi_0_dq_o(qspi_dq_o),
+    .qspi_0_dq_oe(qspi_dq_oe),
+    .qspi_0_cs(qspi_cs),
+    .qspi_1_dq_i('0),
+    .qspi_1_dq_o(),
+    .qspi_1_dq_oe(),
+    .qspi_1_cs()
+);
 
 // SFP+
 wire sfp_tx_clk[2];
@@ -462,12 +554,32 @@ cndm_micro_pcie_us #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
+
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
+
+    // Structural configuration
     .PORTS(2),
+
+    // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(1'b0),
     .PTP_CLK_PER_NS_NUM(32),
     .PTP_CLK_PER_NS_DENOM(5),
+
+    // PCIe interface configuration
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
-    .BAR0_APERTURE(24)
+
+    // AXI lite interface configuration (control)
+    .AXIL_CTRL_DATA_W(AXIL_CTRL_DATA_W),
+    .AXIL_CTRL_ADDR_W(AXIL_CTRL_ADDR_W)
 )
 cndm_inst (
     /*

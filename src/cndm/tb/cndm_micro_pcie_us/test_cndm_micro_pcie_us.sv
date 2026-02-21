@@ -21,18 +21,39 @@ module test_cndm_micro_pcie_us #
     parameter logic SIM = 1'b0,
     parameter string VENDOR = "XILINX",
     parameter string FAMILY = "virtexuplus",
+
+    // FW ID
+    parameter FPGA_ID = 32'hDEADBEEF,
+    parameter FW_ID = 32'h0000C001,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1234_0000,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
+
+    // Structural configuration
     parameter PORTS = 2,
+
+    // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
     parameter logic PTP_TS_FMT_TOD = 1'b0,
     parameter PTP_CLK_PER_NS_NUM = 512,
     parameter PTP_CLK_PER_NS_DENOM = 165,
-    parameter MAC_DATA_W = 32,
+
+    // PCIe interface configuration
     parameter AXIS_PCIE_DATA_W = 256,
     parameter AXIS_PCIE_RC_USER_W = AXIS_PCIE_DATA_W < 512 ? 75 : 161,
     parameter AXIS_PCIE_RQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 62 : 137,
     parameter AXIS_PCIE_CQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 85 : 183,
     parameter AXIS_PCIE_CC_USER_W = AXIS_PCIE_DATA_W < 512 ? 33 : 81,
-    parameter BAR0_APERTURE = 24
+
+    // AXI lite interface configuration (control)
+    parameter AXIL_CTRL_DATA_W = 32,
+    parameter AXIL_CTRL_ADDR_W = 24,
+
+    // MAC configuration
+    parameter MAC_DATA_W = 32
     /* verilator lint_on WIDTHTRUNC */
 )
 ();
@@ -172,12 +193,32 @@ cndm_micro_pcie_us #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
+
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
+
+    // Structural configuration
     .PORTS(PORTS),
+
+    // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
     .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM),
+
+    // PCIe interface configuration
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
-    .BAR0_APERTURE(BAR0_APERTURE)
+
+    // AXI lite interface configuration (control)
+    .AXIL_CTRL_DATA_W(AXIL_CTRL_DATA_W),
+    .AXIL_CTRL_ADDR_W(AXIL_CTRL_ADDR_W)
 )
 uut (
     /*

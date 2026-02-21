@@ -38,14 +38,25 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 export PARAM_SIM := "1'b1"
 export PARAM_VENDOR := "\"XILINX\""
 export PARAM_FAMILY := "\"virtexuplus\""
+
+# Structural configuration
 export PARAM_PORTS := 2
+
+# PTP configuration
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TS_FMT_TOD := 0
 export PARAM_PTP_CLK_PER_NS_NUM := 512
 export PARAM_PTP_CLK_PER_NS_DENOM := 165
-export PARAM_MAC_DATA_W := 32
+
+# PCIe interface configuration
 export PARAM_AXIS_PCIE_DATA_W := 256
-export PARAM_BAR0_APERTURE := 24
+
+# AXI lite interface configuration (control)
+export PARAM_AXIL_CTRL_DATA_W := 32
+export PARAM_AXIL_CTRL_ADDR_W := 24
+
+# MAC configuration
+export PARAM_MAC_DATA_W := 32
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

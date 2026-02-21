@@ -22,6 +22,7 @@ set_property -dict [list \
     CONFIG.pf0_msi_enabled {true} \
     CONFIG.PF0_MSI_CAP_MULTIMSGCAP {32_vectors} \
     CONFIG.en_msi_per_vec_masking {true} \
+    CONFIG.legacy_ext_pcie_cfg_space_enabled {true} \
     CONFIG.vendor_id {1234} \
     CONFIG.mode_selection {Advanced} \
     CONFIG.en_gt_selection {true} \

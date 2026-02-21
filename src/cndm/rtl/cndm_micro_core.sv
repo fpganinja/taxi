@@ -16,7 +16,27 @@ Authors:
  * Corundum-micro core logic
  */
 module cndm_micro_core #(
+    // simulation (set to avoid vendor primitives)
+    parameter logic SIM = 1'b0,
+    // vendor ("GENERIC", "XILINX", "ALTERA")
+    parameter string VENDOR = "XILINX",
+    // device family
+    parameter string FAMILY = "virtexuplus",
+
+    // FW ID
+    parameter FPGA_ID = 32'hDEADBEEF,
+    parameter FW_ID = 32'h0000C001,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1234_0000,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
+
+    // Structural configuration
     parameter PORTS = 2,
+
+    // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
     parameter logic PTP_TS_FMT_TOD = 1'b0,
     parameter PTP_CLK_PER_NS_NUM = 512,

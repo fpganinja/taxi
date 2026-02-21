@@ -511,14 +511,25 @@ def test_cndm_micro_pcie_us(request, mac_data_w):
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"virtexuplus\""
+
+    # Structural configuration
     parameters['PORTS'] = 2
-    parameters["PTP_TS_EN"] = 1
-    parameters["PTP_TS_FMT_TOD"] = 0
-    parameters["PTP_CLK_PER_NS_NUM"] = 512
-    parameters["PTP_CLK_PER_NS_DENOM"] = 165
-    parameters['MAC_DATA_W'] = mac_data_w
+
+    # PTP configuration
+    parameters['PTP_TS_EN'] = 1
+    parameters['PTP_TS_FMT_TOD'] = 0
+    parameters['PTP_CLK_PER_NS_NUM'] = 512
+    parameters['PTP_CLK_PER_NS_DENOM'] = 165
+
+    # PCIe interface configuration
     parameters['AXIS_PCIE_DATA_W'] = 256
-    parameters['BAR0_APERTURE'] = 24
+
+    # AXI lite interface configuration (control)
+    parameters['AXIL_CTRL_DATA_W'] = 32
+    parameters['AXIL_CTRL_ADDR_W'] = 24
+
+    # MAC configuration
+    parameters['MAC_DATA_W'] = mac_data_w
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}
 

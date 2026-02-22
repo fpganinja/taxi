@@ -13,27 +13,42 @@ The design places looped-back MACs on the Ethernet ports, as well as XFCP on the
 
 ## Board details
 
-*  FPGA
-   *  AU45N/SN1000: xcu26-vsva1365-2LV-e
-   *  AU50: xcu50-fsvh2104-2-e
-   *  AU55C: xcu55c-fsvh2892-2L-e
-   *  AU55N/C1100: xcu55n-fsvh2892-2L-e
-   *  AU200: xcu200-fsgd2104-2-e
-   *  AU250: xcu250-fsgd2104-2-e
-   *  AU280: xcu280-fsvh2892-2L-e
-   *  VCU1525: xcvu9p-fsgd2104-2L-e
-   *  X3/X3522: xcux35-vsva1365-3-e
-*  USB UART
-   *  AU45N/SN1000: FTDI FT4232H (DMB-2)
-   *  AU50: FTDI FT4232H (3 via DMB-1)
-   *  AU55C: FTDI FT4232H (2 onboard, all 3 via DMB-1)
-   *  AU55N/C1100: FTDI FT4232H (2 onboard, all 3 via DMB-1)
-   *  AU200: FTDI FT4232H
-   *  AU250: FTDI FT4232H
-   *  AU280: FTDI FT4232H
-   *  VCU1525: FTDI FT4232H
-   *  X3/X3522: FTDI FT4232H (DMB-2)
-*  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU45N/SN1000
+    *  FPGA: xcu26-vsva1365-2LV-e
+    *  USB UART: FTDI FT4232H (DMB-2)
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU50
+    *  FPGA: xcu50-fsvh2104-2-e
+    *  USB UART: FTDI FT4232H (3 via DMB-1)
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU55C
+    *  FPGA: xcu55c-fsvh2892-2L-e
+    *  USB UART: FTDI FT4232H (2 onboard, all 3 via DMB-1)
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU55N/C1100
+    *  FPGA: xcu55n-fsvh2892-2L-e
+    *  USB UART: FTDI FT4232H (2 onboard, all 3 via DMB-1)
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU200
+    *  FPGA: xcu200-fsgd2104-2-e
+    *  USB UART: FTDI FT4232H
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU250
+    *  FPGA: xcu250-fsgd2104-2-e
+    *  USB UART: FTDI FT4232H
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU280
+    *  FPGA: xcu280-fsvh2892-2L-e
+    *  USB UART: FTDI FT4232H
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  VCU1525
+    *  FPGA: xcvu9p-fsgd2104-2L-e
+    *  USB UART: FTDI FT4232H
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  X3/X3522
+    *  FPGA: xcux35-vsva1365-3-e
+    *  USB UART: FTDI FT4232H (DMB-2)
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
 
 ## Licensing
 

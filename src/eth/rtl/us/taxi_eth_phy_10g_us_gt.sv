@@ -129,7 +129,7 @@ module taxi_eth_phy_10g_us_gt #
 );
 
 localparam GT_USP = FAMILY == "kintexuplus" || FAMILY == "virtexuplus" || FAMILY == "virtexuplusHBM"
-    || FAMILY == "virtexuplus58G" || FAMILY == "zynquplus" || FAMILY == "zynquplusRFSOC";
+    || FAMILY == "virtexuplus58G" || FAMILY == "zynquplus" || FAMILY == "zynquplusRFSOC" || FAMILY == "artixuplus";
 
 // check configuration
 if (DATA_W != 32)

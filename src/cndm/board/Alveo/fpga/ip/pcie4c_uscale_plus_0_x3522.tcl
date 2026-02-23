@@ -1,0 +1,30 @@
+
+create_ip -name pcie4c_uscale_plus -vendor xilinx.com -library ip -module_name pcie4c_uscale_plus_0
+
+set_property -dict [list \
+    CONFIG.PL_LINK_CAP_MAX_LINK_SPEED {16.0_GT/s} \
+    CONFIG.PL_LINK_CAP_MAX_LINK_WIDTH {X8} \
+    CONFIG.AXISTEN_IF_EXT_512_CQ_STRADDLE {false} \
+    CONFIG.AXISTEN_IF_EXT_512_RQ_STRADDLE {false} \
+    CONFIG.AXISTEN_IF_EXT_512_RC_4TLP_STRADDLE {false} \
+    CONFIG.axisten_if_enable_client_tag {true} \
+    CONFIG.axisten_if_width {512_bit} \
+    CONFIG.extended_tag_field {true} \
+    CONFIG.pf0_dev_cap_max_payload {1024_bytes} \
+    CONFIG.axisten_freq {250} \
+    CONFIG.PF0_Use_Class_Code_Lookup_Assistant {false} \
+    CONFIG.PF0_CLASS_CODE {020000} \
+    CONFIG.PF0_DEVICE_ID {C001} \
+    CONFIG.PF0_SUBSYSTEM_ID {9dc2} \
+    CONFIG.PF0_SUBSYSTEM_VENDOR_ID {10ee} \
+    CONFIG.pf0_bar0_64bit {true} \
+    CONFIG.pf0_bar0_prefetchable {true} \
+    CONFIG.pf0_bar0_scale {Megabytes} \
+    CONFIG.pf0_bar0_size {16} \
+    CONFIG.pf0_msi_enabled {true} \
+    CONFIG.PF0_MSI_CAP_MULTIMSGCAP {32_vectors} \
+    CONFIG.en_msi_per_vec_masking {true} \
+    CONFIG.legacy_ext_pcie_cfg_space_enabled {true} \
+    CONFIG.vendor_id {1234} \
+    CONFIG.mode_selection {Advanced} \
+] [get_ips pcie4c_uscale_plus_0]

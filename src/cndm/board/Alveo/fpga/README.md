@@ -47,6 +47,12 @@ This design targets the Xilinx Alveo series.
     *  PCIe: gen 3 x16 (~128 Gbps)
     *  Reference oscillator: 156.25 MHz from Si570
     *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  X3/X3522
+    *  FPGA: xcux35-vsva1365-3-e
+    *  USB UART: FTDI FT4232H (DMB-2)
+    *  PCIe: gen 4 x8 (~128 Gbps)
+    *  Reference oscillator: 161.1328125 MHz from Si5394
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
 
 ## Licensing
 

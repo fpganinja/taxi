@@ -354,7 +354,7 @@ int write_1_to_file(const char *file_name)
 
 int file_type_from_ext(const char *file_name)
 {
-	char *ptr;
+	const char *ptr;
 	char buffer[32];
 
 	ptr = strrchr(file_name, '.');

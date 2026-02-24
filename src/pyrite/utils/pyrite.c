@@ -506,6 +506,7 @@ struct reg_if *reg_if_open_vpd(int fd)
 {
 	char buf[32];
 	int offset;
+	bool found = false;
 
 	struct reg_if *reg = calloc(sizeof(struct reg_if), 1);
 
@@ -530,14 +531,98 @@ struct reg_if *reg_if_open_vpd(int fd)
 	while (offset > 0) {
 		pread(fd, buf, 2, offset);
 
-		if (buf[0] == PCI_CAP_ID_VPD)
+		if (buf[0] == PCI_CAP_ID_VPD) {
+			found = true;
 			break;
+		}
 
 		offset = buf[1] & 0xfc;
 	}
 
-	if (!offset || buf[0] != PCI_CAP_ID_VPD) {
-		perror("Failed to locate VPD capability");
+	if (!found) {
+		reg_if_close(reg);
+		return NULL;
+	}
+
+	priv->fd = fd;
+	priv->offset = offset;
+
+	return reg;
+}
+
+struct vsec_reg_priv {
+	int fd;
+	int offset;
+};
+
+static int reg_if_vsec_read32(const struct reg_if *reg, size_t offset, uint32_t *value)
+{
+	const struct vsec_reg_priv *priv = reg->priv;
+	uint32_t offs = offset & 0x7fffffff; // clear F
+	pwrite(priv->fd, &offs, 4, priv->offset+0x08);
+	pread(priv->fd, value, 4, priv->offset+0x0c);
+	return 0;
+}
+
+static int reg_if_vsec_write32(const struct reg_if *reg, size_t offset, uint32_t value)
+{
+	const struct vsec_reg_priv *priv = reg->priv;
+	uint32_t offs = offset | 0x80000000; // set F
+	pwrite(priv->fd, &value, 4, priv->offset+0x0c);
+	pwrite(priv->fd, &offs, 4, priv->offset+0x08);
+	return 0;
+}
+
+static void reg_if_vsec_close(const struct reg_if *reg)
+{
+	free(reg->priv);
+}
+
+static const struct reg_if_ops reg_if_vsec_ops = {
+	.read32 = reg_if_vsec_read32,
+	.write32 = reg_if_vsec_write32,
+	.close = reg_if_vsec_close,
+};
+
+struct reg_if *reg_if_open_vsec(int fd)
+{
+	uint32_t cap_hdr, vsec_hdr;
+	int offset;
+	bool found = false;
+
+	struct reg_if *reg = calloc(sizeof(struct reg_if), 1);
+
+	if (!reg)
+		return NULL;
+
+	struct vsec_reg_priv *priv = calloc(sizeof(struct vsec_reg_priv), 1);
+
+	if (!priv) {
+		free(reg);
+		return NULL;
+	}
+
+	reg->priv = priv;
+	reg->ops = &reg_if_vsec_ops;
+
+	// find VSEC extended capability (ID 0x000b, VSEC ID 0x00db)
+	offset = 0x100;
+
+	while (offset > 0) {
+		pread(fd, &cap_hdr, 4, offset);
+
+		if ((cap_hdr & 0xfffff) == 0x1000b) {
+			pread(fd, &vsec_hdr, 4, offset+4);
+			if ((vsec_hdr & 0xfffff) == 0x100db) {
+				found = true;
+				break;
+			}
+		}
+
+		offset = cap_hdr >> 20;
+	}
+
+	if (!found) {
 		reg_if_close(reg);
 		return NULL;
 	}
@@ -554,7 +639,7 @@ int main(int argc, char *argv[])
 	int opt;
 	int ret = 0;
 
-	struct reg_if *vpd_regs;
+	struct reg_if *ctrl_regs;
 
 	char dev_name[32] = "";
 	char *read_file_name = NULL;
@@ -683,9 +768,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	vpd_regs = reg_if_open_vpd(config_fd);
-	if (!vpd_regs) {
-		perror("Failed to initialize VPD capability");
+	if ((ctrl_regs = reg_if_open_vsec(config_fd))) {
+		// found VSEC
+	} else if ((ctrl_regs = reg_if_open_vpd(config_fd))) {
+		// found VPD
+	} else {
+		fprintf(stderr, "Failed to locate capability structure\n");
 		ret = -1;
 		goto err;
 	}
@@ -699,7 +787,7 @@ int main(int argc, char *argv[])
 	printf("PCIe ID (device): %s\n", strrchr(pci_device_path, '/')+1);
 	printf("PCIe ID (upstream port): %s\n", strrchr(pci_port_path, '/')+1);
 
-	rb_list = enumerate_reg_block_list(vpd_regs, 0x4000, 0, 0x4000);
+	rb_list = enumerate_reg_block_list(ctrl_regs, 0x4000, 0, 0x4000);
 
 	printf("Register blocks:\n");
 	for (struct reg_block *rb = rb_list; rb->regs; rb++)
@@ -1422,8 +1510,8 @@ skip_flash:
 			reg_if_write32(fw_id_rb->regs, 0x0C, 0xFEE1DEAD);
 
 			// disconnect
-			reg_if_close(vpd_regs);
-			vpd_regs = NULL;
+			reg_if_close(ctrl_regs);
+			ctrl_regs = NULL;
 			close(config_fd);
 		}
 
@@ -1484,7 +1572,7 @@ err:
 	flash_release(pri_flash);
 	flash_release(sec_flash);
 
-	reg_if_close(vpd_regs);
+	reg_if_close(ctrl_regs);
 	close(config_fd);
 
 	return ret;

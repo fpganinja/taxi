@@ -143,15 +143,15 @@ MMCME4_BASE #(
     .CLKOUT0_DUTY_CYCLE(0.5),
     .CLKOUT0_PHASE(0),
     // Not used
-    .CLKOUT1_DIVIDE(10),
+    .CLKOUT1_DIVIDE(1),
     .CLKOUT1_DUTY_CYCLE(0.5),
-    .CLKOUT1_PHASE(90),
+    .CLKOUT1_PHASE(0),
     // Not used
-    .CLKOUT2_DIVIDE(20),
+    .CLKOUT2_DIVIDE(1),
     .CLKOUT2_DUTY_CYCLE(0.5),
     .CLKOUT2_PHASE(0),
     // Not used
-    .CLKOUT3_DIVIDE(4),
+    .CLKOUT3_DIVIDE(1),
     .CLKOUT3_DUTY_CYCLE(0.5),
     .CLKOUT3_PHASE(0),
     // Not used

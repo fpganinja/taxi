@@ -160,8 +160,8 @@ class TB:
             # cfg_phy_link_status
             # cfg_negotiated_width
             # cfg_current_speed
-            # cfg_max_payload=dut.cfg_max_payload,
-            # cfg_max_read_req=dut.cfg_max_read_req,
+            cfg_max_payload=dut.cfg_max_payload,
+            cfg_max_read_req=dut.cfg_max_read_req,
             # cfg_function_status
             # cfg_vf_status
             # cfg_function_power_state
@@ -175,7 +175,7 @@ class TB:
             # cfg_rx_pm_state
             # cfg_tx_pm_state
             # cfg_ltssm_state
-            # cfg_rcb_status=dut.cfg_rcb_status,
+            cfg_rcb_status=dut.cfg_rcb_status,
             # cfg_obff_enable
             # cfg_pl_status_change
             # cfg_tph_requester_enable

@@ -12,6 +12,7 @@ Authors:
 #include <fcntl.h>
 #include <limits.h>
 #include <linux/pci_regs.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

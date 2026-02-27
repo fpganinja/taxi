@@ -87,16 +87,18 @@ if (m_axis_rx.DATA_W != DATA_W)
 if (m_axis_rx.USER_W != USER_W)
     $fatal(0, "Error: Interface USER_W parameter mismatch (instance %m)");
 
-localparam [7:0]
+typedef enum logic [7:0] {
     ETH_PRE = 8'h55,
-    ETH_SFD = 8'hD5;
+    ETH_SFD = 8'hD5
+} eth_pre_t;
 
-localparam [1:0]
-    STATE_IDLE = 2'd0,
-    STATE_PIPE = 2'd1,
-    STATE_PAYLOAD = 2'd2;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_PIPE,
+    STATE_PAYLOAD
+} state_t;
 
-logic [1:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic reset_crc;

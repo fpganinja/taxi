@@ -102,11 +102,12 @@ if (s_axis_tx.DATA_W != DATA_W)
 if (s_axis_tx.USER_W != USER_W)
     $fatal(0, "Error: Interface USER_W parameter mismatch (instance %m)");
 
-localparam [7:0]
+typedef enum logic [7:0] {
     ETH_PRE = 8'h55,
-    ETH_SFD = 8'hD5;
+    ETH_SFD = 8'hD5
+} eth_pre_t;
 
-localparam [6:0]
+typedef enum logic [6:0] {
     CTRL_IDLE  = 7'h00,
     CTRL_LPI   = 7'h06,
     CTRL_ERROR = 7'h1e,
@@ -115,17 +116,20 @@ localparam [6:0]
     CTRL_RES_2 = 7'h4b,
     CTRL_RES_3 = 7'h55,
     CTRL_RES_4 = 7'h66,
-    CTRL_RES_5 = 7'h78;
+    CTRL_RES_5 = 7'h78
+} baser_ctrl_t;
 
-localparam [3:0]
+typedef enum logic [3:0] {
     O_SEQ_OS = 4'h0,
-    O_SIG_OS = 4'hf;
+    O_SIG_OS = 4'hf
+} baser_o_t;
 
-localparam [1:0]
+typedef enum logic [1:0] {
     SYNC_DATA = 2'b10,
-    SYNC_CTRL = 2'b01;
+    SYNC_CTRL = 2'b01
+} baser_sync_t;
 
-localparam [7:0]
+typedef enum logic [7:0] {
     BLOCK_TYPE_CTRL     = 8'h1e, // C7 C6 C5 C4 C3 C2 C1 C0 BT
     BLOCK_TYPE_OS_4     = 8'h2d, // D7 D6 D5 O4 C3 C2 C1 C0 BT
     BLOCK_TYPE_START_4  = 8'h33, // D7 D6 D5    C3 C2 C1 C0 BT
@@ -140,9 +144,10 @@ localparam [7:0]
     BLOCK_TYPE_TERM_4   = 8'hcc, // C7 C6 C5    D3 D2 D1 D0 BT
     BLOCK_TYPE_TERM_5   = 8'hd2, // C7 C6    D4 D3 D2 D1 D0 BT
     BLOCK_TYPE_TERM_6   = 8'he1, // C7    D5 D4 D3 D2 D1 D0 BT
-    BLOCK_TYPE_TERM_7   = 8'hff; //    D6 D5 D4 D3 D2 D1 D0 BT
+    BLOCK_TYPE_TERM_7   = 8'hff  //    D6 D5 D4 D3 D2 D1 D0 BT
+} baser_block_type_t;
 
-localparam [2:0]
+typedef enum logic [2:0] {
     OUTPUT_TYPE_IDLE = 3'd0,
     OUTPUT_TYPE_ERROR = 3'd1,
     OUTPUT_TYPE_START = 3'd2,
@@ -150,20 +155,22 @@ localparam [2:0]
     OUTPUT_TYPE_TERM_0 = 3'd4,
     OUTPUT_TYPE_TERM_1 = 3'd5,
     OUTPUT_TYPE_TERM_2 = 3'd6,
-    OUTPUT_TYPE_TERM_3 = 3'd7;
+    OUTPUT_TYPE_TERM_3 = 3'd7
+} out_type_t;
 
-localparam [3:0]
-    STATE_IDLE = 4'd0,
-    STATE_PREAMBLE = 4'd1,
-    STATE_PAYLOAD = 4'd2,
-    STATE_PAD = 4'd3,
-    STATE_FCS_1 = 4'd4,
-    STATE_FCS_2 = 4'd5,
-    STATE_FCS_3 = 4'd6,
-    STATE_ERR = 4'd7,
-    STATE_IFG = 4'd8;
+typedef enum logic [3:0] {
+    STATE_IDLE,
+    STATE_PREAMBLE,
+    STATE_PAYLOAD,
+    STATE_PAD,
+    STATE_FCS_1,
+    STATE_FCS_2,
+    STATE_FCS_3,
+    STATE_ERR,
+    STATE_IFG
+} state_t;
 
-logic [3:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic reset_crc;
@@ -174,8 +181,8 @@ logic [EMPTY_W-1:0] s_empty_reg = '0, s_empty_next;
 
 logic [DATA_W-1:0] fcs_output_data_0;
 logic [DATA_W-1:0] fcs_output_data_1;
-logic [2:0] fcs_output_type_0;
-logic [2:0] fcs_output_type_1;
+out_type_t fcs_output_type_0;
+out_type_t fcs_output_type_1;
 
 logic [7:0] ifg_offset;
 
@@ -216,7 +223,7 @@ logic [GBX_CNT-1:0] tx_gbx_sync_reg = '0;
 
 logic [DATA_W-1:0] output_data_reg = '0, output_data_next;
 logic [DATA_W-1:0] output_data_d1_reg = '0;
-logic [2:0] output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
+out_type_t output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
 
 logic start_packet_reg = 1'b0, start_packet_next;
 

@@ -99,26 +99,38 @@ if (s_axis_tx.DATA_W != DATA_W)
 if (s_axis_tx.USER_W != USER_W)
     $fatal(0, "Error: Interface USER_W parameter mismatch (instance %m)");
 
-localparam [7:0]
+typedef enum logic [7:0] {
     ETH_PRE = 8'h55,
-    ETH_SFD = 8'hD5;
+    ETH_SFD = 8'hD5
+} eth_pre_t;
 
-localparam [7:0]
-    XGMII_IDLE = 8'h07,
-    XGMII_START = 8'hfb,
-    XGMII_TERM = 8'hfd,
-    XGMII_ERROR = 8'hfe;
+typedef enum logic [7:0] {
+    XGMII_IDLE   = 8'h07,
+    XGMII_LPI    = 8'h06,
+    XGMII_START  = 8'hfb,
+    XGMII_TERM   = 8'hfd,
+    XGMII_ERROR  = 8'hfe,
+    XGMII_SEQ_OS = 8'h9c,
+    XGMII_RES_0  = 8'h1c,
+    XGMII_RES_1  = 8'h3c,
+    XGMII_RES_2  = 8'h7c,
+    XGMII_RES_3  = 8'hbc,
+    XGMII_RES_4  = 8'hdc,
+    XGMII_RES_5  = 8'hf7,
+    XGMII_SIG_OS = 8'h5c
+} xgmii_ctrl_t;
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_PAYLOAD = 3'd1,
-    STATE_PAD = 3'd2,
-    STATE_FCS_1 = 3'd3,
-    STATE_FCS_2 = 3'd4,
-    STATE_ERR = 3'd5,
-    STATE_IFG = 3'd6;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_PAYLOAD,
+    STATE_PAD,
+    STATE_FCS_1,
+    STATE_FCS_2,
+    STATE_ERR,
+    STATE_IFG
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic reset_crc;

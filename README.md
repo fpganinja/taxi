@@ -184,6 +184,7 @@ The Taxi transport library contains many smaller components that can be composed
     *  PCIe AXI lite master for Xilinx UltraScale
     *  MSI shim for Xilinx UltraScale
     *  MSI-X with AXI lite control interface
+    *  MSI-X with APB control interface
 *  Primitives
     *  Arbiter
     *  Priority encoder

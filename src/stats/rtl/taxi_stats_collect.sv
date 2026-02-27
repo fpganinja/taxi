@@ -71,11 +71,12 @@ localparam CNT_W = $clog2(CNT);
 localparam PERIOD_CNT_W = $clog2(UPDATE_PERIOD+1);
 localparam ACC_W = INC_W+CNT_W+1;
 
-localparam [0:0]
-    STATE_READ = 1'd0,
-    STATE_WRITE = 1'd1;
+typedef enum logic [0:0] {
+    STATE_READ,
+    STATE_WRITE
+} state_t;
 
-logic [0:0] state_reg = STATE_READ, state_next;
+state_t state_reg = STATE_READ, state_next;
 
 logic [STAT_INC_W-1:0] m_axis_stat_tdata_reg = '0, m_axis_stat_tdata_next;
 logic [STAT_ID_W-1:0] m_axis_stat_tid_reg = '0, m_axis_stat_tid_next;

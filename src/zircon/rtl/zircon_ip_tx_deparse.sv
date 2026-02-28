@@ -86,7 +86,7 @@ function [31:0] swab32(input [31:0] data);
     end
 endfunction
 
-localparam [15:0]
+typedef enum logic [15:0] {
     ETHERTYPE_IPV4 = 16'h0800,
     ETHERTYPE_ARP = 16'h0806,
     ETHERTYPE_VLAN_C = 16'h8100,
@@ -94,9 +94,10 @@ localparam [15:0]
     ETHERTYPE_IPV6 = 16'h86DD,
     ETHERTYPE_PBB = 16'h88E7,
     ETHERTYPE_PTP = 16'h88F7,
-    ETHERTYPE_ROCE = 16'h8915;
+    ETHERTYPE_ROCE = 16'h8915
+} ethertype_t;
 
-localparam [7:0]
+typedef enum logic [7:0] {
     PROTO_IPV6_HOPOPT = 8'd0,
     PROTO_ICMP = 8'd1,
     PROTO_IGMP = 8'd2,
@@ -115,7 +116,8 @@ localparam [7:0]
     PROTO_HIP = 8'd139,
     PROTO_SHIM6 = 8'd140,
     PROTO_253 = 8'd253,
-    PROTO_254 = 8'd254;
+    PROTO_254 = 8'd254
+} proto_t;
 
 localparam
     FLG_VLAN_S = 1,
@@ -130,39 +132,40 @@ localparam
     FLG_ESP = 11,
     FLG_EN = 31;
 
-localparam [4:0]
-    PKT_STATE_IDLE = 5'd0,
-    PKT_STATE_ETH_1 = 5'd1,
-    PKT_STATE_ETH_2 = 5'd2,
-    PKT_STATE_ETH_3 = 5'd3,
-    PKT_STATE_VLAN_1 = 5'd4,
-    PKT_STATE_VLAN_2 = 5'd5,
-    PKT_STATE_IPV4_1 = 5'd6,
-    PKT_STATE_IPV4_2 = 5'd7,
-    PKT_STATE_IPV4_3 = 5'd8,
-    PKT_STATE_IPV4_4 = 5'd9,
-    PKT_STATE_IPV4_5 = 5'd10,
-    PKT_STATE_IPV4_6 = 5'd11,
-    PKT_STATE_IPV6_1 = 5'd12,
-    PKT_STATE_IPV6_2 = 5'd13,
-    PKT_STATE_IPV6_3 = 5'd14,
-    PKT_STATE_IPV6_4 = 5'd15,
-    PKT_STATE_IPV6_5 = 5'd16,
-    PKT_STATE_IPV6_6 = 5'd17,
-    PKT_STATE_IPV6_7 = 5'd18,
-    PKT_STATE_IPV6_8 = 5'd19,
-    PKT_STATE_IPV6_9 = 5'd20,
-    PKT_STATE_IPV6_10 = 5'd21,
-    PKT_STATE_TCP_1 = 5'd23,
-    PKT_STATE_TCP_2 = 5'd24,
-    PKT_STATE_TCP_3 = 5'd25,
-    PKT_STATE_TCP_4 = 5'd26,
-    PKT_STATE_TCP_5 = 5'd27,
-    PKT_STATE_UDP_1 = 5'd28,
-    PKT_STATE_UDP_2 = 5'd29,
-    PKT_STATE_FINISH_1 = 5'd30;
+typedef enum logic [4:0] {
+    PKT_STATE_IDLE,
+    PKT_STATE_ETH_1,
+    PKT_STATE_ETH_2,
+    PKT_STATE_ETH_3,
+    PKT_STATE_VLAN_1,
+    PKT_STATE_VLAN_2,
+    PKT_STATE_IPV4_1,
+    PKT_STATE_IPV4_2,
+    PKT_STATE_IPV4_3,
+    PKT_STATE_IPV4_4,
+    PKT_STATE_IPV4_5,
+    PKT_STATE_IPV4_6,
+    PKT_STATE_IPV6_1,
+    PKT_STATE_IPV6_2,
+    PKT_STATE_IPV6_3,
+    PKT_STATE_IPV6_4,
+    PKT_STATE_IPV6_5,
+    PKT_STATE_IPV6_6,
+    PKT_STATE_IPV6_7,
+    PKT_STATE_IPV6_8,
+    PKT_STATE_IPV6_9,
+    PKT_STATE_IPV6_10,
+    PKT_STATE_TCP_1,
+    PKT_STATE_TCP_2,
+    PKT_STATE_TCP_3,
+    PKT_STATE_TCP_4,
+    PKT_STATE_TCP_5,
+    PKT_STATE_UDP_1,
+    PKT_STATE_UDP_2,
+    PKT_STATE_FINISH_1
+} pkt_state_t;
 
-logic [4:0] pkt_state_reg = PKT_STATE_IDLE, pkt_state_next;
+pkt_state_t pkt_state_reg = PKT_STATE_IDLE, pkt_state_next;
 
 logic [31:0] meta_flag_reg = '0, meta_flag_next;
 logic [15:0] meta_payload_len_reg = '0, meta_payload_len_next;

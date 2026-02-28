@@ -69,7 +69,7 @@ if (META_W != 64)
 if (m_axis_meta.KEEP_W * 8 != META_W)
     $fatal(0, "Error: Interface requires byte (8-bit) granularity (instance %m)");
 
-localparam [15:0]
+typedef enum logic [15:0] {
     ETHERTYPE_IPV4 = 16'h0800,
     ETHERTYPE_ARP = 16'h0806,
     ETHERTYPE_VLAN_C = 16'h8100,
@@ -77,9 +77,10 @@ localparam [15:0]
     ETHERTYPE_IPV6 = 16'h86DD,
     ETHERTYPE_PBB = 16'h88E7,
     ETHERTYPE_PTP = 16'h88F7,
-    ETHERTYPE_ROCE = 16'h8915;
+    ETHERTYPE_ROCE = 16'h8915
+} ethertype_t;
 
-localparam [7:0]
+typedef enum logic [7:0] {
     PROTO_IPV6_HOPOPT = 8'd0,
     PROTO_ICMP = 8'd1,
     PROTO_IGMP = 8'd2,
@@ -98,7 +99,8 @@ localparam [7:0]
     PROTO_HIP = 8'd139,
     PROTO_SHIM6 = 8'd140,
     PROTO_253 = 8'd253,
-    PROTO_254 = 8'd254;
+    PROTO_254 = 8'd254
+} proto_t;
 
 localparam
     FLG_VLAN_S = 1,
@@ -118,41 +120,42 @@ localparam
     FLG_L4_BAD_LEN = 25,
     FLG_PARSE_DONE = 31;
 
-localparam [4:0]
-    STATE_IDLE = 5'd0,
-    STATE_ETH_1 = 5'd1,
-    STATE_ETH_2 = 5'd2,
-    STATE_ETH_3 = 5'd3,
-    STATE_VLAN_1 = 5'd4,
-    STATE_VLAN_2 = 5'd5,
-    STATE_IPV4_1 = 5'd6,
-    STATE_IPV4_2 = 5'd7,
-    STATE_IPV4_3 = 5'd8,
-    STATE_IPV4_4 = 5'd9,
-    STATE_IPV4_5 = 5'd10,
-    STATE_IPV4_6 = 5'd11,
-    STATE_IPV6_1 = 5'd12,
-    STATE_IPV6_2 = 5'd13,
-    STATE_IPV6_3 = 5'd14,
-    STATE_IPV6_4 = 5'd15,
-    STATE_IPV6_5 = 5'd16,
-    STATE_IPV6_6 = 5'd17,
-    STATE_IPV6_7 = 5'd18,
-    STATE_IPV6_8 = 5'd19,
-    STATE_IPV6_9 = 5'd20,
-    STATE_IPV6_10 = 5'd21,
-    STATE_EXT_HDR_1 = 5'd22,
-    STATE_TCP_1 = 5'd23,
-    STATE_TCP_2 = 5'd24,
-    STATE_TCP_3 = 5'd25,
-    STATE_TCP_4 = 5'd26,
-    STATE_TCP_5 = 5'd27,
-    STATE_UDP_1 = 5'd28,
-    STATE_UDP_2 = 5'd29,
-    STATE_FINISH_1 = 5'd30,
-    STATE_FINISH_2 = 5'd31;
+typedef enum logic [4:0] {
+    STATE_IDLE,
+    STATE_ETH_1,
+    STATE_ETH_2,
+    STATE_ETH_3,
+    STATE_VLAN_1,
+    STATE_VLAN_2,
+    STATE_IPV4_1,
+    STATE_IPV4_2,
+    STATE_IPV4_3,
+    STATE_IPV4_4,
+    STATE_IPV4_5,
+    STATE_IPV4_6,
+    STATE_IPV6_1,
+    STATE_IPV6_2,
+    STATE_IPV6_3,
+    STATE_IPV6_4,
+    STATE_IPV6_5,
+    STATE_IPV6_6,
+    STATE_IPV6_7,
+    STATE_IPV6_8,
+    STATE_IPV6_9,
+    STATE_IPV6_10,
+    STATE_EXT_HDR_1,
+    STATE_TCP_1,
+    STATE_TCP_2,
+    STATE_TCP_3,
+    STATE_TCP_4,
+    STATE_TCP_5,
+    STATE_UDP_1,
+    STATE_UDP_2,
+    STATE_FINISH_1,
+    STATE_FINISH_2
+} state_t;
 
-logic [4:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic frame_reg = 1'b0, frame_next;
 logic run_reg = 1'b0, run_next;

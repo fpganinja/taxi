@@ -93,11 +93,12 @@ if (M_BYTE_LANES == S_BYTE_LANES) begin : bypass
 end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
     // output is wider; upsize
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_DATA = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_DATA
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic s_apb_pready_reg = 1'b0, s_apb_pready_next;
     logic [S_DATA_W-1:0] s_apb_prdata_reg = '0, s_apb_prdata_next;
@@ -232,11 +233,12 @@ end else begin : downsize
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_DATA = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_DATA
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic [DATA_W-1:0] data_reg = '0, data_next;
     logic [STRB_W-1:0] strb_reg = '0, strb_next;

@@ -8,18 +8,49 @@ Authors:
 
 """
 
+import array
 import logging
 import struct
 from collections import deque
 
 from cocotb.queue import Queue
 
+
+# Command opcodes
+CNDM_CMD_OP_NOP = 0x0000
+
+CNDM_CMD_OP_CREATE_EQ  = 0x0200
+CNDM_CMD_OP_MODIFY_EQ  = 0x0201
+CNDM_CMD_OP_QUERY_EQ   = 0x0202
+CNDM_CMD_OP_DESTROY_EQ = 0x0203
+
+CNDM_CMD_OP_CREATE_CQ  = 0x0210
+CNDM_CMD_OP_MODIFY_CQ  = 0x0211
+CNDM_CMD_OP_QUERY_CQ   = 0x0212
+CNDM_CMD_OP_DESTROY_CQ = 0x0213
+
+CNDM_CMD_OP_CREATE_SQ  = 0x0220
+CNDM_CMD_OP_MODIFY_SQ  = 0x0221
+CNDM_CMD_OP_QUERY_SQ   = 0x0222
+CNDM_CMD_OP_DESTROY_SQ = 0x0223
+
+CNDM_CMD_OP_CREATE_RQ  = 0x0230
+CNDM_CMD_OP_MODIFY_RQ  = 0x0231
+CNDM_CMD_OP_QUERY_RQ   = 0x0232
+CNDM_CMD_OP_DESTROY_RQ = 0x0233
+
+CNDM_CMD_OP_CREATE_QP  = 0x0240
+CNDM_CMD_OP_MODIFY_QP  = 0x0241
+CNDM_CMD_OP_QUERY_QP   = 0x0242
+CNDM_CMD_OP_DESTROY_QP = 0x0243
+
+
 class Port:
-    def __init__(self, driver, index, hw_regs):
+    def __init__(self, driver, index):
         self.driver = driver
         self.log = driver.log
         self.index = index
-        self.hw_regs = hw_regs
+        self.hw_regs = driver.hw_regs
 
         self.rxq_log_size = (256).bit_length()-1
         self.rxq_size = 2**self.rxq_log_size
@@ -27,6 +58,8 @@ class Port:
         self.rxq = None
         self.rxq_prod = 0
         self.rxq_cons = 0
+        self.rx_rqn = 0
+        self.rxq_db_offs = 0
 
         self.rx_info = [None] * self.rxq_size
 
@@ -36,6 +69,7 @@ class Port:
         self.rxcq = None
         self.rxcq_prod = 0
         self.rxcq_cons = 0
+        self.rx_cqn = 0
 
         self.txq_log_size = (256).bit_length()-1
         self.txq_size = 2**self.txq_log_size
@@ -43,6 +77,8 @@ class Port:
         self.txq = None
         self.txq_prod = 0
         self.txq_cons = 0
+        self.tx_sqn = 0
+        self.txq_db_offs = 0
 
         self.tx_info = [None] * self.txq_size
 
@@ -52,43 +88,103 @@ class Port:
         self.txcq = None
         self.txcq_prod = 0
         self.txcq_cons = 0
+        self.tx_cqn = 0
 
         self.rx_queue = Queue()
 
     async def init(self):
 
-        self.rxq = self.driver.pool.alloc_region(self.rxq_size*16)
-        addr = self.rxq.get_absolute_address(0)
-        await self.hw_regs.write_dword(0x0200, 0x00000000)
-        await self.hw_regs.write_dword(0x0204, 0x00000000)
-        await self.hw_regs.write_dword(0x0208, addr & 0xffffffff)
-        await self.hw_regs.write_dword(0x020c, addr >> 32)
-        await self.hw_regs.write_dword(0x0200, 0x00000001 | (self.rxq_log_size << 16))
-
         self.rxcq = self.driver.pool.alloc_region(self.rxcq_size*16)
         addr = self.rxcq.get_absolute_address(0)
-        await self.hw_regs.write_dword(0x0400, 0x00000000)
-        await self.hw_regs.write_dword(0x0408, addr & 0xffffffff)
-        await self.hw_regs.write_dword(0x040c, addr >> 32)
-        await self.hw_regs.write_dword(0x0400, 0x00000001 | (self.rxcq_log_size << 16))
 
-        self.txq = self.driver.pool.alloc_region(self.txq_size*16)
-        addr = self.txq.get_absolute_address(0)
-        await self.hw_regs.write_dword(0x0100, 0x00000000)
-        await self.hw_regs.write_dword(0x0104, 0x00000000)
-        await self.hw_regs.write_dword(0x0108, addr & 0xffffffff)
-        await self.hw_regs.write_dword(0x010c, addr >> 32)
-        await self.hw_regs.write_dword(0x0100, 0x00000001 | (self.txq_log_size << 16))
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_CREATE_CQ, # opcode
+            0x00000000, # flags
+            self.index, # port
+            0, # cqn
+            0, # eqn
+            0, # pd
+            self.rxcq_log_size, # size
+            0, # dboffs
+            addr, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+        print(rsp)
+
+        self.rxq = self.driver.pool.alloc_region(self.rxq_size*16)
+        addr = self.rxq.get_absolute_address(0)
+
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_CREATE_RQ, # opcode
+            0x00000000, # flags
+            self.index, # port
+            0, # rqn
+            0, # cqn
+            0, # pd
+            self.rxq_log_size, # size
+            0, # dboffs
+            addr, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+        print(rsp)
+
+        self.rxq_db_offs = struct.unpack_from("<L", rsp, 7*4)[0]
 
         self.txcq = self.driver.pool.alloc_region(self.txcq_size*16)
         addr = self.txcq.get_absolute_address(0)
-        await self.hw_regs.write_dword(0x0300, 0x00000000)
-        await self.hw_regs.write_dword(0x0308, addr & 0xffffffff)
-        await self.hw_regs.write_dword(0x030c, addr >> 32)
-        await self.hw_regs.write_dword(0x0300, 0x00000001 | (self.txcq_log_size << 16))
 
-        # wait for writes to complete
-        await self.hw_regs.read_dword(0)
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_CREATE_CQ, # opcode
+            0x00000000, # flags
+            self.index, # port
+            1, # cqn
+            0, # eqn
+            0, # pd
+            self.txcq_log_size, # size
+            0, # dboffs
+            addr, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+        print(rsp)
+
+        self.txq = self.driver.pool.alloc_region(self.txq_size*16)
+        addr = self.txq.get_absolute_address(0)
+
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_CREATE_SQ, # opcode
+            0x00000000, # flags
+            self.index, # port
+            0, # sqn
+            1, # cqn
+            0, # pd
+            self.txq_log_size, # size
+            0, # dboffs
+            addr, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+        print(rsp)
+
+        self.txq_db_offs = struct.unpack_from("<L", rsp, 7*4)[0]
 
         await self.refill_rx_buffers()
 
@@ -101,7 +197,7 @@ class Port:
         struct.pack_into('<xxxxLQ', self.txq.mem, 16*index, len(data), ptr+headroom)
         self.tx_info[index] = tx_buf
         self.txq_prod += 1
-        await self.hw_regs.write_dword(0x0104, self.txq_prod & 0xffff)
+        await self.hw_regs.write_dword(self.txq_db_offs, self.txq_prod & 0xffff)
 
     async def recv(self):
         return await self.rx_queue.get()
@@ -177,7 +273,7 @@ class Port:
             self.prepare_rx_desc(self.rxq_prod & self.rxq_mask)
             self.rxq_prod += 1
 
-        await self.hw_regs.write_dword(0x0204, self.rxq_prod & 0xffff)
+        await self.hw_regs.write_dword(self.rxq_db_offs, self.rxq_prod & 0xffff)
 
     async def process_rx_cq(self):
 
@@ -229,6 +325,8 @@ class Driver:
         self.pool = None
         self.hw_regs = None
 
+        self.port_count = None
+
         self.ports = []
 
         self.free_packets = deque()
@@ -256,11 +354,39 @@ class Driver:
         self.log.info("Port stride: 0x%x", self.port_stride)
 
         for k in range(self.port_count):
-            port = Port(self, k, self.hw_regs.create_window(self.port_offset + self.port_stride*k))
+            port = Port(self, k)
             await port.init()
             self.dev.request_irq(k, port.interrupt_handler)
 
             self.ports.append(port)
+
+    async def exec_cmd(self, cmd):
+        return await self.exec_mbox_cmd(cmd)
+
+    async def exec_mbox_cmd(self, cmd):
+        cmd = bytes(cmd)
+        cmd = cmd.ljust(64, b'\x00')
+
+        if len(cmd) != 64:
+            raise ValueError("Invalid command length")
+
+        # write command to mailbox
+        a = array.array("I")
+        a.frombytes(cmd)
+        for k, dw in enumerate(a):
+            await self.hw_regs.write_dword(0x10000+k*4, dw)
+
+        # execute it
+        await self.hw_regs.write_dword(0x0200, 0x00000001)
+
+        # wait for completion
+        while await self.hw_regs.read_dword(0x0200) & 0x00000001:
+            pass
+
+        # read response from mailbox
+        for k in range(16):
+            a[k] = await self.hw_regs.read_dword(0x10040+k*4)
+        return a.tobytes()
 
     def alloc_pkt(self):
         if self.free_packets:

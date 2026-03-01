@@ -523,8 +523,8 @@ core_inst (
     /*
      * Control register interface
      */
-    .s_axil_wr(axil_ctrl_bar),
-    .s_axil_rd(axil_ctrl_bar),
+    .s_axil_ctrl_wr(axil_ctrl_bar),
+    .s_axil_ctrl_rd(axil_ctrl_bar),
 
     /*
      * DMA

@@ -9,6 +9,7 @@ Authors:
 */
 
 #include "cndm.h"
+#include "cndm_hw.h"
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/version.h>
@@ -68,7 +69,7 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	for (k = 0; k < cdev->port_count; k++) {
 		struct net_device *ndev;
 
-		ndev = cndm_create_netdev(cdev, k, cdev->hw_addr + cdev->port_offset + (cdev->port_stride*k));
+		ndev = cndm_create_netdev(cdev, k);
 		if (IS_ERR_OR_NULL(ndev)) {
 			ret = PTR_ERR(ndev);
 			goto fail_netdev;

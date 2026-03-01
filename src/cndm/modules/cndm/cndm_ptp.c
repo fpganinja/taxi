@@ -148,12 +148,12 @@ void cndm_register_phc(struct cndm_dev *cdev)
 	}
 
 	// TODO
-	if (cdev->port_offset == 0x10000) {
+	if (cdev->port_offset == 0x20000) {
 		dev_info(cdev->dev, "PTP clock not present");
 		return;
 	}
 
-	cdev->phc_regs = cdev->hw_addr + 0x10000; // TODO
+	cdev->phc_regs = cdev->hw_addr + 0x20000; // TODO
 
 	cdev->ptp_clock_info.owner = THIS_MODULE;
 	snprintf(cdev->ptp_clock_info.name, sizeof(cdev->ptp_clock_info.name), "%s_phc", cdev->name);

@@ -20,6 +20,8 @@ Authors:
 #include <linux/ptp_clock_kernel.h>
 #include <net/devlink.h>
 
+#include "cndm_hw.h"
+
 #define DRIVER_VERSION "0.1"
 
 #define CNDM_MAX_IRQ 256
@@ -105,6 +107,7 @@ struct cndm_priv {
 	u32 txq_mask;
 	u32 txq_prod;
 	u32 txq_cons;
+	u32 txq_db_offs;
 
 	size_t rxq_region_len;
 	void *rxq_region;
@@ -115,6 +118,7 @@ struct cndm_priv {
 	u32 rxq_mask;
 	u32 rxq_prod;
 	u32 rxq_cons;
+	u32 rxq_db_offs;
 
 	size_t txcq_region_len;
 	void *txcq_region;
@@ -137,20 +141,9 @@ struct cndm_priv {
 	u32 rxcq_cons;
 };
 
-struct cndm_desc {
-	__u8 rsvd[4];
-	__le32 len;
-	__le64 addr;
-};
-
-struct cndm_cpl {
-	__u8 rsvd[4];
-	__le32 len;
-	__le32 ts_ns;
-	__le16 ts_fns;
-	__u8 ts_s;
-	__u8 phase;
-};
+// cndm_cmd.c
+int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
+int cndm_exec_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
 
 // cndm_devlink.c
 struct devlink *cndm_devlink_alloc(struct device *dev);
@@ -161,7 +154,7 @@ int cndm_irq_init_pcie(struct cndm_dev *cdev);
 void cndm_irq_deinit_pcie(struct cndm_dev *cdev);
 
 // cndm_netdev.c
-struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __iomem *hw_addr);
+struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port);
 void cndm_destroy_netdev(struct net_device *ndev);
 
 // cndm_dev.c

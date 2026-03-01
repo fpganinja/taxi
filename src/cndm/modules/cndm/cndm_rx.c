@@ -92,7 +92,7 @@ int cndm_refill_rx_buffers(struct cndm_priv *priv)
 	}
 
 	dma_wmb();
-	iowrite32(priv->rxq_prod & 0xffff, priv->hw_addr + 0x204);
+	iowrite32(priv->rxq_prod & 0xffff, priv->hw_addr + priv->rxq_db_offs);
 
 	return ret;
 }

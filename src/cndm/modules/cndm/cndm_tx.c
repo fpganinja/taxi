@@ -170,7 +170,7 @@ int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	}
 
 	dma_wmb();
-	iowrite32(priv->txq_prod & 0xffff, priv->hw_addr + 0x104);
+	iowrite32(priv->txq_prod & 0xffff, priv->hw_addr + priv->txq_db_offs);
 
 	return NETDEV_TX_OK;
 

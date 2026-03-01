@@ -9,6 +9,7 @@ Authors:
 */
 
 #include "cndm.h"
+#include "cndm_hw.h"
 
 #include <linux/version.h>
 
@@ -170,12 +171,15 @@ static int cndm_netdev_irq(struct notifier_block *nb, unsigned long action, void
 	return NOTIFY_DONE;
 }
 
-struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __iomem *hw_addr)
+struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 {
 	struct device *dev = cdev->dev;
 	struct net_device *ndev;
 	struct cndm_priv *priv;
 	int ret = 0;
+
+	struct cndm_cmd cmd;
+	struct cndm_cmd rsp;
 
 	ndev = alloc_etherdev_mqs(sizeof(*priv), 1, 1);
 	if (!ndev) {
@@ -193,7 +197,7 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __io
 	priv->ndev = ndev;
 	priv->cdev = cdev;
 
-	priv->hw_addr = hw_addr;
+	priv->hw_addr = cdev->hw_addr;
 
 	netif_set_real_num_tx_queues(ndev, 1);
 	netif_set_real_num_rx_queues(ndev, 1);
@@ -281,27 +285,61 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port, void __io
 		goto fail;
 	}
 
-	iowrite32(0x00000000, priv->hw_addr + 0x200);
-	iowrite32(priv->rxq_prod & 0xffff, priv->hw_addr + 0x204);
-	iowrite32(priv->rxq_region_addr & 0xffffffff, priv->hw_addr + 0x208);
-	iowrite32(priv->rxq_region_addr >> 32, priv->hw_addr + 0x20c);
-	iowrite32(0x00000001 | (priv->rxq_log_size << 16), priv->hw_addr + 0x200);
+	cmd.opcode = CNDM_CMD_OP_CREATE_CQ;
+	cmd.flags = 0x00000000;
+	cmd.port = port;
+	cmd.qn = 0;
+	cmd.qn2 = 0;
+	cmd.pd = 0;
+	cmd.size = priv->rxcq_log_size;
+	cmd.dboffs = 0;
+	cmd.ptr1 = priv->rxcq_region_addr;
+	cmd.ptr2 = 0;
 
-	iowrite32(0x00000000, priv->hw_addr + 0x100);
-	iowrite32(priv->txq_prod & 0xffff, priv->hw_addr + 0x104);
-	iowrite32(priv->txq_region_addr & 0xffffffff, priv->hw_addr + 0x108);
-	iowrite32(priv->txq_region_addr >> 32, priv->hw_addr + 0x10c);
-	iowrite32(0x00000001 | (priv->txq_log_size << 16), priv->hw_addr + 0x100);
+	cndm_exec_cmd(cdev, &cmd, &rsp);
 
-	iowrite32(0x00000000, priv->hw_addr + 0x400);
-	iowrite32(priv->rxcq_region_addr & 0xffffffff, priv->hw_addr + 0x408);
-	iowrite32(priv->rxcq_region_addr >> 32, priv->hw_addr + 0x40c);
-	iowrite32(0x00000001 | (priv->rxcq_log_size << 16), priv->hw_addr + 0x400);
+	cmd.opcode = CNDM_CMD_OP_CREATE_RQ;
+	cmd.flags = 0x00000000;
+	cmd.port = port;
+	cmd.qn = 0;
+	cmd.qn2 = 0;
+	cmd.pd = 0;
+	cmd.size = priv->rxq_log_size;
+	cmd.dboffs = 0;
+	cmd.ptr1 = priv->rxq_region_addr;
+	cmd.ptr2 = 0;
 
-	iowrite32(0x00000000, priv->hw_addr + 0x300);
-	iowrite32(priv->txcq_region_addr & 0xffffffff, priv->hw_addr + 0x308);
-	iowrite32(priv->txcq_region_addr >> 32, priv->hw_addr + 0x30c);
-	iowrite32(0x00000001 | (priv->txcq_log_size << 16), priv->hw_addr + 0x300);
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	priv->rxq_db_offs = rsp.dboffs;
+
+	cmd.opcode = CNDM_CMD_OP_CREATE_CQ;
+	cmd.flags = 0x00000000;
+	cmd.port = port;
+	cmd.qn = 1;
+	cmd.qn2 = 0;
+	cmd.pd = 0;
+	cmd.size = priv->txcq_log_size;
+	cmd.dboffs = 0;
+	cmd.ptr1 = priv->txcq_region_addr;
+	cmd.ptr2 = 0;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	cmd.opcode = CNDM_CMD_OP_CREATE_SQ;
+	cmd.flags = 0x00000000;
+	cmd.port = port;
+	cmd.qn = 0;
+	cmd.qn2 = 0;
+	cmd.pd = 0;
+	cmd.size = priv->txq_log_size;
+	cmd.dboffs = 0;
+	cmd.ptr1 = priv->txq_region_addr;
+	cmd.ptr2 = 0;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	priv->txq_db_offs = rsp.dboffs;
 
 	netif_carrier_off(ndev);
 
@@ -332,12 +370,41 @@ fail:
 void cndm_destroy_netdev(struct net_device *ndev)
 {
 	struct cndm_priv *priv = netdev_priv(ndev);
+	struct cndm_dev *cdev = priv->cdev;
 	struct device *dev = priv->dev;
 
-	iowrite32(0x00000000, priv->hw_addr + 0x200);
-	iowrite32(0x00000000, priv->hw_addr + 0x100);
-	iowrite32(0x00000000, priv->hw_addr + 0x400);
-	iowrite32(0x00000000, priv->hw_addr + 0x300);
+	struct cndm_cmd cmd;
+	struct cndm_cmd rsp;
+
+	cmd.opcode = CNDM_CMD_OP_DESTROY_CQ;
+	cmd.flags = 0x00000000;
+	cmd.port = ndev->dev_port;
+	cmd.qn = 0;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	cmd.opcode = CNDM_CMD_OP_DESTROY_RQ;
+	cmd.flags = 0x00000000;
+	cmd.port = ndev->dev_port;
+	cmd.qn = 0;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	priv->rxq_db_offs = rsp.dboffs;
+
+	cmd.opcode = CNDM_CMD_OP_DESTROY_CQ;
+	cmd.flags = 0x00000000;
+	cmd.port = ndev->dev_port;
+	cmd.qn = 1;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
+
+	cmd.opcode = CNDM_CMD_OP_DESTROY_SQ;
+	cmd.flags = 0x00000000;
+	cmd.port = ndev->dev_port;
+	cmd.qn = 0;
+
+	cndm_exec_cmd(cdev, &cmd, &rsp);
 
 	if (priv->irq)
 		atomic_notifier_chain_unregister(&priv->irq->nh, &priv->irq_nb);

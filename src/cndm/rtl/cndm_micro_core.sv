@@ -49,8 +49,8 @@ module cndm_micro_core #(
     /*
      * Control register interface
      */
-    taxi_axil_if.wr_slv            s_axil_wr,
-    taxi_axil_if.rd_slv            s_axil_rd,
+    taxi_axil_if.wr_slv            s_axil_ctrl_wr,
+    taxi_axil_if.rd_slv            s_axil_ctrl_rd,
 
     /*
      * DMA
@@ -97,8 +97,8 @@ module cndm_micro_core #(
 
 localparam CL_PORTS = $clog2(PORTS);
 
-localparam AXIL_ADDR_W = s_axil_wr.ADDR_W;
-localparam AXIL_DATA_W = s_axil_wr.DATA_W;
+localparam AXIL_ADDR_W = s_axil_ctrl_wr.ADDR_W;
+localparam AXIL_DATA_W = s_axil_ctrl_wr.DATA_W;
 
 localparam RAM_SEGS = dma_ram_wr.SEGS;
 localparam RAM_SEG_ADDR_W = dma_ram_wr.SEG_ADDR_W;
@@ -106,32 +106,33 @@ localparam RAM_SEG_DATA_W = dma_ram_wr.SEG_DATA_W;
 localparam RAM_SEG_BE_W = dma_ram_wr.SEG_BE_W;
 localparam RAM_SEL_W = dma_ram_wr.SEL_W;
 
-localparam PORT_OFFSET = PTP_TS_EN ? 2 : 1;
+localparam PORT_OFFSET = PTP_TS_EN ? 3 : 2;
+localparam PORT_BASE_ADDR = PTP_TS_EN ? 32'h00030000 : 32'h00020000;
 
 taxi_axil_if #(
-    .DATA_W(s_axil_wr.DATA_W),
+    .DATA_W(s_axil_ctrl_wr.DATA_W),
     .ADDR_W(16),
-    .STRB_W(s_axil_wr.STRB_W),
-    .AWUSER_EN(s_axil_wr.AWUSER_EN),
-    .AWUSER_W(s_axil_wr.AWUSER_W),
-    .WUSER_EN(s_axil_wr.WUSER_EN),
-    .WUSER_W(s_axil_wr.WUSER_W),
-    .BUSER_EN(s_axil_wr.BUSER_EN),
-    .BUSER_W(s_axil_wr.BUSER_W),
-    .ARUSER_EN(s_axil_wr.ARUSER_EN),
-    .ARUSER_W(s_axil_wr.ARUSER_W),
-    .RUSER_EN(s_axil_wr.RUSER_EN),
-    .RUSER_W(s_axil_wr.RUSER_W)
+    .STRB_W(s_axil_ctrl_wr.STRB_W),
+    .AWUSER_EN(s_axil_ctrl_wr.AWUSER_EN),
+    .AWUSER_W(s_axil_ctrl_wr.AWUSER_W),
+    .WUSER_EN(s_axil_ctrl_wr.WUSER_EN),
+    .WUSER_W(s_axil_ctrl_wr.WUSER_W),
+    .BUSER_EN(s_axil_ctrl_wr.BUSER_EN),
+    .BUSER_W(s_axil_ctrl_wr.BUSER_W),
+    .ARUSER_EN(s_axil_ctrl_wr.ARUSER_EN),
+    .ARUSER_W(s_axil_ctrl_wr.ARUSER_W),
+    .RUSER_EN(s_axil_ctrl_wr.RUSER_EN),
+    .RUSER_W(s_axil_ctrl_wr.RUSER_W)
 )
-s_axil_ctrl[PORTS+PORT_OFFSET]();
+axil_ctrl[PORTS+PORT_OFFSET]();
 
 taxi_axil_interconnect_1s #(
-    .M_COUNT($size(s_axil_ctrl)),
-    .ADDR_W(s_axil_wr.ADDR_W),
+    .M_COUNT($size(axil_ctrl)),
+    .ADDR_W(s_axil_ctrl_wr.ADDR_W),
     .M_REGIONS(1),
     .M_BASE_ADDR('0),
-    .M_ADDR_W({$size(s_axil_ctrl){{1{32'd16}}}}),
-    .M_SECURE({$size(s_axil_ctrl){1'b0}})
+    .M_ADDR_W({$size(axil_ctrl){{1{32'd16}}}}),
+    .M_SECURE({$size(axil_ctrl){1'b0}})
 )
 port_intercon_inst (
     .clk(clk),
@@ -140,14 +141,14 @@ port_intercon_inst (
     /*
      * AXI4-lite slave interface
      */
-    .s_axil_wr(s_axil_wr),
-    .s_axil_rd(s_axil_rd),
+    .s_axil_wr(s_axil_ctrl_wr),
+    .s_axil_rd(s_axil_ctrl_rd),
 
     /*
      * AXI4-lite master interfaces
      */
-    .m_axil_wr(s_axil_ctrl),
-    .m_axil_rd(s_axil_ctrl)
+    .m_axil_wr(axil_ctrl),
+    .m_axil_rd(axil_ctrl)
 );
 
 logic s_axil_awready_reg = 1'b0;
@@ -158,53 +159,64 @@ logic s_axil_arready_reg = 1'b0;
 logic [AXIL_DATA_W-1:0] s_axil_rdata_reg = '0;
 logic s_axil_rvalid_reg = 1'b0;
 
-assign s_axil_ctrl[0].awready = s_axil_awready_reg;
-assign s_axil_ctrl[0].wready = s_axil_wready_reg;
-assign s_axil_ctrl[0].bresp = '0;
-assign s_axil_ctrl[0].buser = '0;
-assign s_axil_ctrl[0].bvalid = s_axil_bvalid_reg;
+assign axil_ctrl[0].awready = s_axil_awready_reg;
+assign axil_ctrl[0].wready = s_axil_wready_reg;
+assign axil_ctrl[0].bresp = '0;
+assign axil_ctrl[0].buser = '0;
+assign axil_ctrl[0].bvalid = s_axil_bvalid_reg;
 
-assign s_axil_ctrl[0].arready = s_axil_arready_reg;
-assign s_axil_ctrl[0].rdata = s_axil_rdata_reg;
-assign s_axil_ctrl[0].rresp = '0;
-assign s_axil_ctrl[0].ruser = '0;
-assign s_axil_ctrl[0].rvalid = s_axil_rvalid_reg;
+assign axil_ctrl[0].arready = s_axil_arready_reg;
+assign axil_ctrl[0].rdata = s_axil_rdata_reg;
+assign axil_ctrl[0].rresp = '0;
+assign axil_ctrl[0].ruser = '0;
+assign axil_ctrl[0].rvalid = s_axil_rvalid_reg;
+
+logic cmd_mbox_start_reg = 1'b0;
+wire cmd_mbox_busy;
 
 always_ff @(posedge clk) begin
     s_axil_awready_reg <= 1'b0;
     s_axil_wready_reg <= 1'b0;
-    s_axil_bvalid_reg <= s_axil_bvalid_reg && !s_axil_ctrl[0].bready;
+    s_axil_bvalid_reg <= s_axil_bvalid_reg && !axil_ctrl[0].bready;
 
     s_axil_arready_reg <= 1'b0;
-    s_axil_rvalid_reg <= s_axil_rvalid_reg && !s_axil_ctrl[0].rready;
+    s_axil_rvalid_reg <= s_axil_rvalid_reg && !axil_ctrl[0].rready;
 
-    if (s_axil_ctrl[0].awvalid && s_axil_ctrl[0].wvalid && !s_axil_bvalid_reg) begin
+    cmd_mbox_start_reg <= 1'b0;
+
+    if (axil_ctrl[0].awvalid && axil_ctrl[0].wvalid && !s_axil_bvalid_reg) begin
         s_axil_awready_reg <= 1'b1;
         s_axil_wready_reg <= 1'b1;
         s_axil_bvalid_reg <= 1'b1;
 
-        case ({s_axil_ctrl[0].awaddr[15:2], 2'b00})
+        case ({axil_ctrl[0].awaddr[15:2], 2'b00})
             // 16'h0100: begin
-            //     txq_en_reg <= s_axil_ctrl[0].wdata[0];
-            //     txq_size_reg <= s_axil_ctrl[0].wdata[19:16];
+            //     txq_en_reg <= axil_ctrl[0].wdata[0];
+            //     txq_size_reg <= axil_ctrl[0].wdata[19:16];
             // end
-            // 16'h0104: txq_prod_reg <= s_axil_ctrl[0].wdata[15:0];
-            // 16'h0108: txq_base_addr_reg[31:0] <= s_axil_ctrl[0].wdata;
-            // 16'h010c: txq_base_addr_reg[63:32] <= s_axil_ctrl[0].wdata;
+            // 16'h0104: txq_prod_reg <= axil_ctrl[0].wdata[15:0];
+            // 16'h0108: txq_base_addr_reg[31:0] <= axil_ctrl[0].wdata;
+            // 16'h010c: txq_base_addr_reg[63:32] <= axil_ctrl[0].wdata;
+            16'h0200: begin
+                cmd_mbox_start_reg <= axil_ctrl[0].wdata[0];
+            end
             default: begin end
         endcase
     end
 
-    if (s_axil_ctrl[0].arvalid && !s_axil_rvalid_reg) begin
+    if (axil_ctrl[0].arvalid && !s_axil_rvalid_reg) begin
         s_axil_rdata_reg <= '0;
 
         s_axil_arready_reg <= 1'b1;
         s_axil_rvalid_reg <= 1'b1;
 
-        case ({s_axil_ctrl[0].araddr[15:2], 2'b00})
+        case ({axil_ctrl[0].araddr[15:2], 2'b00})
             16'h0100: s_axil_rdata_reg <= PORTS; // port count
-            16'h0104: s_axil_rdata_reg <= PTP_TS_EN ? 32'h00020000 : 32'h00010000; // port offset
+            16'h0104: s_axil_rdata_reg <= PORT_BASE_ADDR; // port offset
             16'h0108: s_axil_rdata_reg <= 32'h00010000; // port stride
+            16'h0200: begin
+                s_axil_rdata_reg[0] <= cmd_mbox_busy;
+            end
             default: begin end
         endcase
     end
@@ -219,6 +231,106 @@ always_ff @(posedge clk) begin
     end
 end
 
+// command mailbox
+taxi_axis_if #(
+    .DATA_W(32),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(0),
+    .DEST_EN(0),
+    .USER_EN(0)
+) axis_cmd();
+
+taxi_axis_if #(
+    .DATA_W(32),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(0),
+    .DEST_EN(0),
+    .USER_EN(0)
+) axis_rsp();
+
+cndm_micro_cmd_mbox
+cmd_mbox_inst (
+    .clk(clk),
+    .rst(rst),
+
+    /*
+     * AXI lite interface
+     */
+     .s_axil_wr(axil_ctrl[1]),
+     .s_axil_rd(axil_ctrl[1]),
+
+    /*
+     * Control
+     */
+    .start(cmd_mbox_start_reg),
+    .busy(cmd_mbox_busy),
+
+    /*
+     * Command interface
+     */
+    .m_axis_cmd(axis_cmd),
+    .s_axis_rsp(axis_rsp)
+);
+
+// datapath manager
+
+taxi_apb_if #(
+    .DATA_W(32),
+    .ADDR_W(16+CL_PORTS)
+)
+apb_dp_ctrl();
+
+cndm_micro_dp_mgr #(
+    .PORTS(PORTS),
+    .PORT_BASE_ADDR(PORT_BASE_ADDR)
+)
+dp_mgr_inst (
+    .clk(clk),
+    .rst(rst),
+
+    /*
+     * Command interface
+     */
+    .s_axis_cmd(axis_cmd),
+    .m_axis_rsp(axis_rsp),
+
+    /*
+     * APB master interface (datapath control)
+     */
+    .m_apb_dp_ctrl(apb_dp_ctrl)
+);
+
+taxi_apb_if #(
+    .DATA_W(32),
+    .ADDR_W(16)
+)
+apb_port_dp_ctrl[PORTS]();
+
+taxi_apb_interconnect #(
+    .M_CNT($size(apb_port_dp_ctrl)),
+    .ADDR_W(apb_dp_ctrl.ADDR_W),
+    .M_REGIONS(1),
+    .M_BASE_ADDR('0),
+    .M_ADDR_W({$size(apb_port_dp_ctrl){{1{32'd16}}}}),
+    .M_SECURE({$size(apb_port_dp_ctrl){1'b0}})
+)
+port_dp_intercon_inst (
+    .clk(clk),
+    .rst(rst),
+
+    /*
+     * APB slave interface
+     */
+    .s_apb(apb_dp_ctrl),
+
+    /*
+     * APB master interfaces
+     */
+    .m_apb(apb_port_dp_ctrl)
+);
+
 if (PTP_TS_EN) begin : ptp
 
     taxi_ptp_td_phc_axil #(
@@ -232,8 +344,8 @@ if (PTP_TS_EN) begin : ptp
         /*
          * Control register interface
          */
-        .s_axil_wr(s_axil_ctrl[1]),
-        .s_axil_rd(s_axil_ctrl[1]),
+        .s_axil_wr(axil_ctrl[2]),
+        .s_axil_rd(axil_ctrl[2]),
 
         /*
          * PTP
@@ -362,8 +474,13 @@ for (genvar p = 0; p < PORTS; p = p + 1) begin : port
         /*
          * Control register interface
          */
-        .s_axil_wr(s_axil_ctrl[PORT_OFFSET+p]),
-        .s_axil_rd(s_axil_ctrl[PORT_OFFSET+p]),
+        .s_axil_ctrl_wr(axil_ctrl[PORT_OFFSET+p]),
+        .s_axil_ctrl_rd(axil_ctrl[PORT_OFFSET+p]),
+
+        /*
+         * Datapath control register interface
+         */
+        .s_apb_dp_ctrl(apb_port_dp_ctrl[p]),
 
         /*
          * DMA

@@ -97,7 +97,7 @@ class Port:
         self.rxcq = self.driver.pool.alloc_region(self.rxcq_size*16)
         addr = self.rxcq.get_absolute_address(0)
 
-        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_CQ, # opcode
             0x00000000, # flags
@@ -119,7 +119,7 @@ class Port:
         self.rxq = self.driver.pool.alloc_region(self.rxq_size*16)
         addr = self.rxq.get_absolute_address(0)
 
-        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_RQ, # opcode
             0x00000000, # flags
@@ -143,7 +143,7 @@ class Port:
         self.txcq = self.driver.pool.alloc_region(self.txcq_size*16)
         addr = self.txcq.get_absolute_address(0)
 
-        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_CQ, # opcode
             0x00000000, # flags
@@ -165,7 +165,7 @@ class Port:
         self.txq = self.driver.pool.alloc_region(self.txq_size*16)
         addr = self.txq.get_absolute_address(0)
 
-        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLLLLLLL",
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_SQ, # opcode
             0x00000000, # flags

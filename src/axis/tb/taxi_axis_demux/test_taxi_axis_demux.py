@@ -65,11 +65,11 @@ async def run_test(dut, payload_lengths=None, payload_data=None, idle_inserter=N
 
     tb = TB(dut)
 
-    id_width = len(tb.source.bus.tid)
+    id_width = len(tb.sink[0].bus.tid)
     id_count = 2**id_width
     id_mask = id_count-1
 
-    dest_width = len(tb.sink[0].bus.tid)
+    dest_width = len(tb.sink[0].bus.tdest)
     dest_count = 2**dest_width
     dest_mask = dest_count-1
 
@@ -183,12 +183,14 @@ def test_taxi_axis_demux(request, m_count, data_w, tdest_route):
     parameters['STRB_EN'] = 0
     parameters['LAST_EN'] = 1
     parameters['ID_EN'] = 1
-    parameters['ID_W'] = 8
+    parameters['M_ID_W'] = 8
+    parameters['S_ID_W'] = parameters['M_ID_W'] + (m_count-1).bit_length()
     parameters['DEST_EN'] = 1
     parameters['M_DEST_W'] = 8
     parameters['S_DEST_W'] = parameters['M_DEST_W'] + (m_count-1).bit_length()
     parameters['USER_EN'] = 1
     parameters['USER_W'] = 1
+    parameters['TID_ROUTE'] = 0
     parameters['TDEST_ROUTE'] = tdest_route
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}

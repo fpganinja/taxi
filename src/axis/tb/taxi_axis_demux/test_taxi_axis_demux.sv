@@ -25,12 +25,14 @@ module test_taxi_axis_demux #
     parameter logic STRB_EN = 1'b0,
     parameter logic LAST_EN = 1'b1,
     parameter logic ID_EN = 1'b0,
-    parameter ID_W = 8,
+    parameter M_ID_W = 8,
+    parameter S_ID_W = M_ID_W+$clog2(M_COUNT),
     parameter logic DEST_EN = 1'b0,
     parameter M_DEST_W = 8,
     parameter S_DEST_W = M_DEST_W+$clog2(M_COUNT),
     parameter logic USER_EN = 1'b1,
     parameter USER_W = 1,
+    parameter logic TID_ROUTE = 1'b0,
     parameter logic TDEST_ROUTE = 1'b0
     /* verilator lint_on WIDTHTRUNC */
 )
@@ -46,7 +48,7 @@ taxi_axis_if #(
     .STRB_EN(STRB_EN),
     .LAST_EN(LAST_EN),
     .ID_EN(ID_EN),
-    .ID_W(ID_W),
+    .ID_W(S_ID_W),
     .DEST_EN(DEST_EN),
     .DEST_W(S_DEST_W),
     .USER_EN(USER_EN),
@@ -60,7 +62,7 @@ taxi_axis_if #(
     .STRB_EN(STRB_EN),
     .LAST_EN(LAST_EN),
     .ID_EN(ID_EN),
-    .ID_W(ID_W),
+    .ID_W(M_ID_W),
     .DEST_EN(DEST_EN),
     .DEST_W(M_DEST_W),
     .USER_EN(USER_EN),
@@ -73,6 +75,7 @@ logic [$clog2(M_COUNT)-1:0] select;
 
 taxi_axis_demux #(
     .M_COUNT(M_COUNT),
+    .TID_ROUTE(TID_ROUTE),
     .TDEST_ROUTE(TDEST_ROUTE)
 )
 uut (

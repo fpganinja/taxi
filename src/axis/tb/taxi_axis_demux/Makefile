@@ -40,12 +40,14 @@ export PARAM_KEEP_W := $(shell expr \( $(PARAM_DATA_W) + 7 \) / 8 )
 export PARAM_STRB_EN := 0
 export PARAM_LAST_EN := 1
 export PARAM_ID_EN := 1
-export PARAM_ID_W := 8
+export PARAM_M_ID_W := 8
+export PARAM_S_ID_W := $(shell python -c "print($(PARAM_M_ID_W) + ($(PARAM_M_COUNT)-1).bit_length())")
 export PARAM_DEST_EN := 1
 export PARAM_M_DEST_W := 8
 export PARAM_S_DEST_W := $(shell python -c "print($(PARAM_M_DEST_W) + ($(PARAM_M_COUNT)-1).bit_length())")
 export PARAM_USER_EN := 1
 export PARAM_USER_W := 1
+export PARAM_TID_ROUTE := 0
 export PARAM_TDEST_ROUTE := 1
 
 ifeq ($(SIM), icarus)

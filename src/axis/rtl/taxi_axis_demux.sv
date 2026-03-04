@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CERN-OHL-S-2.0
 /*
 
-Copyright (c) 2018-2025 FPGA Ninja, LLC
+Copyright (c) 2018-2026 FPGA Ninja, LLC
 
 Authors:
 - Alex Forencich
@@ -19,6 +19,8 @@ module taxi_axis_demux #
 (
     // Number of AXI stream outputs
     parameter M_COUNT = 4,
+    // route via tid
+    parameter logic TID_ROUTE = 1'b0,
     // route via tdest
     parameter logic TDEST_ROUTE = 1'b0
 )
@@ -53,6 +55,8 @@ localparam logic LAST_EN = s_axis.LAST_EN && m_axis[0].LAST_EN;
 localparam logic ID_EN = s_axis.ID_EN && m_axis[0].ID_EN;
 localparam ID_W = s_axis.ID_W;
 localparam logic DEST_EN = s_axis.DEST_EN && m_axis[0].DEST_EN;
+localparam S_ID_W = s_axis.ID_W;
+localparam M_ID_W = m_axis[0].ID_W;
 localparam S_DEST_W = s_axis.DEST_W;
 localparam M_DEST_W = m_axis[0].DEST_W;
 localparam logic USER_EN = s_axis.USER_EN && m_axis[0].USER_EN;
@@ -61,6 +65,7 @@ localparam USER_W = s_axis.USER_W;
 localparam CL_M_COUNT = $clog2(M_COUNT);
 
 localparam M_DEST_W_INT = M_DEST_W > 0 ? M_DEST_W : 1;
+localparam M_ID_W_INT = M_ID_W > 0 ? M_ID_W : 1;
 
 // check configuration
 if (m_axis[0].DATA_W != DATA_W)
@@ -68,6 +73,17 @@ if (m_axis[0].DATA_W != DATA_W)
 
 if (KEEP_EN && m_axis[0].KEEP_W != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
+
+if (TID_ROUTE) begin
+    if (!ID_EN)
+        $fatal(0, "Error: TID_ROUTE set requires ID_EN set (instance %m)");
+
+    if (S_ID_W < CL_M_COUNT)
+        $fatal(0, "Error: S_ID_W too small for port count (instance %m)");
+
+    if (TDEST_ROUTE)
+        $fatal(0, "Error: Cannot enable both TID_ROUTE and TDEST_ROUTE (instance %m)");
+end
 
 if (TDEST_ROUTE) begin
     if (!DEST_EN)
@@ -90,7 +106,7 @@ logic [KEEP_W-1:0]    m_axis_tstrb_int;
 logic [M_COUNT-1:0]   m_axis_tvalid_int;
 logic                 m_axis_tready_int_reg = 1'b0;
 logic                 m_axis_tlast_int;
-logic [ID_W-1:0]      m_axis_tid_int;
+logic [M_ID_W-1:0]    m_axis_tid_int;
 logic [M_DEST_W-1:0]  m_axis_tdest_int;
 logic [USER_W-1:0]    m_axis_tuser_int;
 wire                  m_axis_tready_int_early;
@@ -115,7 +131,15 @@ always_comb begin
 
     if (!frame_reg && s_axis.tvalid && s_axis.tready) begin
         // start of frame, grab select value
-        if (TDEST_ROUTE) begin
+        if (TID_ROUTE) begin
+            if (M_COUNT > 1) begin
+                select_ctl = s_axis.tid[S_ID_W-1:S_ID_W-CL_M_COUNT];
+                drop_ctl = (CL_M_COUNT+1)'(select_ctl) >= (CL_M_COUNT+1)'(M_COUNT);
+            end else begin
+                select_ctl = '0;
+                drop_ctl = 1'b0;
+            end
+        end else if (TDEST_ROUTE) begin
             if (M_COUNT > 1) begin
                 select_ctl = s_axis.tdest[S_DEST_W-1:S_DEST_W-CL_M_COUNT];
                 drop_ctl = (CL_M_COUNT+1)'(select_ctl) >= (CL_M_COUNT+1)'(M_COUNT);
@@ -141,7 +165,7 @@ always_comb begin
     m_axis_tvalid_int = '0;
     m_axis_tvalid_int[select_ctl] = s_axis.tvalid && s_axis.tready && !drop_ctl;
     m_axis_tlast_int  = s_axis.tlast;
-    m_axis_tid_int    = s_axis.tid;
+    m_axis_tid_int    = M_ID_W'(s_axis.tid);
     m_axis_tdest_int  = M_DEST_W'(s_axis.tdest);
     m_axis_tuser_int  = s_axis.tuser;
 end
@@ -170,7 +194,7 @@ logic [KEEP_W-1:0]    m_axis_tkeep_reg  = '0;
 logic [KEEP_W-1:0]    m_axis_tstrb_reg  = '0;
 logic [M_COUNT-1:0]   m_axis_tvalid_reg = '0, m_axis_tvalid_next;
 logic                 m_axis_tlast_reg  = 1'b0;
-logic [ID_W-1:0]      m_axis_tid_reg    = '0;
+logic [M_ID_W-1:0]    m_axis_tid_reg    = '0;
 logic [M_DEST_W-1:0]  m_axis_tdest_reg  = '0;
 logic [USER_W-1:0]    m_axis_tuser_reg  = '0;
 
@@ -179,7 +203,7 @@ logic [KEEP_W-1:0]    temp_m_axis_tkeep_reg  = '0;
 logic [KEEP_W-1:0]    temp_m_axis_tstrb_reg  = '0;
 logic [M_COUNT-1:0]   temp_m_axis_tvalid_reg = '0, temp_m_axis_tvalid_next;
 logic                 temp_m_axis_tlast_reg  = 1'b0;
-logic [ID_W-1:0]      temp_m_axis_tid_reg    = '0;
+logic [M_ID_W-1:0]    temp_m_axis_tid_reg    = '0;
 logic [M_DEST_W-1:0]  temp_m_axis_tdest_reg  = '0;
 logic [USER_W-1:0]    temp_m_axis_tuser_reg  = '0;
 

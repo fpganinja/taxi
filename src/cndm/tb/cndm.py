@@ -57,69 +57,67 @@ CNDM_CMD_PTP_FLG_OFFSET_REL = 0x00000008
 CNDM_CMD_PTP_FLG_OFFSET_FNS = 0x00000010
 CNDM_CMD_PTP_FLG_SET_PERIOD = 0x00000080
 
-class Port:
-    def __init__(self, driver, index):
+
+class Cq:
+    def __init__(self, driver, port):
         self.driver = driver
         self.log = driver.log
-        self.index = index
-        self.hw_regs = driver.hw_regs
 
-        self.rxq_log_size = (256).bit_length()-1
-        self.rxq_size = 2**self.rxq_log_size
-        self.rxq_mask = self.rxq_size-1
-        self.rxq = None
-        self.rxq_prod = 0
-        self.rxq_cons = 0
-        self.rx_rqn = 0
-        self.rxq_db_offs = 0
+        self.port = port
+        self.irqn = None
 
-        self.rx_info = [None] * self.rxq_size
+        self.log_size = 0
+        self.size = 0
+        self.size_mask = 0
+        self.stride = 0
+        self.cqn = None
+        self.enabled = False
 
-        self.rxcq_log_size = (256).bit_length()-1
-        self.rxcq_size = 2**self.rxcq_log_size
-        self.rxcq_mask = self.rxcq_size-1
-        self.rxcq = None
-        self.rxcq_prod = 0
-        self.rxcq_cons = 0
-        self.rx_cqn = 0
+        self.buf_size = 0
+        self.buf_region = None
+        self.buf_dma = 0
+        self.buf = None
 
-        self.txq_log_size = (256).bit_length()-1
-        self.txq_size = 2**self.txq_log_size
-        self.txq_mask = self.txq_size-1
-        self.txq = None
-        self.txq_prod = 0
-        self.txq_cons = 0
-        self.tx_sqn = 0
-        self.txq_db_offs = 0
+        self.eq = None
 
-        self.tx_info = [None] * self.txq_size
+        self.src_ring = None
+        self.handler = None
 
-        self.txcq_log_size = (256).bit_length()-1
-        self.txcq_size = 2**self.txcq_log_size
-        self.txcq_mask = self.txcq_size-1
-        self.txcq = None
-        self.txcq_prod = 0
-        self.txcq_cons = 0
-        self.tx_cqn = 0
+        self.cons_ptr = None
 
-        self.rx_queue = Queue()
+        self.hw_regs = self.driver.hw_regs
 
-    async def init(self):
+    async def open(self, irqn, size):
+        if self.cqn is not None:
+            raise Exception("Already open")
 
-        self.rxcq = self.driver.pool.alloc_region(self.rxcq_size*16)
-        addr = self.rxcq.get_absolute_address(0)
+        self.irqn = irqn
+
+        self.log_size = size.bit_length() - 1
+        self.size = 2**self.log_size
+        self.size_mask = self.size-1
+        self.stride = 16
+
+        self.buf_size = self.size*self.stride
+        self.buf_region = self.driver.pool.alloc_region(self.buf_size)
+        self.buf_dma = self.buf_region.get_absolute_address(0)
+        self.buf = self.buf_region.mem
+
+        self.buf[0:self.buf_size] = b'\x00'*self.buf_size
+
+        self.cons_ptr = 0
 
         rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_CQ, # opcode
             0x00000000, # flags
-            self.index, # port
+            self.port.index, # port
             0, # cqn
-            self.index, # eqn
+            self.irqn, # eqn
             0, # pd
-            self.rxcq_log_size, # size
+            self.log_size, # size
             0, # dboffs
-            addr, # base addr
+            self.buf_dma, # base addr
             0, # ptr2
             0, # prod_ptr
             0, # cons_ptr
@@ -129,22 +127,29 @@ class Port:
 
         rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
         print(rsp_unpacked)
-        self.rx_cqn = rsp_unpacked[4]
+        self.cqn = rsp_unpacked[4]
 
-        self.rxq = self.driver.pool.alloc_region(self.rxq_size*16)
-        addr = self.rxq.get_absolute_address(0)
+        self.log.info("Opened CQ %d", self.cqn)
+
+        self.enabled = True
+
+    async def close(self):
+        if self.cqn is None:
+            return
+
+        self.enabled = False
 
         rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
-            CNDM_CMD_OP_CREATE_RQ, # opcode
+            CNDM_CMD_OP_DESTROY_CQ, # opcode
             0x00000000, # flags
-            self.index, # port
-            0, # rqn
-            self.rx_cqn, # cqn
+            self.port.index, # port
+            self.cqn, # cqn
+            0, # eqn
             0, # pd
-            self.rxq_log_size, # size
+            0, # size
             0, # dboffs
-            addr, # base addr
+            0, # base addr
             0, # ptr2
             0, # prod_ptr
             0, # cons_ptr
@@ -152,50 +157,79 @@ class Port:
             0, # rsvd
         ))
 
-        rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
-        print(rsp_unpacked)
-        self.rx_rqn = rsp_unpacked[4]
-        self.rxq_db_offs = rsp_unpacked[8]
+        self.cqn = None
 
-        self.txcq = self.driver.pool.alloc_region(self.txcq_size*16)
-        addr = self.txcq.get_absolute_address(0)
+        # TODO free buffer
 
-        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
-            0, # rsvd
-            CNDM_CMD_OP_CREATE_CQ, # opcode
-            0x00000000, # flags
-            self.index, # port
-            0, # cqn
-            self.index, # eqn
-            0, # pd
-            self.txcq_log_size, # size
-            0, # dboffs
-            addr, # base addr
-            0, # ptr2
-            0, # prod_ptr
-            0, # cons_ptr
-            0, # rsvd
-            0, # rsvd
-        ))
 
-        rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
-        print(rsp_unpacked)
-        self.tx_cqn = rsp_unpacked[4]
+class Sq:
+    def __init__(self, driver, port):
+        self.driver = driver
+        self.log = driver.log
 
-        self.txq = self.driver.pool.alloc_region(self.txq_size*16)
-        addr = self.txq.get_absolute_address(0)
+        self.port = port
+
+        self.log_size = 0
+        self.size = 0
+        self.size_mask = 0
+        self.full_size = 0
+        self.stride = 0
+        self.sqn = None
+        self.enabled = False
+
+        self.buf_size = 0
+        self.buf_region = None
+        self.buf_dma = 0
+        self.buf = None
+
+        self.cq = None
+
+        self.prod_ptr = None
+        self.cons_ptr = None
+
+        self.packets = 0
+        self.bytes = 0
+
+        self.db_offset = None
+
+        self.hw_regs = self.driver.hw_regs
+
+    async def open(self, cq, size):
+        if self.sqn is not None:
+            raise Exception("Already open")
+
+        self.log_size = size.bit_length() - 1
+        self.size = 2**self.log_size
+        self.size_mask = self.size-1
+        self.stride = 16
+
+        self.tx_info = [None]*self.size
+
+        self.buf_size = self.size*self.stride
+        self.buf_region = self.driver.pool.alloc_region(self.buf_size)
+        self.buf_dma = self.buf_region.get_absolute_address(0)
+        self.buf = self.buf_region.mem
+
+        self.buf[0:self.buf_size] = b'\x00'*self.buf_size
+
+        self.prod_ptr = 0
+        self.cons_ptr = 0
+
+        self.cq = cq
+        self.cq.src_ring = self
+        self.cq.handler = Sq.process_tx_cq
 
         rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
             0, # rsvd
             CNDM_CMD_OP_CREATE_SQ, # opcode
             0x00000000, # flags
-            self.index, # port
+            self.port.index, # port
             0, # sqn
-            self.tx_cqn, # cqn
+            self.cq.cqn, # cqn
             0, # pd
-            self.txq_log_size, # size
+            self.log_size, # size
             0, # dboffs
-            addr, # base addr
+            self.buf_dma, # base addr
             0, # ptr2
             0, # prod_ptr
             0, # cons_ptr
@@ -205,27 +239,51 @@ class Port:
 
         rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
         print(rsp_unpacked)
-        self.tx_sqn = rsp_unpacked[4]
-        self.txq_db_offs = rsp_unpacked[8]
+        self.sqn = rsp_unpacked[4]
+        self.db_offset = rsp_unpacked[8]
 
-        await self.refill_rx_buffers()
+        self.log.info("Opened SQ %d", self.sqn)
+
+        self.enabled = True
+
+    async def close(self):
+        if self.sqn is None:
+            return
+
+        self.enabled = False
+
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_DESTROY_SQ, # opcode
+            0x00000000, # flags
+            self.port.index, # port
+            self.sqn, # sqn
+            0, # eqn
+            0, # pd
+            0, # size
+            0, # dboffs
+            0, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+
+        self.sqn = None
+
+        # TODO free buffer
 
     async def start_xmit(self, data):
         headroom = 10
         tx_buf = self.driver.alloc_pkt()
         await tx_buf.write(headroom, data)
-        index = self.txq_prod & self.txq_mask
+        index = self.prod_ptr & self.size_mask
         ptr = tx_buf.get_absolute_address(0)
-        struct.pack_into('<xxxxLQ', self.txq.mem, 16*index, len(data), ptr+headroom)
+        struct.pack_into('<xxxxLQ', self.buf, 16*index, len(data), ptr+headroom)
         self.tx_info[index] = tx_buf
-        self.txq_prod += 1
-        await self.hw_regs.write_dword(self.txq_db_offs, self.txq_prod & 0xffff)
-
-    async def recv(self):
-        return await self.rx_queue.get()
-
-    async def recv_nowait(self):
-        return self.rx_queue.get_nowait()
+        self.prod_ptr += 1
+        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
 
     def free_tx_desc(self, index):
         pkt = self.tx_info[index]
@@ -233,37 +291,156 @@ class Port:
         self.tx_info[index] = None
 
     def free_tx_buf(self):
-        while self.txq_cons != self.txq_prod:
-            index = self.txq_cons & self.txq_mask
+        while self.cons_ptr != self.txq_prod:
+            index = self.cons_ptr & self.size_mask
             self.free_tx_desc(index)
-            self.txq_cons += 1
+            self.cons_ptr += 1
 
-    async def process_tx_cq(self):
+    @staticmethod
+    async def process_tx_cq(cq):
+        sq = cq.src_ring
 
-        cq_cons_ptr = self.txcq_cons
-        cons_ptr = self.txq_cons
+        cq.log.info("Process CQ %d for SQ %d", cq.cqn, sq.sqn)
+
+        cq_cons_ptr = cq.cons_ptr
+        cons_ptr = sq.cons_ptr
 
         while True:
-            cq_index = cq_cons_ptr & self.txcq_mask
-            index = cons_ptr & self.txq_mask
+            cq_index = cq_cons_ptr & cq.size_mask
+            index = cons_ptr & sq.size_mask
 
-            cpl_data = struct.unpack_from("<LLLL", self.txcq.mem, cq_index*16)
+            cpl_data = struct.unpack_from("<LLLL", cq.buf, cq_index*16)
 
-            self.log.info("TX CQ index %d data %s", cq_index, cpl_data)
+            cq.log.info("TX CQ index %d data %s", cq_index, cpl_data)
 
-            if bool(cpl_data[-1] & 0x80000000) == bool(cq_cons_ptr & self.txcq_size):
-                self.log.info("CQ empty")
+            if bool(cpl_data[-1] & 0x80000000) == bool(cq_cons_ptr & cq.size):
+                cq.log.info("CQ empty")
                 break
 
-            pkt = self.tx_info[index]
+            pkt = sq.tx_info[index]
 
-            self.free_tx_desc(index)
+            sq.free_tx_desc(index)
 
             cq_cons_ptr += 1
             cons_ptr += 1
 
-        self.txcq_cons = cq_cons_ptr
-        self.txq_cons = cons_ptr
+        cq.cons_ptr = cq_cons_ptr
+        sq.cons_ptr = cons_ptr
+
+
+class Rq:
+    def __init__(self, driver, port):
+        self.driver = driver
+        self.log = driver.log
+
+        self.port = port
+
+        self.log_size = 0
+        self.size = 0
+        self.size_mask = 0
+        self.full_size = 0
+        self.stride = 0
+        self.rqn = None
+        self.enabled = False
+
+        self.buf_size = 0
+        self.buf_region = None
+        self.buf_dma = 0
+        self.buf = None
+
+        self.cq = None
+
+        self.prod_ptr = None
+        self.cons_ptr = None
+
+        self.packets = 0
+        self.bytes = 0
+
+        self.db_offset = None
+
+        self.hw_regs = self.driver.hw_regs
+
+    async def open(self, cq, size):
+        if self.rqn is not None:
+            raise Exception("Already open")
+
+        self.log_size = size.bit_length() - 1
+        self.size = 2**self.log_size
+        self.size_mask = self.size-1
+        self.stride = 16
+
+        self.rx_info = [None]*self.size
+
+        self.buf_size = self.size*self.stride
+        self.buf_region = self.driver.pool.alloc_region(self.buf_size)
+        self.buf_dma = self.buf_region.get_absolute_address(0)
+        self.buf = self.buf_region.mem
+
+        self.buf[0:self.buf_size] = b'\x00'*self.buf_size
+
+        self.prod_ptr = 0
+        self.cons_ptr = 0
+
+        self.cq = cq
+        self.cq.src_ring = self
+        self.cq.handler = Rq.process_rx_cq
+
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_CREATE_RQ, # opcode
+            0x00000000, # flags
+            self.port.index, # port
+            0, # rqn
+            self.cq.cqn, # cqn
+            0, # pd
+            self.log_size, # size
+            0, # dboffs
+            self.buf_dma, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+
+        rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
+        print(rsp_unpacked)
+        self.rqn = rsp_unpacked[4]
+        self.db_offset = rsp_unpacked[8]
+
+        self.log.info("Opened RQ %d", self.rqn)
+
+        self.enabled = True
+
+        await self.refill_rx_buffers()
+
+    async def close(self):
+        if self.rqn is None:
+            return
+
+        self.enabled = False
+
+        rsp = await self.driver.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_DESTROY_RQ, # opcode
+            0x00000000, # flags
+            self.port.index, # port
+            self.rqn, # rqn
+            0, # eqn
+            0, # pd
+            0, # size
+            0, # dboffs
+            0, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+
+        self.rqn = None
+
+        # TODO free buffer
 
     def free_rx_desc(self, index):
         pkt = self.rx_info[index]
@@ -271,10 +448,10 @@ class Port:
         self.rx_info[index] = None
 
     def free_rx_buf(self):
-        while self.rxq_cons != self.rxq_prod:
-            index = self.rxq_cons & self.rxq_mask
+        while self.cons_ptr != self.prod_ptr:
+            index = self.cons_ptr & self.size_mask
             self.free_rx_desc(index)
-            self.rxq_cons += 1
+            self.cons_ptr += 1
 
     def prepare_rx_desc(self, index):
         pkt = self.driver.alloc_pkt()
@@ -283,60 +460,103 @@ class Port:
         length = pkt.size
         ptr = pkt.get_absolute_address(0)
 
-        struct.pack_into('<xxxxLQ', self.rxq.mem, 16*index, length, ptr)
+        struct.pack_into('<xxxxLQ', self.buf, 16*index, length, ptr)
 
     async def refill_rx_buffers(self):
-        missing = self.rxq_size - (self.rxq_prod - self.rxq_cons)
+        missing = self.size - (self.prod_ptr - self.cons_ptr)
 
         if missing < 8:
             return
 
         for k in range(missing):
-            self.prepare_rx_desc(self.rxq_prod & self.rxq_mask)
-            self.rxq_prod += 1
+            self.prepare_rx_desc(self.prod_ptr & self.size_mask)
+            self.prod_ptr += 1
 
-        await self.hw_regs.write_dword(self.rxq_db_offs, self.rxq_prod & 0xffff)
+        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
 
-    async def process_rx_cq(self):
+    @staticmethod
+    async def process_rx_cq(cq):
+        rq = cq.src_ring
 
-        cq_cons_ptr = self.rxcq_cons
-        cons_ptr = self.rxq_cons
+        cq.log.info("Process CQ %d for RQ %d", cq.cqn, rq.rqn)
+
+        cq_cons_ptr = cq.cons_ptr
+        cons_ptr = rq.cons_ptr
 
         while True:
-            cq_index = cq_cons_ptr & self.rxcq_mask
-            index = cons_ptr & self.rxq_mask
+            cq_index = cq_cons_ptr & cq.size_mask
+            index = cons_ptr & rq.size_mask
 
-            cpl_data = struct.unpack_from("<LLLL", self.rxcq.mem, cq_index*16)
+            cpl_data = struct.unpack_from("<LLLL", cq.buf, cq_index*16)
 
-            self.log.info("RX CQ index %d data %s", cq_index, cpl_data)
+            rq.log.info("RX CQ index %d data %s", cq_index, cpl_data)
 
-            if bool(cpl_data[-1] & 0x80000000) == bool(cq_cons_ptr & self.rxcq_size):
-                self.log.info("CQ empty")
+            if bool(cpl_data[-1] & 0x80000000) == bool(cq_cons_ptr & cq.size):
+                rq.log.info("CQ empty")
                 break
 
-            pkt = self.rx_info[index]
+            pkt = rq.rx_info[index]
             length = cpl_data[1]
 
             data = pkt[:length]
 
-            self.log.info("Packet: %s", data)
+            rq.log.info("Packet: %s", data)
 
-            self.rx_queue.put_nowait(data)
+            rq.port.rx_queue.put_nowait(data)
 
-            self.free_rx_desc(index)
+            rq.free_rx_desc(index)
 
             cq_cons_ptr += 1
             cons_ptr += 1
 
-        self.rxcq_cons = cq_cons_ptr
-        self.rxq_cons = cons_ptr
+        cq.cons_ptr = cq_cons_ptr
+        rq.cons_ptr = cons_ptr
 
-        await self.refill_rx_buffers()
+        await rq.refill_rx_buffers()
+
+
+class Port:
+    def __init__(self, driver, index):
+        self.driver = driver
+        self.log = driver.log
+        self.index = index
+        self.hw_regs = driver.hw_regs
+
+        self.rxq = None
+        self.rxcq = None
+
+        self.txq = None
+        self.txcq = None
+
+        self.rx_queue = Queue()
+
+    async def init(self):
+
+        self.rxcq = Cq(self.driver, self)
+        await self.rxcq.open(self.index, 256)
+
+        self.rxq = Rq(self.driver, self)
+        await self.rxq.open(self.rxcq, 256)
+
+        self.txcq = Cq(self.driver, self)
+        await self.txcq.open(self.index, 256)
+
+        self.txq = Sq(self.driver, self)
+        await self.txq.open(self.txcq, 256)
+
+    async def start_xmit(self, data):
+        await self.txq.start_xmit(data)
+
+    async def recv(self):
+        return await self.rx_queue.get()
+
+    async def recv_nowait(self):
+        return self.rx_queue.get_nowait()
 
     async def interrupt_handler(self):
         self.log.info("Interrupt")
-        await self.process_rx_cq()
-        await self.process_tx_cq()
+        await self.rxcq.handler(self.rxcq)
+        await self.txcq.handler(self.txcq)
 
 
 class Driver:

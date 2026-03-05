@@ -85,6 +85,8 @@ class Cq:
 
         self.cons_ptr = None
 
+        self.db_offset = None
+
         self.hw_regs = self.driver.hw_regs
 
     async def open(self, irqn, size):
@@ -128,6 +130,13 @@ class Cq:
         rsp_unpacked = struct.unpack("<HHLLLLLLLQQLLLL", rsp)
         print(rsp_unpacked)
         self.cqn = rsp_unpacked[4]
+        self.db_offset = rsp_unpacked[8]
+
+        if self.db_offset == 0:
+            self.cqn = None
+            self.db_offset = None
+            self.log.error("Failed to allocate CQ")
+            return
 
         self.log.info("Opened CQ %d", self.cqn)
 
@@ -242,7 +251,13 @@ class Sq:
         self.sqn = rsp_unpacked[4]
         self.db_offset = rsp_unpacked[8]
 
-        self.log.info("Opened SQ %d", self.sqn)
+        if self.db_offset == 0:
+            self.sqn = None
+            self.db_offset = None
+            self.log.error("Failed to allocate SQ")
+            return
+
+        self.log.info("Opened SQ %d (CQ %d)", self.sqn, cq.cqn)
 
         self.enabled = True
 
@@ -408,7 +423,13 @@ class Rq:
         self.rqn = rsp_unpacked[4]
         self.db_offset = rsp_unpacked[8]
 
-        self.log.info("Opened RQ %d", self.rqn)
+        if self.db_offset == 0:
+            self.rqn = None
+            self.db_offset = None
+            self.log.error("Failed to allocate RQ")
+            return
+
+        self.log.info("Opened RQ %d (CQ %d)", self.rqn, cq.cqn)
 
         self.enabled = True
 
@@ -531,7 +552,9 @@ class Port:
         self.rx_queue = Queue()
 
     async def init(self):
+        await self.open()
 
+    async def open(self):
         self.rxcq = Cq(self.driver, self)
         await self.rxcq.open(self.index, 256)
 

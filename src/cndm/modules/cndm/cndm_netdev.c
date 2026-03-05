@@ -9,53 +9,167 @@ Authors:
 */
 
 #include "cndm.h"
-#include "cndm_hw.h"
 
 #include <linux/version.h>
+
+static int cndm_close(struct net_device *ndev);
 
 static int cndm_open(struct net_device *ndev)
 {
 	struct cndm_priv *priv = netdev_priv(ndev);
+	struct cndm_ring *q;
+	struct cndm_cq *cq;
+	int k;
+	int ret = 0;
 
-	cndm_refill_rx_buffers(priv->rxq);
+	netdev_info(ndev, "Open port");
 
-	priv->txq->tx_queue = netdev_get_tx_queue(ndev, 0);
+	netif_set_real_num_tx_queues(ndev, priv->txq_count);
+	netif_set_real_num_rx_queues(ndev, priv->rxq_count);
 
-	netif_napi_add_tx(ndev, &priv->txcq->napi, cndm_poll_tx_cq);
-	napi_enable(&priv->txcq->napi);
-	netif_napi_add(ndev, &priv->rxcq->napi, cndm_poll_rx_cq);
-	napi_enable(&priv->rxcq->napi);
+	// set up RX queues
+	for (k = 0; k < priv->rxq_count; k++) {
+		if (priv->rxq)
+			break;
+
+		cq = cndm_create_cq(priv);
+		if (IS_ERR_OR_NULL(cq)) {
+			ret = PTR_ERR(cq);
+			goto fail;
+		}
+
+		ret = cndm_open_cq(cq, 0, 256);
+		if (ret) {
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		q = cndm_create_rq(priv);
+		if (IS_ERR_OR_NULL(q)) {
+			ret = PTR_ERR(q);
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		ret = cndm_open_rq(q, priv, cq, 256);
+		if (ret) {
+			cndm_destroy_rq(q);
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		priv->rxq = q;
+
+		netif_napi_add(ndev, &cq->napi, cndm_poll_rx_cq);
+		napi_enable(&cq->napi);
+	}
+
+	// set up TX queues
+	for (k = 0; k < priv->txq_count; k++) {
+		if (priv->txq)
+			break;
+
+		cq = cndm_create_cq(priv);
+		if (IS_ERR_OR_NULL(cq)) {
+			ret = PTR_ERR(cq);
+			goto fail;
+		}
+
+		ret = cndm_open_cq(cq, 0, 256);
+		if (ret) {
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		q = cndm_create_sq(priv);
+		if (IS_ERR_OR_NULL(q)) {
+			ret = PTR_ERR(q);
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		q->tx_queue = netdev_get_tx_queue(ndev, k);
+
+		ret = cndm_open_sq(q, priv, cq, 256);
+		if (ret) {
+			cndm_destroy_sq(q);
+			cndm_destroy_cq(cq);
+			goto fail;
+		}
+
+		priv->txq = q;
+
+		netif_napi_add_tx(ndev, &cq->napi, cndm_poll_tx_cq);
+		napi_enable(&cq->napi);
+	}
 
 	netif_tx_start_all_queues(ndev);
-	netif_carrier_on(ndev);
 	netif_device_attach(ndev);
+	netif_carrier_on(ndev);
 
 	priv->port_up = 1;
 
 	return 0;
+
+fail:
+	cndm_close(ndev);
+	return ret;
 }
 
 static int cndm_close(struct net_device *ndev)
 {
 	struct cndm_priv *priv = netdev_priv(ndev);
+	struct cndm_ring *q;
+	struct cndm_cq *cq;
+	int k;
+
+	netdev_info(ndev, "Close port");
 
 	if (!priv->port_up)
 		return 0;
 
-	priv->port_up = 0;
-
-	if (priv->txcq) {
-		napi_disable(&priv->txcq->napi);
-		netif_napi_del(&priv->txcq->napi);
-	}
-	if (priv->rxcq) {
-		napi_disable(&priv->rxcq->napi);
-		netif_napi_del(&priv->rxcq->napi);
-	}
-
+	netif_tx_lock_bh(ndev);
 	netif_tx_stop_all_queues(ndev);
+	netif_tx_unlock_bh(ndev);
+
 	netif_carrier_off(ndev);
 	netif_tx_disable(ndev);
+
+	priv->port_up = 0;
+
+	// clean up TX queues
+	for (k = 0; k < priv->txq_count; k++) {
+		if (!priv->txq)
+			break;
+
+		q = priv->txq;
+		cq = q->cq;
+
+		napi_disable(&cq->napi);
+		netif_napi_del(&cq->napi);
+
+		cndm_destroy_sq(q);
+		cndm_destroy_cq(cq);
+
+		priv->txq = NULL;
+	}
+
+	// clean up RX queues
+	for (k = 0; k < priv->rxq_count; k++) {
+		if (!priv->rxq)
+			break;
+
+		q = priv->rxq;
+		cq = q->cq;
+
+		napi_disable(&cq->napi);
+		netif_napi_del(&cq->napi);
+
+		cndm_destroy_rq(q);
+		cndm_destroy_cq(cq);
+
+		priv->rxq = NULL;
+	}
 
 	return 0;
 }
@@ -171,8 +285,8 @@ static int cndm_netdev_irq(struct notifier_block *nb, unsigned long action, void
 	netdev_dbg(priv->ndev, "Interrupt");
 
 	if (priv->port_up) {
-		napi_schedule_irqoff(&priv->txcq->napi);
-		napi_schedule_irqoff(&priv->rxcq->napi);
+		napi_schedule_irqoff(&priv->txq->cq->napi);
+		napi_schedule_irqoff(&priv->rxq->cq->napi);
 	}
 
 	return NOTIFY_DONE;
@@ -226,54 +340,6 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 	ndev->min_mtu = ETH_MIN_MTU;
 	ndev->max_mtu = 1500;
 
-	priv->rxcq = cndm_create_cq(priv);
-	if (IS_ERR_OR_NULL(priv->rxcq)) {
-		ret = PTR_ERR(priv->rxcq);
-		goto fail;
-	}
-	ret = cndm_open_cq(priv->rxcq, 0, 256);
-	if (ret) {
-		cndm_destroy_cq(priv->rxcq);
-		priv->rxcq = NULL;
-		goto fail;
-	}
-
-	priv->rxq = cndm_create_rq(priv);
-	if (IS_ERR_OR_NULL(priv->rxq)) {
-		ret = PTR_ERR(priv->rxq);
-		goto fail;
-	}
-	ret = cndm_open_rq(priv->rxq, priv, priv->rxcq, 256);
-	if (ret) {
-		cndm_destroy_rq(priv->rxq);
-		priv->rxq = NULL;
-		goto fail;
-	}
-
-	priv->txcq = cndm_create_cq(priv);
-	if (IS_ERR_OR_NULL(priv->txcq)) {
-		ret = PTR_ERR(priv->txcq);
-		goto fail;
-	}
-	ret = cndm_open_cq(priv->txcq, 0, 256);
-	if (ret) {
-		cndm_destroy_cq(priv->txcq);
-		priv->txcq = NULL;
-		goto fail;
-	}
-
-	priv->txq = cndm_create_sq(priv);
-	if (IS_ERR_OR_NULL(priv->txq)) {
-		ret = PTR_ERR(priv->txq);
-		goto fail;
-	}
-	ret = cndm_open_sq(priv->txq, priv, priv->txcq, 256);
-	if (ret) {
-		cndm_destroy_sq(priv->txq);
-		priv->txq = NULL;
-		goto fail;
-	}
-
 	netif_carrier_off(ndev);
 
 	ret = register_netdev(ndev);
@@ -292,7 +358,6 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 		goto fail;
 	}
 
-
 	return ndev;
 
 fail:
@@ -304,40 +369,13 @@ void cndm_destroy_netdev(struct net_device *ndev)
 {
 	struct cndm_priv *priv = netdev_priv(ndev);
 
-	if (priv->port_up)
-		cndm_close(ndev);
-
-	if (priv->txq) {
-		cndm_close_sq(priv->txq);
-		cndm_destroy_sq(priv->txq);
-		priv->txq = NULL;
-	}
-
-	if (priv->txcq) {
-		cndm_close_cq(priv->txcq);
-		cndm_destroy_cq(priv->txcq);
-		priv->txcq = NULL;
-	}
-
-	if (priv->rxq) {
-		cndm_close_rq(priv->rxq);
-		cndm_destroy_rq(priv->rxq);
-		priv->rxq = NULL;
-	}
-
-	if (priv->rxcq) {
-		cndm_close_cq(priv->rxcq);
-		cndm_destroy_cq(priv->rxcq);
-		priv->rxcq = NULL;
-	}
+	if (priv->registered)
+		unregister_netdev(ndev);
 
 	if (priv->irq)
 		atomic_notifier_chain_unregister(&priv->irq->nh, &priv->irq_nb);
 
 	priv->irq = NULL;
-
-	if (priv->registered)
-		unregister_netdev(ndev);
 
 	free_netdev(ndev);
 }

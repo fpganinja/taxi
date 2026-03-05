@@ -157,9 +157,7 @@ struct cndm_priv {
 	int txq_count;
 
 	struct cndm_ring *txq;
-	struct cndm_cq *txcq;
 	struct cndm_ring *rxq;
-	struct cndm_cq *rxcq;
 };
 
 // cndm_cmd.c

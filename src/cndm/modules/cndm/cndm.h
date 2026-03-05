@@ -136,6 +136,9 @@ struct cndm_cq {
 	struct cndm_ring *src_ring;
 
 	void (*handler)(struct cndm_cq *cq);
+
+	u32 db_offset;
+	u8 __iomem *db_addr;
 };
 
 struct cndm_priv {

@@ -27,6 +27,9 @@ struct cndm_cq *cndm_create_cq(struct cndm_priv *priv)
 
 	cq->cons_ptr = 0;
 
+	cq->db_offset = 0;
+	cq->db_addr = NULL;
+
 	return cq;
 }
 
@@ -74,9 +77,19 @@ int cndm_open_cq(struct cndm_cq *cq, int irqn, int size)
 
 	cndm_exec_cmd(cq->cdev, &cmd, &rsp);
 
+	if (rsp.dboffs == 0) {
+		netdev_err(cq->priv->ndev, "Failed to allocate CQ");
+		ret = -1;
+		goto fail;
+	}
+
 	cq->cqn = rsp.qn;
+	cq->db_offset = rsp.dboffs;
+	cq->db_addr = cq->cdev->hw_addr + rsp.dboffs;
 
 	cq->enabled = 1;
+
+	netdev_dbg(cq->priv->ndev, "Opened CQ %d", cq->cqn);
 
 	return 0;
 
@@ -102,6 +115,8 @@ void cndm_close_cq(struct cndm_cq *cq)
 		cndm_exec_cmd(cdev, &cmd, &rsp);
 
 		cq->cqn = -1;
+		cq->db_offset = 0;
+		cq->db_addr = NULL;
 	}
 
 	if (cq->buf) {

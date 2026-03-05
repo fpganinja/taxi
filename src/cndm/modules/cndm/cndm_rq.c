@@ -87,11 +87,19 @@ int cndm_open_rq(struct cndm_ring *rq, struct cndm_priv *priv, struct cndm_cq *c
 
 	cndm_exec_cmd(rq->cdev, &cmd, &rsp);
 
+	if (rsp.dboffs == 0) {
+		netdev_err(rq->priv->ndev, "Failed to allocate RQ");
+		ret = -1;
+		goto fail;
+	}
+
 	rq->index = rsp.qn;
 	rq->db_offset = rsp.dboffs;
-	rq->db_addr = priv->cdev->hw_addr + rsp.dboffs;
+	rq->db_addr = rq->cdev->hw_addr + rsp.dboffs;
 
 	rq->enabled = 1;
+
+	netdev_dbg(cq->priv->ndev, "Opened RQ %d (CQ %d)", rq->index, cq->cqn);
 
 	ret = cndm_refill_rx_buffers(rq);
 	if (ret) {
@@ -135,6 +143,8 @@ void cndm_close_rq(struct cndm_ring *rq)
 		cndm_exec_cmd(cdev, &cmd, &rsp);
 
 		rq->index = -1;
+		rq->db_offset = 0;
+		rq->db_addr = NULL;
 	}
 
 	if (rq->buf) {

@@ -87,11 +87,19 @@ int cndm_open_sq(struct cndm_ring *sq, struct cndm_priv *priv, struct cndm_cq *c
 
 	cndm_exec_cmd(sq->cdev, &cmd, &rsp);
 
+	if (rsp.dboffs == 0) {
+		netdev_err(sq->priv->ndev, "Failed to allocate SQ");
+		ret = -1;
+		goto fail;
+	}
+
 	sq->index = rsp.qn;
 	sq->db_offset = rsp.dboffs;
-	sq->db_addr = priv->cdev->hw_addr + rsp.dboffs;
+	sq->db_addr = sq->cdev->hw_addr + rsp.dboffs;
 
 	sq->enabled = 1;
+
+	netdev_dbg(cq->priv->ndev, "Opened SQ %d (CQ %d)", sq->index, cq->cqn);
 
 	return 0;
 
@@ -124,6 +132,8 @@ void cndm_close_sq(struct cndm_ring *sq)
 		cndm_exec_cmd(cdev, &cmd, &rsp);
 
 		sq->index = -1;
+		sq->db_offset = 0;
+		sq->db_addr = NULL;
 	}
 
 	if (sq->buf) {

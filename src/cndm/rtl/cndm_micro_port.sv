@@ -313,16 +313,15 @@ desc_rd_inst (
 
 // desc demux
 taxi_axis_if #(
-    .DATA_W(axis_desc.DATA_W),
-    .KEEP_EN(axis_desc.KEEP_EN),
-    .KEEP_W(axis_desc.KEEP_W),
-    .LAST_EN(axis_desc.LAST_EN),
-    .ID_EN(axis_desc.ID_EN),
-    .ID_W(axis_desc.ID_W),
-    .DEST_EN(axis_desc.DEST_EN),
-    .DEST_W(axis_desc.DEST_W),
-    .USER_EN(axis_desc.USER_EN),
-    .USER_W(axis_desc.USER_W)
+    .DATA_W(16*8),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(1),
+    .ID_W(1),
+    .DEST_EN(1),
+    .DEST_W(WQN_W),
+    .USER_EN(1),
+    .USER_W(1)
 ) axis_desc_txrx[2]();
 
 taxi_axis_demux #(
@@ -363,16 +362,13 @@ taxi_axis_if #(
 ) axis_cpl();
 
 taxi_axis_if #(
-    .DATA_W(axis_cpl.DATA_W),
-    .KEEP_EN(axis_cpl.KEEP_EN),
-    .KEEP_W(axis_cpl.KEEP_W),
-    .LAST_EN(axis_cpl.LAST_EN),
-    .ID_EN(axis_cpl.ID_EN),
-    .ID_W(axis_cpl.ID_W),
-    .DEST_EN(axis_cpl.DEST_EN),
-    .DEST_W(axis_cpl.DEST_W),
-    .USER_EN(axis_cpl.USER_EN),
-    .USER_W(axis_cpl.USER_W)
+    .DATA_W(16*8),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(0),
+    .DEST_EN(1),
+    .DEST_W(CQN_W),
+    .USER_EN(0)
 ) axis_cpl_txrx[2]();
 
 taxi_axis_arb_mux #(

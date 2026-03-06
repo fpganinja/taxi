@@ -37,7 +37,8 @@ module cndm_micro_core #(
     parameter PORTS = 2,
 
     // Queue configuration
-    parameter CQN_W = 5,
+    parameter WQN_W = 5,
+    parameter CQN_W = WQN_W,
 
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
@@ -312,6 +313,7 @@ apb_dp_ctrl();
 cndm_micro_dp_mgr #(
     .PORTS(PORTS),
 
+    .WQN_W(WQN_W),
     .CQN_W(CQN_W),
 
     .PTP_EN(PTP_TS_EN),
@@ -498,6 +500,7 @@ for (genvar p = 0; p < PORTS; p = p + 1) begin : port
 
     cndm_micro_port #(
         // Queue configuration
+        .WQN_W(WQN_W),
         .CQN_W(CQN_W),
 
         // PTP configuration

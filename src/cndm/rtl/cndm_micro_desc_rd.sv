@@ -15,7 +15,10 @@ Authors:
 /*
  * Corundum-micro descriptor read module
  */
-module cndm_micro_desc_rd
+module cndm_micro_desc_rd #(
+    parameter WQN_W = 5,
+    parameter CQN_W = 5
+)
 (
     input  wire logic         clk,
     input  wire logic         rst,
@@ -42,190 +45,55 @@ module cndm_micro_desc_rd
     taxi_axis_if.src          m_axis_desc
 );
 
-localparam AXIL_ADDR_W = s_axil_ctrl_wr.ADDR_W;
-localparam AXIL_DATA_W = s_axil_ctrl_wr.DATA_W;
-
-localparam APB_ADDR_W = s_apb_dp_ctrl.ADDR_W;
-localparam APB_DATA_W = s_apb_dp_ctrl.DATA_W;
+localparam DMA_ADDR_W = dma_rd_desc_req.SRC_ADDR_W;
 
 localparam RAM_ADDR_W = 16;
 
-logic         txq_en_reg = '0;
-logic [3:0]   txq_size_reg = '0;
-logic [7:0]   txq_cqn_reg = '0;
-logic [63:0]  txq_base_addr_reg = '0;
-logic [15:0]  txq_prod_reg = '0;
-logic         rxq_en_reg = '0;
-logic [3:0]   rxq_size_reg = '0;
-logic [7:0]   rxq_cqn_reg = '0;
-logic [63:0]  rxq_base_addr_reg = '0;
-logic [15:0]  rxq_prod_reg = '0;
+logic [WQN_W-1:0]       wq_req_wqn_reg = '0;
+logic                   wq_req_valid_reg = 1'b0;
+logic                   wq_req_ready;
+logic [CQN_W-1:0]       wq_rsp_cqn;
+logic [DMA_ADDR_W-1:0]  wq_rsp_addr;
+logic                   wq_rsp_error;
+logic                   wq_rsp_valid;
+logic                   wq_rsp_ready_reg = 1'b0;
 
-logic [15:0] txq_cons_ptr_reg = '0;
-logic [15:0] rxq_cons_ptr_reg = '0;
+cndm_micro_queue_state #(
+    .QN_W(WQN_W),
+    .DQN_W(CQN_W),
+    .IS_CQ(0),
+    .QE_SIZE(16),
+    .DMA_ADDR_W(DMA_ADDR_W)
+)
+wq_mgr_inst (
+    .clk(clk),
+    .rst(rst),
 
-logic s_axil_ctrl_awready_reg = 1'b0;
-logic s_axil_ctrl_wready_reg = 1'b0;
-logic s_axil_ctrl_bvalid_reg = 1'b0;
+    /*
+     * Control register interface
+     */
+    .s_axil_ctrl_wr(s_axil_ctrl_wr),
+    .s_axil_ctrl_rd(s_axil_ctrl_rd),
 
-logic s_axil_ctrl_arready_reg = 1'b0;
-logic [AXIL_DATA_W-1:0] s_axil_ctrl_rdata_reg = '0;
-logic s_axil_ctrl_rvalid_reg = 1'b0;
+    /*
+     * Datapath control register interface
+     */
+    .s_apb_dp_ctrl(s_apb_dp_ctrl),
 
-assign s_axil_ctrl_wr.awready = s_axil_ctrl_awready_reg;
-assign s_axil_ctrl_wr.wready = s_axil_ctrl_wready_reg;
-assign s_axil_ctrl_wr.bresp = '0;
-assign s_axil_ctrl_wr.buser = '0;
-assign s_axil_ctrl_wr.bvalid = s_axil_ctrl_bvalid_reg;
-
-assign s_axil_ctrl_rd.arready = s_axil_ctrl_arready_reg;
-assign s_axil_ctrl_rd.rdata = s_axil_ctrl_rdata_reg;
-assign s_axil_ctrl_rd.rresp = '0;
-assign s_axil_ctrl_rd.ruser = '0;
-assign s_axil_ctrl_rd.rvalid = s_axil_ctrl_rvalid_reg;
-
-logic s_apb_dp_ctrl_pready_reg = 1'b0;
-logic [AXIL_DATA_W-1:0] s_apb_dp_ctrl_prdata_reg = '0;
-
-assign s_apb_dp_ctrl.pready = s_apb_dp_ctrl_pready_reg;
-assign s_apb_dp_ctrl.prdata = s_apb_dp_ctrl_prdata_reg;
-assign s_apb_dp_ctrl.pslverr = 1'b0;
-assign s_apb_dp_ctrl.pruser = '0;
-assign s_apb_dp_ctrl.pbuser = '0;
-
-always_ff @(posedge clk) begin
-    s_axil_ctrl_awready_reg <= 1'b0;
-    s_axil_ctrl_wready_reg <= 1'b0;
-    s_axil_ctrl_bvalid_reg <= s_axil_ctrl_bvalid_reg && !s_axil_ctrl_wr.bready;
-
-    s_axil_ctrl_arready_reg <= 1'b0;
-    s_axil_ctrl_rvalid_reg <= s_axil_ctrl_rvalid_reg && !s_axil_ctrl_rd.rready;
-
-    s_apb_dp_ctrl_pready_reg <= 1'b0;
-
-    if (s_axil_ctrl_wr.awvalid && s_axil_ctrl_wr.wvalid && !s_axil_ctrl_bvalid_reg) begin
-        s_axil_ctrl_awready_reg <= 1'b1;
-        s_axil_ctrl_wready_reg <= 1'b1;
-        s_axil_ctrl_bvalid_reg <= 1'b1;
-
-        case ({s_axil_ctrl_wr.awaddr[9:2], 2'b00})
-            // 10'h000: begin
-            //     txq_en_reg <= s_axil_ctrl_wr.wdata[0];
-            //     txq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            // end
-            10'h004: txq_prod_reg <= s_axil_ctrl_wr.wdata[15:0];
-            // 10'h008: txq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            // 10'h00c: txq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-
-            // 10'h100: begin
-            //     rxq_en_reg <= s_axil_ctrl_wr.wdata[0];
-            //     rxq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            // end
-            10'h104: rxq_prod_reg <= s_axil_ctrl_wr.wdata[15:0];
-            // 10'h108: rxq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            // 10'h10c: rxq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-            default: begin end
-        endcase
-    end
-
-    if (s_axil_ctrl_rd.arvalid && !s_axil_ctrl_rvalid_reg) begin
-        s_axil_ctrl_rdata_reg <= '0;
-
-        s_axil_ctrl_arready_reg <= 1'b1;
-        s_axil_ctrl_rvalid_reg <= 1'b1;
-
-        // case ({s_axil_ctrl_rd.araddr[9:2], 2'b00})
-        //     10'h000: begin
-        //         s_axil_ctrl_rdata_reg[0] <= txq_en_reg;
-        //         s_axil_ctrl_rdata_reg[19:16] <= txq_size_reg;
-        //     end
-        //     10'h004: begin
-        //         s_axil_ctrl_rdata_reg[15:0] <= txq_prod_reg;
-        //         s_axil_ctrl_rdata_reg[31:16] <= txq_cons_ptr_reg;
-        //     end
-        //     10'h008: s_axil_ctrl_rdata_reg <= txq_base_addr_reg[31:0];
-        //     10'h00c: s_axil_ctrl_rdata_reg <= txq_base_addr_reg[63:32];
-
-        //     10'h100: begin
-        //         s_axil_ctrl_rdata_reg[0] <= rxq_en_reg;
-        //         s_axil_ctrl_rdata_reg[19:16] <= rxq_size_reg;
-        //     end
-        //     10'h104: begin
-        //         s_axil_ctrl_rdata_reg[15:0] <= rxq_prod_reg;
-        //         s_axil_ctrl_rdata_reg[31:16] <= rxq_cons_ptr_reg;
-        //     end
-        //     10'h108: s_axil_ctrl_rdata_reg <= rxq_base_addr_reg[31:0];
-        //     10'h10c: s_axil_ctrl_rdata_reg <= rxq_base_addr_reg[63:32];
-        //     default: begin end
-        // endcase
-    end
-
-    if (s_apb_dp_ctrl.penable && s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
-        s_apb_dp_ctrl_pready_reg <= 1'b1;
-        s_apb_dp_ctrl_prdata_reg <= '0;
-
-        if (s_apb_dp_ctrl.pwrite) begin
-            case ({s_apb_dp_ctrl.paddr[9:2], 2'b00})
-                10'h000: begin
-                    txq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    txq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                    txq_cqn_reg <= s_apb_dp_ctrl.pwdata[31:24];
-                end
-                10'h004: txq_prod_reg <= s_apb_dp_ctrl.pwdata[15:0];
-                10'h008: txq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                10'h00c: txq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-
-                10'h100: begin
-                    rxq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    rxq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                    rxq_cqn_reg <= s_apb_dp_ctrl.pwdata[31:24];
-                end
-                10'h104: rxq_prod_reg <= s_apb_dp_ctrl.pwdata[15:0];
-                10'h108: rxq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                10'h10c: rxq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-                default: begin end
-            endcase
-        end
-
-        case ({s_apb_dp_ctrl.paddr[9:2], 2'b00})
-            10'h000: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= txq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= txq_size_reg;
-                s_apb_dp_ctrl_prdata_reg[31:24] <= txq_cqn_reg;
-            end
-            10'h004: begin
-                s_apb_dp_ctrl_prdata_reg[15:0] <= txq_prod_reg;
-                s_apb_dp_ctrl_prdata_reg[31:16] <= txq_cons_ptr_reg;
-            end
-            10'h008: s_apb_dp_ctrl_prdata_reg <= txq_base_addr_reg[31:0];
-            10'h00c: s_apb_dp_ctrl_prdata_reg <= txq_base_addr_reg[63:32];
-
-            10'h100: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= rxq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= rxq_size_reg;
-                s_apb_dp_ctrl_prdata_reg[31:24] <= rxq_cqn_reg;
-            end
-            10'h104: begin
-                s_apb_dp_ctrl_prdata_reg[15:0] <= rxq_prod_reg;
-                s_apb_dp_ctrl_prdata_reg[31:16] <= rxq_cons_ptr_reg;
-            end
-            10'h108: s_apb_dp_ctrl_prdata_reg <= rxq_base_addr_reg[31:0];
-            10'h10c: s_apb_dp_ctrl_prdata_reg <= rxq_base_addr_reg[63:32];
-            default: begin end
-        endcase
-    end
-
-    if (rst) begin
-        s_axil_ctrl_awready_reg <= 1'b0;
-        s_axil_ctrl_wready_reg <= 1'b0;
-        s_axil_ctrl_bvalid_reg <= 1'b0;
-
-        s_axil_ctrl_arready_reg <= 1'b0;
-        s_axil_ctrl_rvalid_reg <= 1'b0;
-
-        s_apb_dp_ctrl_pready_reg <= 1'b0;
-    end
-end
+    /*
+     * Queue management interface
+     */
+    .req_qn(wq_req_wqn_reg),
+    .req_valid(wq_req_valid_reg),
+    .req_ready(wq_req_ready),
+    .rsp_qn(),
+    .rsp_dqn(wq_rsp_cqn),
+    .rsp_addr(wq_rsp_addr),
+    .rsp_phase_tag(),
+    .rsp_error(wq_rsp_error),
+    .rsp_valid(wq_rsp_valid),
+    .rsp_ready(wq_rsp_ready_reg)
+);
 
 taxi_dma_desc_if #(
     .SRC_ADDR_W(RAM_ADDR_W),
@@ -247,8 +115,8 @@ taxi_dma_desc_if #(
 
 typedef enum logic [1:0] {
     STATE_IDLE,
+    STATE_QUERY_WQ,
     STATE_READ_DESC,
-    STATE_READ_DATA,
     STATE_TX_DESC
 } state_t;
 
@@ -257,8 +125,6 @@ state_t state_reg = STATE_IDLE;
 logic [1:0] desc_req_reg = '0;
 
 always_ff @(posedge clk) begin
-    // axis_desc.tready <= 1'b0;
-
     dma_rd_desc_req.req_src_sel <= '0;
     dma_rd_desc_req.req_src_asid <= '0;
     dma_rd_desc_req.req_dst_sel <= '0;
@@ -284,46 +150,50 @@ always_ff @(posedge clk) begin
     dma_desc.req_user <= '0;
     dma_desc.req_valid <= dma_desc.req_valid && !dma_desc.req_ready;
 
+    wq_req_valid_reg <= wq_req_valid_reg && !wq_req_ready;
+    wq_rsp_ready_reg <= 1'b0;
+
     desc_req_reg <= desc_req_reg | desc_req;
-
-    if (!txq_en_reg) begin
-        txq_cons_ptr_reg <= '0;
-    end
-
-    if (!rxq_en_reg) begin
-        rxq_cons_ptr_reg <= '0;
-    end
 
     case (state_reg)
         STATE_IDLE: begin
+            wq_req_wqn_reg <= 0;
+
             if (desc_req_reg[1]) begin
-                dma_rd_desc_req.req_src_addr <= rxq_base_addr_reg + 64'(16'(rxq_cons_ptr_reg & ({16{1'b1}} >> (16 - rxq_size_reg))) * 16);
-                dma_desc.req_id <= 1'b1;
-                dma_desc.req_dest <= rxq_cqn_reg;
                 desc_req_reg[1] <= 1'b0;
-                if (rxq_cons_ptr_reg == rxq_prod_reg || !rxq_en_reg) begin
-                    dma_desc.req_user <= 1'b1;
-                    dma_desc.req_valid <= 1'b1;
-                    state_reg <= STATE_TX_DESC;
-                end else begin
-                    dma_desc.req_user <= 1'b0;
-                    dma_rd_desc_req.req_valid <= 1'b1;
-                    rxq_cons_ptr_reg <= rxq_cons_ptr_reg + 1;
-                    state_reg <= STATE_READ_DESC;
-                end
+                wq_req_wqn_reg <= 1;
+                wq_req_valid_reg <= 1'b1;
+                dma_desc.req_id <= 1'b1;
+                state_reg <= STATE_QUERY_WQ;
             end else if (desc_req_reg[0]) begin
-                dma_rd_desc_req.req_src_addr <= txq_base_addr_reg + 64'(16'(txq_cons_ptr_reg & ({16{1'b1}} >> (16 - txq_size_reg))) * 16);
-                dma_desc.req_id <= 1'b0;
-                dma_desc.req_dest <= txq_cqn_reg;
                 desc_req_reg[0] <= 1'b0;
-                if (txq_cons_ptr_reg == txq_prod_reg || !txq_en_reg) begin
+                wq_req_wqn_reg <= 0;
+                wq_req_valid_reg <= 1'b1;
+                dma_desc.req_id <= 1'b0;
+                state_reg <= STATE_QUERY_WQ;
+            end else begin
+                state_reg <= STATE_IDLE;
+            end
+        end
+        STATE_QUERY_WQ: begin
+            wq_rsp_ready_reg <= 1'b1;
+
+            if (wq_rsp_valid && wq_rsp_ready_reg) begin
+                wq_rsp_ready_reg <= 1'b0;
+
+                dma_rd_desc_req.req_src_addr <= wq_rsp_addr;
+
+                dma_desc.req_dest <= wq_rsp_cqn;
+
+                if (wq_rsp_error) begin
+                    // report error
                     dma_desc.req_user <= 1'b1;
                     dma_desc.req_valid <= 1'b1;
                     state_reg <= STATE_TX_DESC;
                 end else begin
+                    // read desc
                     dma_desc.req_user <= 1'b0;
                     dma_rd_desc_req.req_valid <= 1'b1;
-                    txq_cons_ptr_reg <= txq_cons_ptr_reg + 1;
                     state_reg <= STATE_READ_DESC;
                 end
             end

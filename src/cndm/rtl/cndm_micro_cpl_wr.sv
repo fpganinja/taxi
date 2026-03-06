@@ -50,7 +50,7 @@ logic [CQN_W-1:0]       cq_req_cqn_reg = '0;
 logic                   cq_req_valid_reg = 1'b0;
 logic                   cq_req_ready;
 logic [DMA_ADDR_W-1:0]  cq_rsp_addr;
-logic                   cq_rsp_phase;
+logic                   cq_rsp_phase_tag;
 logic                   cq_rsp_error;
 logic                   cq_rsp_valid;
 logic                   cq_rsp_ready_reg = 1'b0;
@@ -58,7 +58,8 @@ logic                   cq_rsp_ready_reg = 1'b0;
 cndm_micro_queue_state #(
     .QN_W(CQN_W),
     .DQN_W(CQN_W), // TODO
-    .CPL_SIZE(16),
+    .IS_CQ(1),
+    .QE_SIZE(16),
     .DMA_ADDR_W(DMA_ADDR_W)
 )
 cq_mgr_inst (
@@ -77,7 +78,7 @@ cq_mgr_inst (
     .s_apb_dp_ctrl(s_apb_dp_ctrl),
 
     /*
-     * CQ management interface
+     * Queue management interface
      */
     .req_qn(cq_req_cqn_reg),
     .req_valid(cq_req_valid_reg),
@@ -85,7 +86,7 @@ cq_mgr_inst (
     .rsp_qn(),
     .rsp_dqn(),
     .rsp_addr(cq_rsp_addr),
-    .rsp_phase(cq_rsp_phase),
+    .rsp_phase_tag(cq_rsp_phase_tag),
     .rsp_error(cq_rsp_error),
     .rsp_valid(cq_rsp_valid),
     .rsp_ready(cq_rsp_ready_reg)
@@ -130,7 +131,7 @@ always_ff @(posedge clk) begin
         STATE_IDLE: begin
             dma_wr_desc_req.req_src_addr <= '0;
 
-            cq_req_cqn_reg <= CQN_W'(s_axis_cpl.tdest);
+            cq_req_cqn_reg <= s_axis_cpl.tdest;
 
             if (s_axis_cpl.tvalid && !s_axis_cpl.tready) begin
                 cq_req_valid_reg <= 1'b1;
@@ -143,11 +144,11 @@ always_ff @(posedge clk) begin
             dma_wr_desc_req.req_src_addr <= '0;
             cq_rsp_ready_reg <= 1'b1;
 
-            if (cq_rsp_valid) begin
+            if (cq_rsp_valid && cq_rsp_ready_reg) begin
                 cq_rsp_ready_reg <= 1'b0;
 
                 dma_wr_desc_req.req_dst_addr <= cq_rsp_addr;
-                phase_tag_reg <= cq_rsp_phase;
+                phase_tag_reg <= cq_rsp_phase_tag;
 
                 if (cq_rsp_error) begin
                     // drop completion

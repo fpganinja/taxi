@@ -19,7 +19,8 @@ module cndm_micro_dp_mgr #
 (
     parameter PORTS = 2,
 
-    parameter CQN_W = 5,
+    parameter WQN_W = 5,
+    parameter CQN_W = WQN_W,
 
     parameter logic PTP_EN = 1'b1,
     parameter PTP_BASE_ADDR_DP = 0,
@@ -90,8 +91,10 @@ typedef enum logic [4:0] {
     STATE_CREATE_Q_FIND_2,
     STATE_CREATE_Q_RESET_1,
     STATE_CREATE_Q_RESET_2,
+    STATE_CREATE_Q_RESET_3,
     STATE_CREATE_Q_SET_BASE_L,
     STATE_CREATE_Q_SET_BASE_H,
+    STATE_CREATE_Q_SET_DQN,
     STATE_CREATE_Q_ENABLE,
     STATE_DESTROY_Q_DISABLE,
     STATE_PTP_READ_1,
@@ -297,15 +300,15 @@ always_comb begin
                 CMD_OP_CREATE_RQ:
                 begin
                     cnt_next = 0;
-                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0100) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0100) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0020) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0020) + PORT_BASE_ADDR_HOST;
                 end
                 CMD_OP_MODIFY_RQ,
                 CMD_OP_QUERY_RQ,
                 CMD_OP_DESTROY_RQ:
                 begin
-                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0100) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0100) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0020) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0020) + PORT_BASE_ADDR_HOST;
                 end
                 default: begin end
             endcase
@@ -512,12 +515,27 @@ always_comb begin
             // reset queue 2
 
             // store doorbell offset
-            cmd_ram_wr_data = host_ptr_reg + 'h0004;
+            cmd_ram_wr_data = host_ptr_reg + 'h0008;
             cmd_ram_wr_addr = 7;
             cmd_ram_wr_en = 1'b1;
 
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h0004;
+                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h0008;
+                m_apb_dp_ctrl_psel_next = 1'b1;
+                m_apb_dp_ctrl_pwrite_next = 1'b1;
+                m_apb_dp_ctrl_pwdata_next = 32'h00000000;
+                m_apb_dp_ctrl_pstrb_next = '1;
+
+                state_next = STATE_CREATE_Q_RESET_3;
+            end else begin
+                state_next = STATE_CREATE_Q_RESET_2;
+            end
+        end
+        STATE_CREATE_Q_RESET_3: begin
+            // reset queue 2
+
+            if (!m_apb_dp_ctrl_psel_reg) begin
+                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h000c;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = 32'h00000000;
@@ -525,14 +543,14 @@ always_comb begin
 
                 state_next = STATE_CREATE_Q_SET_BASE_L;
             end else begin
-                state_next = STATE_CREATE_Q_RESET_2;
+                state_next = STATE_CREATE_Q_RESET_3;
             end
         end
         STATE_CREATE_Q_SET_BASE_L: begin
             // set queue base addr (LSB)
             cmd_ram_rd_addr = 8;
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h0008;
+                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h0018;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
@@ -547,7 +565,7 @@ always_comb begin
             // set queue base addr (MSB)
             cmd_ram_rd_addr = 9;
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h000C;
+                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h001C;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
@@ -555,7 +573,22 @@ always_comb begin
 
                 state_next = STATE_CREATE_Q_ENABLE;
             end else begin
-                state_next = STATE_CREATE_Q_SET_BASE_H;
+                state_next = STATE_CREATE_Q_SET_DQN;
+            end
+        end
+        STATE_CREATE_Q_SET_DQN: begin
+            // set CQN/EQN/IRQN
+            cmd_ram_rd_addr = 4;
+            if (!m_apb_dp_ctrl_psel_reg) begin
+                m_apb_dp_ctrl_paddr_next = dp_ptr_reg + 'h0004;
+                m_apb_dp_ctrl_psel_next = 1'b1;
+                m_apb_dp_ctrl_pwrite_next = 1'b1;
+                m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
+                m_apb_dp_ctrl_pstrb_next = '1;
+
+                state_next = STATE_CREATE_Q_ENABLE;
+            end else begin
+                state_next = STATE_CREATE_Q_SET_DQN;
             end
         end
         STATE_CREATE_Q_ENABLE: begin
@@ -566,7 +599,6 @@ always_comb begin
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = '0;
-                m_apb_dp_ctrl_pwdata_next[31:24] = qn2_reg[7:0];
                 m_apb_dp_ctrl_pwdata_next[19:16] = cmd_ram_rd_data[3:0];
                 m_apb_dp_ctrl_pwdata_next[0] = 1'b1;
                 m_apb_dp_ctrl_pstrb_next = '1;

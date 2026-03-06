@@ -17,7 +17,8 @@ Authors:
  */
 module cndm_micro_port #(
     // Queue configuration
-    parameter CQN_W = 5,
+    parameter WQN_W = 5,
+    parameter CQN_W = WQN_W,
 
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
@@ -275,12 +276,15 @@ taxi_axis_if #(
     .ID_EN(1),
     .ID_W(1),
     .DEST_EN(1),
-    .DEST_W(8),
+    .DEST_W(WQN_W),
     .USER_EN(1),
     .USER_W(1)
 ) axis_desc();
 
-cndm_micro_desc_rd
+cndm_micro_desc_rd #(
+    .WQN_W(WQN_W),
+    .CQN_W(CQN_W)
+)
 desc_rd_inst (
     .clk(clk),
     .rst(rst),
@@ -354,7 +358,7 @@ taxi_axis_if #(
     .LAST_EN(1),
     .ID_EN(0),
     .DEST_EN(1),
-    .DEST_W(8),
+    .DEST_W(CQN_W),
     .USER_EN(0)
 ) axis_cpl();
 

@@ -18,7 +18,8 @@ Authors:
 module cndm_micro_queue_state #(
     parameter QN_W = 5,
     parameter DQN_W = 5,
-    parameter CPL_SIZE = 16,
+    parameter logic IS_CQ = 1'b0,
+    parameter QE_SIZE = 16,
     parameter DMA_ADDR_W = 64
 )
 (
@@ -37,7 +38,7 @@ module cndm_micro_queue_state #(
     taxi_apb_if.slv                      s_apb_dp_ctrl,
 
     /*
-     * CQ management interface
+     * Queue management interface
      */
      input  wire logic [QN_W-1:0]        req_qn,
      input  wire logic                   req_valid,
@@ -45,7 +46,7 @@ module cndm_micro_queue_state #(
      output wire logic [QN_W-1:0]        rsp_qn,
      output wire logic [DQN_W-1:0]       rsp_dqn,
      output wire logic [DMA_ADDR_W-1:0]  rsp_addr,
-     output wire logic                   rsp_phase,
+     output wire logic                   rsp_phase_tag,
      output wire logic                   rsp_error,
      output wire logic                   rsp_valid,
      input  wire logic                   rsp_ready
@@ -115,7 +116,7 @@ logic req_ready_reg = 1'b0, req_ready_next;
 logic [QN_W-1:0] rsp_qn_reg = '0, rsp_qn_next;
 logic [DQN_W-1:0] rsp_dqn_reg = '0, rsp_dqn_next;
 logic [DMA_ADDR_W-1:0] rsp_addr_reg = '0, rsp_addr_next;
-logic rsp_phase_reg = 1'b0, rsp_phase_next;
+logic rsp_phase_tag_reg = 1'b0, rsp_phase_tag_next;
 logic rsp_error_reg = 1'b0, rsp_error_next;
 logic rsp_valid_reg = 1'b0, rsp_valid_next;
 
@@ -123,30 +124,38 @@ assign req_ready = req_ready_reg;
 assign rsp_qn = rsp_qn_reg;
 assign rsp_dqn = rsp_dqn_reg;
 assign rsp_addr = rsp_addr_reg;
-assign rsp_phase = rsp_phase_reg;
+assign rsp_phase_tag = rsp_phase_tag_reg;
 assign rsp_error = rsp_error_reg;
 assign rsp_valid = rsp_valid_reg;
 
 logic [2**QN_W-1:0] queue_enable_reg = '0;
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [3:0] queue_mem_size[2**QN_W] = '{default: '0};
+logic [DQN_W-1:0] queue_mem_dqn[2**QN_W] = '{default: '0};
+(* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
+logic [3:0] queue_mem_log_size[2**QN_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
 logic [DMA_ADDR_W-1:0] queue_mem_base_addr[2**QN_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [PTR_W-1:0] queue_mem_prod[2**QN_W] = '{default: '0};
+logic [PTR_W-1:0] queue_mem_prod_ptr[2**QN_W] = '{default: '0};
+(* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
+logic [PTR_W-1:0] queue_mem_cons_ptr[2**QN_W] = '{default: '0};
 
 logic queue_mem_wr_en;
 logic [QN_W-1:0] queue_mem_addr;
 
 wire queue_mem_rd_enable = queue_enable_reg[queue_mem_addr];
-wire [3:0] queue_mem_rd_size = queue_mem_size[queue_mem_addr];
+wire [DQN_W-1:0] queue_mem_rd_dqn = queue_mem_dqn[queue_mem_addr];
+wire [3:0] queue_mem_rd_log_size = queue_mem_log_size[queue_mem_addr];
 wire [DMA_ADDR_W-1:0] queue_mem_rd_base_addr = queue_mem_base_addr[queue_mem_addr];
-wire [PTR_W-1:0] queue_mem_rd_prod = queue_mem_prod[queue_mem_addr];
+wire [PTR_W-1:0] queue_mem_rd_prod_ptr = queue_mem_prod_ptr[queue_mem_addr];
+wire [PTR_W-1:0] queue_mem_rd_cons_ptr = queue_mem_cons_ptr[queue_mem_addr];
 
 logic queue_mem_wr_enable;
-logic [3:0] queue_mem_wr_size;
+logic [DQN_W-1:0] queue_mem_wr_dqn;
+logic [3:0] queue_mem_wr_log_size;
 logic [DMA_ADDR_W-1:0] queue_mem_wr_base_addr;
-logic [PTR_W-1:0] queue_mem_wr_prod;
+logic [PTR_W-1:0] queue_mem_wr_prod_ptr;
+logic [PTR_W-1:0] queue_mem_wr_cons_ptr;
 
 always_comb begin
     s_axil_ctrl_awready_next = 1'b0;
@@ -164,7 +173,7 @@ always_comb begin
     rsp_qn_next = rsp_qn_reg;
     rsp_dqn_next = rsp_dqn_reg;
     rsp_addr_next = rsp_addr_reg;
-    rsp_phase_next = rsp_phase_reg;
+    rsp_phase_tag_next = rsp_phase_tag_reg;
     rsp_error_next = rsp_error_reg;
     rsp_valid_next = rsp_valid_reg && !rsp_ready;
 
@@ -172,12 +181,14 @@ always_comb begin
     queue_mem_addr = '0;
 
     queue_mem_wr_enable = queue_mem_rd_enable;
-    queue_mem_wr_size = queue_mem_rd_size;
+    queue_mem_wr_dqn = queue_mem_rd_dqn;
+    queue_mem_wr_log_size = queue_mem_rd_log_size;
     queue_mem_wr_base_addr = queue_mem_rd_base_addr;
-    queue_mem_wr_prod = queue_mem_rd_prod;
+    queue_mem_wr_prod_ptr = queue_mem_rd_prod_ptr;
+    queue_mem_wr_cons_ptr = queue_mem_rd_cons_ptr;
 
     // terminate AXI lite writes
-    if (s_axil_ctrl_wr.awvalid && s_axil_ctrl_wr.wvalid && !s_axil_ctrl_bvalid_reg) begin
+    if (IS_CQ && s_axil_ctrl_wr.awvalid && s_axil_ctrl_wr.wvalid && !s_axil_ctrl_bvalid_reg) begin
         s_axil_ctrl_awready_next = 1'b1;
         s_axil_ctrl_wready_next = 1'b1;
         s_axil_ctrl_bvalid_next = 1'b1;
@@ -191,7 +202,21 @@ always_comb begin
         s_axil_ctrl_rvalid_next = 1'b1;
     end
 
-    if (s_apb_dp_ctrl.penable && s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
+    if (!IS_CQ && s_axil_ctrl_wr.awvalid && s_axil_ctrl_wr.wvalid && !s_axil_ctrl_bvalid_reg) begin
+        // AXI lite write
+        s_axil_ctrl_awready_next = 1'b1;
+        s_axil_ctrl_wready_next = 1'b1;
+        s_axil_ctrl_bvalid_next = 1'b1;
+
+        queue_mem_wr_en = 1'b1;
+        queue_mem_addr = s_axil_ctrl_awaddr_queue_index;
+
+        case (s_axil_ctrl_awaddr_reg_index)
+            3'd2: queue_mem_wr_prod_ptr = s_axil_ctrl_wr.wdata[15:0];
+            default: begin end
+        endcase
+
+    end else if (s_apb_dp_ctrl.penable && s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
         // APB read/write
         s_apb_dp_ctrl_pready_next = 1'b1;
         s_apb_dp_ctrl_prdata_next = '0;
@@ -204,11 +229,13 @@ always_comb begin
             case (s_apb_dp_ctrl_paddr_reg_index)
                 3'd0: begin
                     queue_mem_wr_enable = s_apb_dp_ctrl.pwdata[0];
-                    queue_mem_wr_size = s_apb_dp_ctrl.pwdata[19:16];
+                    queue_mem_wr_log_size = s_apb_dp_ctrl.pwdata[19:16];
                 end
-                3'd1: queue_mem_wr_prod = s_apb_dp_ctrl.pwdata[15:0];
-                3'd2: queue_mem_wr_base_addr[31:0] = s_apb_dp_ctrl.pwdata;
-                3'd3: queue_mem_wr_base_addr[63:32] = s_apb_dp_ctrl.pwdata;
+                3'd1: queue_mem_wr_dqn = s_apb_dp_ctrl.pwdata[DQN_W-1:0];
+                3'd2: queue_mem_wr_prod_ptr = s_apb_dp_ctrl.pwdata[15:0];
+                3'd3: queue_mem_wr_cons_ptr = s_apb_dp_ctrl.pwdata[15:0];
+                3'd6: queue_mem_wr_base_addr[31:0] = s_apb_dp_ctrl.pwdata;
+                3'd7: queue_mem_wr_base_addr[63:32] = s_apb_dp_ctrl.pwdata;
                 default: begin end
             endcase
         end
@@ -216,11 +243,13 @@ always_comb begin
         case (s_apb_dp_ctrl_paddr_reg_index)
             3'd0: begin
                 s_apb_dp_ctrl_prdata_next[0] = queue_mem_rd_enable;
-                s_apb_dp_ctrl_prdata_next[19:16] = queue_mem_rd_size;
+                s_apb_dp_ctrl_prdata_next[19:16] = queue_mem_rd_log_size;
             end
-            3'd1: s_apb_dp_ctrl_prdata_next[15:0] = queue_mem_rd_prod;
-            3'd2: s_apb_dp_ctrl_prdata_next = queue_mem_rd_base_addr[31:0];
-            3'd3: s_apb_dp_ctrl_prdata_next = queue_mem_rd_base_addr[63:32];
+            3'd1: s_apb_dp_ctrl_prdata_next = 32'(queue_mem_rd_dqn);
+            3'd2: s_apb_dp_ctrl_prdata_next[15:0] = queue_mem_rd_prod_ptr;
+            3'd3: s_apb_dp_ctrl_prdata_next[15:0] = IS_CQ ? '0 : queue_mem_rd_cons_ptr;
+            3'd6: s_apb_dp_ctrl_prdata_next = queue_mem_rd_base_addr[31:0];
+            3'd7: s_apb_dp_ctrl_prdata_next = queue_mem_rd_base_addr[63:32];
             default: begin end
         endcase
 
@@ -231,15 +260,20 @@ always_comb begin
         queue_mem_addr = req_qn;
 
         rsp_qn_next = req_qn;
-        rsp_dqn_next = '0; // TODO
-        rsp_addr_next = queue_mem_rd_base_addr + DMA_ADDR_W'(16'(queue_mem_rd_prod & ({16{1'b1}} >> (16 - queue_mem_rd_size))) * CPL_SIZE);
-        rsp_phase_next = !queue_mem_rd_prod[queue_mem_rd_size];
-        rsp_error_next = !queue_mem_rd_enable;
+        rsp_dqn_next = queue_mem_rd_dqn;
+        if (IS_CQ) begin
+            rsp_addr_next = queue_mem_rd_base_addr + DMA_ADDR_W'(16'(queue_mem_rd_prod_ptr & ({16{1'b1}} >> (16 - queue_mem_rd_log_size))) * QE_SIZE);
+            rsp_phase_tag_next = !queue_mem_rd_prod_ptr[queue_mem_rd_log_size];
+            rsp_error_next = !queue_mem_rd_enable;
+            queue_mem_wr_prod_ptr = queue_mem_rd_prod_ptr + 1;
+        end else begin
+            rsp_addr_next = queue_mem_rd_base_addr + DMA_ADDR_W'(16'(queue_mem_rd_cons_ptr & ({16{1'b1}} >> (16 - queue_mem_rd_log_size))) * QE_SIZE);
+            rsp_error_next = !queue_mem_rd_enable || queue_mem_rd_prod_ptr == queue_mem_rd_cons_ptr;
+            queue_mem_wr_cons_ptr = queue_mem_rd_cons_ptr + 1;
+        end
         rsp_valid_next = 1'b1;
 
-        queue_mem_wr_prod = queue_mem_rd_prod + 1;
-
-        if (queue_mem_rd_enable) begin
+        if (!rsp_error_next) begin
             queue_mem_wr_en = 1'b1;
         end
     end
@@ -261,15 +295,17 @@ always @(posedge clk) begin
     rsp_qn_reg <= rsp_qn_next;
     rsp_dqn_reg <= rsp_dqn_next;
     rsp_addr_reg <= rsp_addr_next;
-    rsp_phase_reg <= rsp_phase_next;
+    rsp_phase_tag_reg <= rsp_phase_tag_next;
     rsp_error_reg <= rsp_error_next;
     rsp_valid_reg <= rsp_valid_next;
 
     if (queue_mem_wr_en) begin
         queue_enable_reg[queue_mem_addr] <= queue_mem_wr_enable;
-        queue_mem_size[queue_mem_addr] <= queue_mem_wr_size;
+        queue_mem_dqn[queue_mem_addr] <= queue_mem_wr_dqn;
+        queue_mem_log_size[queue_mem_addr] <= queue_mem_wr_log_size;
         queue_mem_base_addr[queue_mem_addr] <= queue_mem_wr_base_addr;
-        queue_mem_prod[queue_mem_addr] <= queue_mem_wr_prod;
+        queue_mem_prod_ptr[queue_mem_addr] <= queue_mem_wr_prod_ptr;
+        queue_mem_cons_ptr[queue_mem_addr] <= queue_mem_wr_cons_ptr;
     end
 
     if (rst) begin

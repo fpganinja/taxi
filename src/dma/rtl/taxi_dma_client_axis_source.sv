@@ -227,8 +227,8 @@ always_comb begin
                 axis_cmd_axis_dest_next = desc_req.req_dest;
                 axis_cmd_axis_user_next = desc_req.req_user;
 
-                axis_cmd_cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1)) >> $clog2(AXIS_KEEP_W_INT);
-                read_cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1)) >> $clog2(AXIS_KEEP_W_INT);
+                axis_cmd_cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1) >> $clog2(AXIS_KEEP_W_INT));
+                read_cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1) >> $clog2(AXIS_KEEP_W_INT));
 
                 axis_cmd_valid_next = 1'b1;
 

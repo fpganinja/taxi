@@ -278,8 +278,18 @@ class TB:
         # Ethernet
         self.port_mac = []
 
-        eth_clock_period = 3.2
-        eth_speed = 10e9
+        if len(dut.mac_axis_tx[0].tdata) == 512:
+            # assuming US+ 100G CMAC, 512 bits at 322.265625 MHz
+            eth_clock_period = 3.102
+            eth_speed = 100e9
+        elif len(dut.mac_axis_tx[0].tdata) == 64:
+            # assuming 25G MAC in low-latency mode, 64 bits at 402.83203125 MHz
+            eth_clock_period = 2.482
+            eth_speed = 25e9
+        else:
+            # assuming 25G MAC in low-latency mode, 512 bits at 322.265625 MHz
+            eth_clock_period = 3.102
+            eth_speed = 10e9
 
         for k in range(len(dut.mac_axis_tx)):
             cocotb.start_soon(Clock(dut.mac_tx_clk[k], eth_clock_period, units="ns").start())
@@ -302,53 +312,6 @@ class TB:
             )
             self.port_mac.append(mac)
 
-        # cocotb.start_soon(Clock(dut.sfp_mgt_refclk_p, 6.4, units="ns").start())
-
-        # self.sfp_sources = []
-        # self.sfp_sinks = []
-
-        # for ch in dut.uut.sfp_mac_inst.ch:
-        #     gt_inst = ch.ch_inst.gt.gt_inst
-
-        #     if ch.ch_inst.DATA_W.value == 64:
-        #         if ch.ch_inst.CFG_LOW_LATENCY.value:
-        #             clk = 2.482
-        #             gbx_cfg = (66, [64, 65])
-        #         else:
-        #             clk = 2.56
-        #             gbx_cfg = None
-        #     else:
-        #         if ch.ch_inst.CFG_LOW_LATENCY.value:
-        #             clk = 3.102
-        #             gbx_cfg = (66, [64, 65])
-        #         else:
-        #             clk = 3.2
-        #             gbx_cfg = None
-
-        #     cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
-        #     cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
-
-        #     self.sfp_sources.append(BaseRSerdesSource(
-        #         data=gt_inst.serdes_rx_data,
-        #         data_valid=gt_inst.serdes_rx_data_valid,
-        #         hdr=gt_inst.serdes_rx_hdr,
-        #         hdr_valid=gt_inst.serdes_rx_hdr_valid,
-        #         clock=gt_inst.rx_clk,
-        #         slip=gt_inst.serdes_rx_bitslip,
-        #         reverse=True,
-        #         gbx_cfg=gbx_cfg
-        #     ))
-        #     self.sfp_sinks.append(BaseRSerdesSink(
-        #         data=gt_inst.serdes_tx_data,
-        #         data_valid=gt_inst.serdes_tx_data_valid,
-        #         hdr=gt_inst.serdes_tx_hdr,
-        #         hdr_valid=gt_inst.serdes_tx_hdr_valid,
-        #         gbx_sync=gt_inst.serdes_tx_gbx_sync,
-        #         clock=gt_inst.tx_clk,
-        #         reverse=True,
-        #         gbx_cfg=gbx_cfg
-        #     ))
-        #
         self.loopback_enable = False
         cocotb.start_soon(self._run_loopback())
 

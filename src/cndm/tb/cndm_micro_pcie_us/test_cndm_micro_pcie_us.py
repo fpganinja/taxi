@@ -52,7 +52,7 @@ class TB:
         self.dev = UltraScalePlusPcieDevice(
             # configuration options
             pcie_generation=3,
-            pcie_link_width=8,
+            #pcie_link_width=8,
             user_clk_frequency=250e6,
             alignment="dword",
             cq_straddle=False,
@@ -490,8 +490,15 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize("mac_data_w", [32, 64])
-def test_cndm_micro_pcie_us(request, mac_data_w):
+@pytest.mark.parametrize(("pcie_data_w", "mac_data_w"), [
+    (128, 32),
+    (128, 64),
+    (256, 32),
+    (256, 64),
+    (512, 32),
+    (512, 64),
+])
+def test_cndm_micro_pcie_us(request, pcie_data_w, mac_data_w):
     dut = "cndm_micro_pcie_us"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
@@ -519,7 +526,7 @@ def test_cndm_micro_pcie_us(request, mac_data_w):
     parameters['PTP_CLK_PER_NS_DENOM'] = 165
 
     # PCIe interface configuration
-    parameters['AXIS_PCIE_DATA_W'] = 256
+    parameters['AXIS_PCIE_DATA_W'] = pcie_data_w
 
     # AXI lite interface configuration (control)
     parameters['AXIL_CTRL_DATA_W'] = 32

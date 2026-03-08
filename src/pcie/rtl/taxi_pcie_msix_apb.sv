@@ -139,11 +139,11 @@ logic msix_mask_reg = 1'b0;
 
 // MSI-X table
 (* ramstyle = "no_rw_check, mlab" *)
-logic [63:0] tbl_mem[2**TBL_ADDR_W];
+logic [63:0] tbl_mem[2**TBL_ADDR_W] = '{default: '0};
 
 // MSI-X PBA
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [63:0] pba_mem[2**PBA_ADDR_W];
+logic [63:0] pba_mem[2**PBA_ADDR_W] = '{default: '0};
 
 logic tbl_rd_data_valid_reg = 1'b0, tbl_rd_data_valid_next;
 logic pba_rd_data_valid_reg = 1'b0, pba_rd_data_valid_next;
@@ -175,15 +175,6 @@ assign tx_wr_req_tlp.error = '0;
 assign tx_wr_req_tlp.valid = tx_wr_req_tlp_valid_reg;
 assign tx_wr_req_tlp.sop = 1'b1;
 assign tx_wr_req_tlp.eop = 1'b1;
-
-initial begin
-    for (integer i = 0; i < 2**TBL_ADDR_W; i = i + 1) begin
-        tbl_mem[i] = '0;
-    end
-    for (integer i = 0; i < 2**PBA_ADDR_W; i = i + 1) begin
-        pba_mem[i] = '0;
-    end
-end
 
 always_comb begin
     state_next = STATE_IDLE;

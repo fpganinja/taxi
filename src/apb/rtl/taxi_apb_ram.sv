@@ -59,7 +59,7 @@ logic [DATA_W-1:0] s_apb_prdata_reg = '0, s_apb_prdata_next;
 logic [DATA_W-1:0] s_apb_prdata_pipe_reg = '0;
 
 // (* RAM_STYLE="BLOCK" *)
-logic [DATA_W-1:0] mem[2**VALID_ADDR_W];
+logic [DATA_W-1:0] mem[2**VALID_ADDR_W] = '{default: '0};
 
 wire [VALID_ADDR_W-1:0] s_apb_paddr_valid = VALID_ADDR_W'(s_apb.paddr >> (ADDR_W - VALID_ADDR_W));
 
@@ -68,16 +68,6 @@ assign s_apb.pready = PIPELINE_OUTPUT ? s_apb_pready_pipe_reg : s_apb_pready_reg
 assign s_apb.pslverr = 1'b0;
 assign s_apb.pruser = '0;
 assign s_apb.pbuser = '0;
-
-initial begin
-    // two nested loops for smaller number of iterations per loop
-    // workaround for synthesizer complaints about large loop counts
-    for (integer i = 0; i < 2**VALID_ADDR_W; i = i + 2**(VALID_ADDR_W/2)) begin
-        for (integer j = i; j < i + 2**(VALID_ADDR_W/2); j = j + 1) begin
-            mem[j] = '0;
-        end
-    end
-end
 
 always_comb begin
     mem_wr_en = 1'b0;

@@ -77,7 +77,7 @@ logic [DATA_W-1:0] s_apb_b_prdata_pipe_reg = '0;
 
 // verilator lint_off MULTIDRIVEN
 // (* RAM_STYLE="BLOCK" *)
-logic [DATA_W-1:0] mem[2**VALID_ADDR_W];
+logic [DATA_W-1:0] mem[2**VALID_ADDR_W] = '{default: '0};
 // verilator lint_on MULTIDRIVEN
 
 wire [VALID_ADDR_W-1:0] s_apb_a_paddr_valid = VALID_ADDR_W'(s_apb_a.paddr >> (ADDR_W - VALID_ADDR_W));
@@ -94,16 +94,6 @@ assign s_apb_b.pready = PIPELINE_OUTPUT ? s_apb_b_pready_pipe_reg : s_apb_b_prea
 assign s_apb_b.pslverr = 1'b0;
 assign s_apb_b.pruser = '0;
 assign s_apb_b.pbuser = '0;
-
-initial begin
-    // two nested loops for smaller number of iterations per loop
-    // workaround for synthesizer complaints about large loop counts
-    for (integer i = 0; i < 2**VALID_ADDR_W; i = i + 2**(VALID_ADDR_W/2)) begin
-        for (integer j = i; j < i + 2**(VALID_ADDR_W/2); j = j + 1) begin
-            mem[j] = '0;
-        end
-    end
-end
 
 always_comb begin
     mem_wr_en_a = 1'b0;

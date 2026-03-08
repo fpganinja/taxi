@@ -128,17 +128,17 @@ if (PIPELINE_OUTPUT > 0) begin
 
     // pipeline
     (* shreg_extract = "no" *)
-    logic [95:0]  output_ts_tod_reg[0:PIPELINE_OUTPUT-1];
+    logic [95:0]  output_ts_tod_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic         output_ts_tod_step_reg[0:PIPELINE_OUTPUT-1];
+    logic         output_ts_tod_step_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic [63:0]  output_ts_rel_reg[0:PIPELINE_OUTPUT-1];
+    logic [63:0]  output_ts_rel_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic         output_ts_rel_step_reg[0:PIPELINE_OUTPUT-1];
+    logic         output_ts_rel_step_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic         output_pps_reg[0:PIPELINE_OUTPUT-1];
+    logic         output_pps_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic         output_pps_str_reg[0:PIPELINE_OUTPUT-1];
+    logic         output_pps_str_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
 
     assign output_ts_tod = output_ts_tod_reg[PIPELINE_OUTPUT-1];
     assign output_ts_tod_step = output_ts_tod_step_reg[PIPELINE_OUTPUT-1];
@@ -148,19 +148,6 @@ if (PIPELINE_OUTPUT > 0) begin
 
     assign output_pps = output_pps_reg[PIPELINE_OUTPUT-1];
     assign output_pps_str = output_pps_str_reg[PIPELINE_OUTPUT-1];
-
-    initial begin
-        for (integer i = 0; i < PIPELINE_OUTPUT; i = i + 1) begin
-            output_ts_tod_reg[i] = '0;
-            output_ts_tod_step_reg[i] = 1'b0;
-
-            output_ts_rel_reg[i] = '0;
-            output_ts_rel_step_reg[i] = 1'b0;
-
-            output_pps_reg[i] = 1'b0;
-            output_pps_str_reg[i] = 1'b0;
-        end
-    end
 
     always_ff @(posedge clk) begin
         output_ts_tod_reg[0][95:48] <= ts_tod_s_reg;

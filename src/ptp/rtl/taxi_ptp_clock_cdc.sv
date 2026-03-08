@@ -106,10 +106,10 @@ logic ts_step_reg = 1'b0, ts_step_next;
 logic pps_reg = 1'b0;
 logic pps_str_reg = 1'b0;
 
-logic [47:0] ts_s_pipe_reg[0:PIPELINE_OUTPUT-1];
-logic [TS_NS_W+CMP_FNS_W-1:0] ts_ns_pipe_reg[0:PIPELINE_OUTPUT-1];
-logic ts_step_pipe_reg[0:PIPELINE_OUTPUT-1];
-logic pps_pipe_reg[0:PIPELINE_OUTPUT-1];
+logic [47:0] ts_s_pipe_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
+logic [TS_NS_W+CMP_FNS_W-1:0] ts_ns_pipe_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
+logic ts_step_pipe_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
+logic pps_pipe_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
 
 logic [PHASE_CNT_W-1:0] src_phase_reg = '0;
 logic [PHASE_ACC_W-1:0] dest_phase_reg = '0, dest_phase_next;
@@ -151,27 +151,18 @@ if (PIPELINE_OUTPUT > 0) begin
 
     // pipeline
     (* shreg_extract = "no" *)
-    logic [TS_W-1:0]  output_ts_reg[0:PIPELINE_OUTPUT-1];
+    logic [TS_W-1:0]  output_ts_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic             output_ts_step_reg[0:PIPELINE_OUTPUT-1];
+    logic             output_ts_step_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic             output_pps_reg[0:PIPELINE_OUTPUT-1];
+    logic             output_pps_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
     (* shreg_extract = "no" *)
-    logic             output_pps_str_reg[0:PIPELINE_OUTPUT-1];
+    logic             output_pps_str_reg[0:PIPELINE_OUTPUT-1] = '{default: '0};
 
     assign output_ts = output_ts_reg[PIPELINE_OUTPUT-1];
     assign output_ts_step = output_ts_step_reg[PIPELINE_OUTPUT-1];
     assign output_pps = output_pps_reg[PIPELINE_OUTPUT-1];
     assign output_pps_str = output_pps_str_reg[PIPELINE_OUTPUT-1];
-
-    initial begin
-        for (integer i = 0; i < PIPELINE_OUTPUT; i = i + 1) begin
-            output_ts_reg[i] = 0;
-            output_ts_step_reg[i] = 1'b0;
-            output_pps_reg[i] = 1'b0;
-            output_pps_str_reg[i] = 1'b0;
-        end
-    end
 
     always_ff @(posedge output_clk) begin
         if (TS_W == 96) begin
@@ -218,15 +209,6 @@ end else begin
     assign output_pps = pps_reg;
     assign output_pps_str = pps_str_reg;
 
-end
-
-initial begin
-    for (integer i = 0; i < PIPELINE_OUTPUT; i = i + 1) begin
-        ts_s_pipe_reg[i] = 0;
-        ts_ns_pipe_reg[i] = 0;
-        ts_step_pipe_reg[i] = 1'b0;
-        pps_pipe_reg[i] = 1'b0;
-    end
 end
 
 // source PTP clock capture and sync logic

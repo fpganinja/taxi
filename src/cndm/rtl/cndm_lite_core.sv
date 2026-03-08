@@ -220,7 +220,6 @@ always_ff @(posedge clk) begin
         s_axil_rvalid_reg <= 1'b1;
 
         case ({axil_ctrl[0].araddr[15:2], 2'b00})
-            16'h0100: s_axil_rdata_reg <= PORTS; // port count
             16'h0200: begin
                 s_axil_rdata_reg[0] <= cmd_mbox_busy;
             end

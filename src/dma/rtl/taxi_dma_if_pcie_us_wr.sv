@@ -405,34 +405,21 @@ logic op_tbl_finish_en;
 logic [2**OP_TAG_W-1:0] op_tbl_active = '0;
 logic [2**OP_TAG_W-1:0] op_tbl_tx_done = '0;
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [PCIE_ADDR_W-1:0] op_tbl_pcie_addr[2**OP_TAG_W];
+logic [PCIE_ADDR_W-1:0] op_tbl_pcie_addr[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [11:0] op_tbl_len[2**OP_TAG_W];
+logic [11:0] op_tbl_len[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_zero_len[2**OP_TAG_W];
+logic op_tbl_zero_len[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [10:0] op_tbl_dword_len[2**OP_TAG_W];
+logic [10:0] op_tbl_dword_len[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [CYCLE_COUNT_W-1:0] op_tbl_cycle_count[2**OP_TAG_W];
+logic [CYCLE_COUNT_W-1:0] op_tbl_cycle_count[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [RAM_OFFSET_W-1:0] op_tbl_offset[2**OP_TAG_W];
+logic [RAM_OFFSET_W-1:0] op_tbl_offset[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [TAG_W-1:0] op_tbl_tag[2**OP_TAG_W];
+logic [TAG_W-1:0] op_tbl_tag[2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_last[2**OP_TAG_W];
-
-initial begin
-    for (integer i = 0; i < 2**OP_TAG_W; i = i + 1) begin
-        op_tbl_pcie_addr[i] = '0;
-        op_tbl_len[i] = '0;
-        op_tbl_zero_len[i] = '0;
-        op_tbl_dword_len[i] = '0;
-        op_tbl_cycle_count[i] = '0;
-        op_tbl_offset[i] = '0;
-        op_tbl_tag[i] = '0;
-        op_tbl_last[i] = '0;
-    end
-end
+logic op_tbl_last[2**OP_TAG_W] = '{default: '0};
 
 always_comb begin
     req_state_next = REQ_STATE_IDLE;

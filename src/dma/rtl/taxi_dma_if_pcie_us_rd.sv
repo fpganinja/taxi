@@ -484,17 +484,17 @@ logic [PCIE_TAG_W-1:0] pcie_tag_table_finish_ptr;
 logic pcie_tag_table_finish_en;
 
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [RAM_SEL_W-1:0] pcie_tag_table_ram_sel[2**PCIE_TAG_W];
+logic [RAM_SEL_W-1:0] pcie_tag_table_ram_sel[2**PCIE_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [RAM_ADDR_W-1:0] pcie_tag_table_ram_addr[2**PCIE_TAG_W];
+logic [RAM_ADDR_W-1:0] pcie_tag_table_ram_addr[2**PCIE_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [OP_TAG_W-1:0] pcie_tag_table_op_tag[2**PCIE_TAG_W];
+logic [OP_TAG_W-1:0] pcie_tag_table_op_tag[2**PCIE_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic pcie_tag_table_zero_len[2**PCIE_TAG_W];
+logic pcie_tag_table_zero_len[2**PCIE_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic pcie_tag_table_active_a[2**PCIE_TAG_W];
+logic pcie_tag_table_active_a[2**PCIE_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic pcie_tag_table_active_b[2**PCIE_TAG_W];
+logic pcie_tag_table_active_b[2**PCIE_TAG_W] = '{default: '0};
 
 logic [PCIE_TAG_W-1:0] pcie_tag_fifo_wr_tag;
 
@@ -524,23 +524,23 @@ logic [OP_TAG_W-1:0] op_tbl_rd_finish_ptr;
 logic op_tbl_rd_finish_en;
 
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [TAG_W-1:0] op_tbl_tag [2**OP_TAG_W];
+logic [TAG_W-1:0] op_tbl_tag [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_rd_init_a [2**OP_TAG_W];
+logic op_tbl_rd_init_a [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_rd_init_b [2**OP_TAG_W];
+logic op_tbl_rd_init_b [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_rd_commit [2**OP_TAG_W];
+logic op_tbl_rd_commit [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [OP_TBL_RD_COUNT_W-1:0] op_tbl_rd_count_start [2**OP_TAG_W];
+logic [OP_TBL_RD_COUNT_W-1:0] op_tbl_rd_count_start [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [OP_TBL_RD_COUNT_W-1:0] op_tbl_rd_count_finish [2**OP_TAG_W];
+logic [OP_TBL_RD_COUNT_W-1:0] op_tbl_rd_count_finish [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_error_a [2**OP_TAG_W];
+logic op_tbl_error_a [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic op_tbl_error_b [2**OP_TAG_W];
+logic op_tbl_error_b [2**OP_TAG_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-logic [3:0] op_tbl_error_code [2**OP_TAG_W];
+logic [3:0] op_tbl_error_code [2**OP_TAG_W] = '{default: '0};
 
 logic [OP_TAG_W+1-1:0] op_tag_fifo_wr_ptr_reg = '0;
 logic [OP_TAG_W+1-1:0] op_tag_fifo_rd_ptr_reg = '0, op_tag_fifo_rd_ptr_next;
@@ -548,29 +548,6 @@ logic [OP_TAG_W+1-1:0] op_tag_fifo_rd_ptr_reg = '0, op_tag_fifo_rd_ptr_next;
 logic [OP_TAG_W-1:0] op_tag_fifo_mem [2**OP_TAG_W];
 logic [OP_TAG_W-1:0] op_tag_fifo_wr_tag;
 logic op_tag_fifo_we;
-
-initial begin
-    for (integer i = 0; i < 2**OP_TAG_W; i = i + 1) begin
-        op_tbl_tag[i] = '0;
-        op_tbl_rd_init_a[i] = '0;
-        op_tbl_rd_init_b[i] = '0;
-        op_tbl_rd_commit[i] = '0;
-        op_tbl_rd_count_start[i] = '0;
-        op_tbl_rd_count_finish[i] = '0;
-        op_tbl_error_a[i] = '0;
-        op_tbl_error_b[i] = '0;
-        op_tbl_error_code[i] = '0;
-    end
-
-    for (integer i = 0; i < 2**PCIE_TAG_W; i = i + 1) begin
-        pcie_tag_table_ram_sel[i] = '0;
-        pcie_tag_table_ram_addr[i] = '0;
-        pcie_tag_table_op_tag[i] = '0;
-        pcie_tag_table_zero_len[i] = '0;
-        pcie_tag_table_active_a[i] = '0;
-        pcie_tag_table_active_b[i] = '0;
-    end
-end
 
 always_comb begin
     req_state_next = REQ_STATE_IDLE;

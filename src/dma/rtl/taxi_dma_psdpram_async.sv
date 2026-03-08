@@ -59,26 +59,12 @@ if (SEGS != dma_ram_rd.SEGS || SEG_DATA_W != dma_ram_rd.SEG_DATA_W)
 for (genvar n = 0; n < SEGS; n = n + 1) begin
 
     (* ramstyle = "no_rw_check" *)
-    logic [SEG_DATA_W-1:0] mem_reg[2**INT_ADDR_W];
+    logic [SEG_DATA_W-1:0] mem_reg[2**INT_ADDR_W] = '{default: '0};
 
     logic wr_done_reg = 1'b0;
 
     logic [PIPELINE-1:0] rd_resp_valid_pipe_reg = '0;
-    logic [SEG_DATA_W-1:0] rd_resp_data_pipe_reg[PIPELINE];
-
-    initial begin
-        // two nested loops for smaller number of iterations per loop
-        // workaround for synthesizer complaints about large loop counts
-        for (integer i = 0; i < 2**INT_ADDR_W; i = i + 2**(INT_ADDR_W/2)) begin
-            for (integer j = i; j < i + 2**(INT_ADDR_W/2); j = j + 1) begin
-                mem_reg[j] = '0;
-            end
-        end
-
-        for (integer i = 0; i < PIPELINE; i = i + 1) begin
-            rd_resp_data_pipe_reg[i] = '0;
-        end
-    end
+    logic [SEG_DATA_W-1:0] rd_resp_data_pipe_reg[PIPELINE] = '{default: '0};
 
     always_ff @(posedge clk_wr) begin
         wr_done_reg <= 1'b0;

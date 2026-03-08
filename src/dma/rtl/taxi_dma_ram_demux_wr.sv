@@ -76,16 +76,10 @@ for (genvar n = 0; n < SEGS; n = n + 1) begin
         logic [FIFO_AW+1-1:0] fifo_wr_ptr_reg = '0;
         logic [FIFO_AW+1-1:0] fifo_rd_ptr_reg = '0;
         (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-        logic [CL_PORTS-1:0] fifo_sel[2**FIFO_AW];
+        logic [CL_PORTS-1:0] fifo_sel[2**FIFO_AW] = '{default: '0};
 
         wire fifo_empty = fifo_wr_ptr_reg == fifo_rd_ptr_reg;
         wire fifo_full = fifo_wr_ptr_reg == (fifo_rd_ptr_reg ^ (1 << FIFO_AW));
-
-        initial begin
-            for (integer i = 0; i < 2**FIFO_AW; i = i + 1) begin
-                fifo_sel[i] = '0;
-            end
-        end
 
         // RAM write command demux
 

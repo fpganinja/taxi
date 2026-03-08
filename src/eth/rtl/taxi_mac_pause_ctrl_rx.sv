@@ -85,7 +85,7 @@ logic [QFB-1:0] quanta_cnt_reg = '0, quanta_cnt_next;
 logic [1:0] quanta_inc_reg = '0, quanta_inc_next;
 
 logic [QW-1:0] lfc_quanta_reg = '0, lfc_quanta_next;
-logic [QW-1:0] pfc_quanta_reg[8], pfc_quanta_next[8];
+logic [QW-1:0] pfc_quanta_reg[8] = '{default: '0}, pfc_quanta_next[8];
 
 logic stat_rx_lfc_pkt_reg = 1'b0, stat_rx_lfc_pkt_next;
 logic stat_rx_lfc_xon_reg = 1'b0, stat_rx_lfc_xon_next;
@@ -105,12 +105,6 @@ assign stat_rx_pfc_pkt = stat_rx_pfc_pkt_reg;
 assign stat_rx_pfc_xon = stat_rx_pfc_xon_reg;
 assign stat_rx_pfc_xoff = stat_rx_pfc_xoff_reg;
 assign stat_rx_pfc_paused = pfc_req_reg;
-
-initial begin
-    for (integer k = 0; k < 8; k = k + 1) begin
-        pfc_quanta_reg[k] = '0;
-    end
-end
 
 always_comb begin
     stat_rx_lfc_pkt_next = 1'b0;

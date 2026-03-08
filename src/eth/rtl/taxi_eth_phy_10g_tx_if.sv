@@ -100,25 +100,17 @@ end
 
 if (SERDES_PIPELINE > 0) begin
     (* srl_style = "register" *)
-    logic [DATA_W-1:0] serdes_tx_data_pipe_reg[SERDES_PIPELINE-1:0];
+    logic [DATA_W-1:0] serdes_tx_data_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
     (* srl_style = "register" *)
-    logic serdes_tx_data_valid_pipe_reg[SERDES_PIPELINE-1:0];
+    logic serdes_tx_data_valid_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
     (* srl_style = "register" *)
-    logic [HDR_W-1:0] serdes_tx_hdr_pipe_reg[SERDES_PIPELINE-1:0];
+    logic [HDR_W-1:0] serdes_tx_hdr_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
     (* srl_style = "register" *)
-    logic serdes_tx_hdr_valid_pipe_reg[SERDES_PIPELINE-1:0];
+    logic serdes_tx_hdr_valid_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
     (* srl_style = "register" *)
-    logic serdes_tx_gbx_sync_pipe_reg[SERDES_PIPELINE-1:0];
+    logic serdes_tx_gbx_sync_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
 
     for (genvar n = 0; n < SERDES_PIPELINE; n = n + 1) begin
-        initial begin
-            serdes_tx_data_pipe_reg[n] = '0;
-            serdes_tx_data_valid_pipe_reg[n] = '0;
-            serdes_tx_hdr_pipe_reg[n] = '0;
-            serdes_tx_hdr_valid_pipe_reg[n] = '0;
-            serdes_tx_gbx_sync_pipe_reg[n] = '0;
-        end
-
         always_ff @(posedge clk) begin
             serdes_tx_data_pipe_reg[n] <= n == 0 ? serdes_tx_data_int : serdes_tx_data_pipe_reg[n-1];
             serdes_tx_data_valid_pipe_reg[n] <= n == 0 ? serdes_tx_data_valid_reg : serdes_tx_data_valid_pipe_reg[n-1];

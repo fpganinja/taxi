@@ -47,7 +47,7 @@ module fpga_core #
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
     parameter PTP_CLK_PER_NS_NUM = 32,
-    parameter PTP_CLK_PER_NS_DENOM = 5,
+    parameter PTP_CLK_PER_NS_DEN = 5,
 
     // PCIe interface configuration
     parameter RQ_SEQ_NUM_W = 6,
@@ -753,7 +753,7 @@ cndm_micro_pcie_us #(
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(1'b0),
     .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
-    .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM),
+    .PTP_CLK_PER_NS_DEN(PTP_CLK_PER_NS_DEN),
 
     // PCIe interface configuration
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),

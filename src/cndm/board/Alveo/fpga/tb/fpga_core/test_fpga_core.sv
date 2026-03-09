@@ -45,7 +45,7 @@ module test_fpga_core #
     // PTP configuration
     parameter logic PTP_TS_EN = 1'b1,
     parameter PTP_CLK_PER_NS_NUM = 32,
-    parameter PTP_CLK_PER_NS_DENOM = 5,
+    parameter PTP_CLK_PER_NS_DEN = 5,
 
     // PCIe interface configuration
     parameter AXIS_PCIE_DATA_W = 512,
@@ -215,7 +215,7 @@ fpga_core #(
     // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
-    .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM),
+    .PTP_CLK_PER_NS_DEN(PTP_CLK_PER_NS_DEN),
 
     // PCIe interface configuration
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),

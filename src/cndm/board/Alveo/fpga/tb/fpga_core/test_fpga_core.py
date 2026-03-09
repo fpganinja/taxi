@@ -519,7 +519,7 @@ def test_fpga_core(request, mac_data_w):
     # PTP configuration
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_CLK_PER_NS_NUM'] = 32
-    parameters['PTP_CLK_PER_NS_DENOM'] = 5
+    parameters['PTP_CLK_PER_NS_DEN'] = 5
 
     # AXI lite interface configuration (control)
     parameters['AXIL_CTRL_DATA_W'] = 32

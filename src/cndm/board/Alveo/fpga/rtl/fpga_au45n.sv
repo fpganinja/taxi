@@ -748,7 +748,7 @@ fpga_core #(
     // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_CLK_PER_NS_NUM(1024),
-    .PTP_CLK_PER_NS_DENOM(165),
+    .PTP_CLK_PER_NS_DEN(165),
 
     // PCIe interface configuration
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),

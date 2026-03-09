@@ -59,7 +59,7 @@ export PARAM_GTY_CLK_CNT := $(PARAM_GTY_QUAD_CNT)
 # PTP configuration
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_CLK_PER_NS_NUM := 32
-export PARAM_PTP_CLK_PER_NS_DENOM := 5
+export PARAM_PTP_CLK_PER_NS_DEN := 5
 
 # AXI lite interface configuration (control)
 export PARAM_AXIL_CTRL_DATA_W := 32

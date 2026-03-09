@@ -49,7 +49,10 @@ module cndm_micro_port #(
     taxi_dma_ram_if.wr_slv    dma_ram_wr,
     taxi_dma_ram_if.rd_slv    dma_ram_rd,
 
-    output wire logic         irq,
+    /*
+     * Interrupts
+     */
+    taxi_axis_if.src          m_axis_irq,
 
     /*
      * PTP
@@ -505,8 +508,12 @@ cpl_wr_inst (
     .dma_wr_desc_sts(dma_wr_desc_int[0]),
     .dma_ram_rd(dma_ram_rd_int[0]),
 
-    .s_axis_cpl(axis_cpl),
-    .irq(irq)
+    /*
+     * Interrupts
+     */
+    .m_axis_irq(m_axis_irq),
+
+    .s_axis_cpl(axis_cpl)
 );
 
 // TX path

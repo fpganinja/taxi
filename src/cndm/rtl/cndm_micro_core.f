@@ -20,3 +20,4 @@ cndm_micro_cpl_wr.sv
 ../lib/taxi/src/axis/rtl/taxi_axis_demux.sv
 ../lib/taxi/src/ptp/rtl/taxi_ptp_td_phc_apb.f
 ../lib/taxi/src/ptp/rtl/taxi_ptp_td_rel2tod.sv
+../lib/taxi/src/pcie/rtl/taxi_irq_rate_limit.sv

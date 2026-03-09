@@ -459,8 +459,25 @@ cfg_inst (
     .cfg_mgmt_read_write_done(cfg_mgmt_read_write_done)
 );
 
-wire [PORTS-1:0] irq;
-wire [31:0] msi_irq = 32'(irq);
+localparam IRQN_W = $clog2(32);
+
+taxi_axis_if #(
+    .DATA_W(IRQN_W),
+    .KEEP_EN(0),
+    .KEEP_W(1)
+) axis_irq();
+
+logic [31:0] msi_irq_reg = '0;
+
+assign axis_irq.tready = 1'b1;
+
+always @(posedge pcie_clk) begin
+    msi_irq_reg <= '0;
+
+    if (axis_irq.tvalid) begin
+        msi_irq_reg[axis_irq.tdata] <= 1'b1;
+    end
+end
 
 taxi_pcie_us_msi #(
     .MSI_CNT(32)
@@ -472,7 +489,7 @@ msi_inst (
     /*
      * Interrupt request inputs
      */
-    .msi_irq(msi_irq),
+    .msi_irq(msi_irq_reg),
 
     /*
      * Interface to UltraScale PCIe IP core
@@ -547,7 +564,10 @@ core_inst (
     .dma_ram_wr(dma_ram),
     .dma_ram_rd(dma_ram),
 
-    .irq(irq),
+    /*
+     * Interrupts
+     */
+    .m_axis_irq(axis_irq),
 
     /*
      * PTP

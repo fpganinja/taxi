@@ -68,7 +68,10 @@ module cndm_micro_core #(
     taxi_dma_ram_if.wr_slv         dma_ram_wr,
     taxi_dma_ram_if.rd_slv         dma_ram_rd,
 
-    output wire logic [PORTS-1:0]  irq,
+    /*
+     * Interrupts
+     */
+    taxi_axis_if.src               m_axis_irq,
 
     /*
      * PTP
@@ -116,6 +119,8 @@ localparam PORT_OFFSET_DP = PTP_TS_EN ? 1 : 0;
 localparam PORT_OFFSET_HOST = 2;
 localparam PORT_BASE_ADDR_DP = PTP_TS_EN ? 32'h00010000 : 32'h00000000;
 localparam PORT_BASE_ADDR_HOST = 32'h00020000;
+
+localparam SYS_CLK_CYC_PER_US = (1000*SYS_CLK_PER_NS_DEN+SYS_CLK_PER_NS_NUM-1)/SYS_CLK_PER_NS_NUM;
 
 taxi_axil_if #(
     .DATA_W(s_axil_ctrl_wr.DATA_W),
@@ -517,6 +522,54 @@ dma_mux_inst (
     .client_ram_rd(dma_ram_int)
 );
 
+taxi_axis_if #(
+    .DATA_W(m_axis_irq.DATA_W),
+    .KEEP_EN(0),
+    .KEEP_W(1)
+) axis_irq_int(), axis_irq_port[PORTS]();
+
+taxi_axis_arb_mux #(
+    .S_COUNT($size(axis_irq_port)),
+    .ARB_ROUND_ROBIN(1),
+    .ARB_LSB_HIGH_PRIO(1)
+)
+irq_mux_inst (
+    .clk(clk),
+    .rst(rst),
+
+    /*
+     * AXI4-Stream input (sink)
+     */
+    .s_axis(axis_irq_port),
+
+    /*
+     * AXI4-Stream output (source)
+     */
+    .m_axis(axis_irq_int)
+);
+
+taxi_irq_rate_limit
+irq_rate_limit_inst (
+    .clk(clk),
+    .rst(rst),
+
+    /*
+     * Interrupt request input
+     */
+    .s_axis_irq(axis_irq_int),
+
+    /*
+     * Interrupt request output
+     */
+    .m_axis_irq(m_axis_irq),
+
+    /*
+     * Configuration
+     */
+    .prescale(16'(SYS_CLK_CYC_PER_US)),
+    .min_interval(10) // TODO make configurable
+);
+
 for (genvar p = 0; p < PORTS; p = p + 1) begin : port
 
     cndm_micro_port #(
@@ -553,7 +606,10 @@ for (genvar p = 0; p < PORTS; p = p + 1) begin : port
         .dma_ram_wr(dma_ram_int[p]),
         .dma_ram_rd(dma_ram_int[p]),
 
-        .irq(irq[p]),
+        /*
+         * Interrupts
+         */
+        .m_axis_irq(axis_irq_port[p]),
 
         /*
          * PTP

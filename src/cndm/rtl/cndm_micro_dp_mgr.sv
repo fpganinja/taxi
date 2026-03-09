@@ -694,7 +694,11 @@ always_comb begin
             // reset queue 2
 
             // store doorbell offset
-            cmd_ram_wr_data = host_ptr_reg + 'h0008;
+            if (qtype_reg == QTYPE_SQ || qtype_reg == QTYPE_RQ) begin
+                cmd_ram_wr_data = host_ptr_reg + 'h0008;
+            end else begin
+                cmd_ram_wr_data = host_ptr_reg + 'h000C;
+            end
             cmd_ram_wr_addr = 7;
             cmd_ram_wr_en = 1'b1;
 

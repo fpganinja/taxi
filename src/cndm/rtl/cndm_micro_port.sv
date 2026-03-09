@@ -513,6 +513,9 @@ cpl_wr_inst (
      */
     .m_axis_irq(m_axis_irq),
 
+    /*
+     * Completion input
+     */
     .s_axis_cpl(axis_cpl)
 );
 

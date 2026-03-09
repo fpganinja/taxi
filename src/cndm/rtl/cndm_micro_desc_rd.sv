@@ -100,6 +100,7 @@ wq_mgr_inst (
     .rsp_dqn(wq_rsp_cqn),
     .rsp_addr(wq_rsp_addr),
     .rsp_phase_tag(),
+    .rsp_arm(),
     .rsp_error(wq_rsp_error),
     .rsp_valid(wq_rsp_valid),
     .rsp_ready(wq_rsp_ready_reg)

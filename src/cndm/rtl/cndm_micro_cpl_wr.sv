@@ -45,6 +45,9 @@ module cndm_micro_cpl_wr #(
      */
     taxi_axis_if.src          m_axis_irq,
 
+    /*
+     * Completion input
+     */
     taxi_axis_if.snk          s_axis_cpl
 );
 
@@ -58,6 +61,7 @@ logic                   cq_req_ready;
 logic [IRQN_W-1:0]      cq_rsp_irqn;
 logic [DMA_ADDR_W-1:0]  cq_rsp_addr;
 logic                   cq_rsp_phase_tag;
+logic                   cq_rsp_arm;
 logic                   cq_rsp_error;
 logic                   cq_rsp_valid;
 logic                   cq_rsp_ready_reg = 1'b0;
@@ -96,6 +100,7 @@ cq_mgr_inst (
     .rsp_dqn(cq_rsp_irqn),
     .rsp_addr(cq_rsp_addr),
     .rsp_phase_tag(cq_rsp_phase_tag),
+    .rsp_arm(cq_rsp_arm),
     .rsp_error(cq_rsp_error),
     .rsp_valid(cq_rsp_valid),
     .rsp_ready(cq_rsp_ready_reg)
@@ -110,6 +115,7 @@ typedef enum logic [1:0] {
 state_t state_reg = STATE_IDLE;
 
 logic phase_tag_reg = 1'b0;
+logic arm_reg = 1'b0;
 
 logic [IRQN_W-1:0] m_axis_irq_irqn_reg = '0;
 logic m_axis_irq_tvalid_reg = 1'b0;
@@ -167,6 +173,7 @@ always_ff @(posedge clk) begin
                 m_axis_irq_irqn_reg <= cq_rsp_irqn;
                 dma_wr_desc_req.req_dst_addr <= cq_rsp_addr;
                 phase_tag_reg <= cq_rsp_phase_tag;
+                arm_reg <= cq_rsp_arm;
 
                 if (cq_rsp_error) begin
                     // drop completion
@@ -181,7 +188,7 @@ always_ff @(posedge clk) begin
         STATE_WRITE_DATA: begin
             if (dma_wr_desc_sts.sts_valid) begin
                 s_axis_cpl.tready <= 1'b1;
-                m_axis_irq_tvalid_reg <= 1'b1;
+                m_axis_irq_tvalid_reg <= arm_reg; // only generate interrupt when armed
                 state_reg <= STATE_IDLE;
             end
         end

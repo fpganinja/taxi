@@ -89,7 +89,6 @@ class Cq:
         self.cons_ptr = None
 
         self.db_offset = None
-
         self.hw_regs = self.driver.hw_regs
 
     async def open(self, irqn, size):
@@ -141,7 +140,10 @@ class Cq:
             self.log.error("Failed to allocate CQ")
             return
 
+        await self.write_cons_ptr_arm()
+
         self.log.info("Opened CQ %d", self.cqn)
+        self.log.info("Using doorbell at offset 0x%08x", self.db_offset)
 
         self.enabled = True
 
@@ -173,6 +175,12 @@ class Cq:
 
         # TODO free buffer
 
+    async def write_cons_ptr(self):
+        await self.hw_regs.write_dword(self.db_offset, self.cons_ptr & 0xffff)
+
+    async def write_cons_ptr_arm(self):
+        await self.hw_regs.write_dword(self.db_offset, (self.cons_ptr & 0xffff) | 0x80000000)
+
 
 class Sq:
     def __init__(self, driver, port):
@@ -203,7 +211,6 @@ class Sq:
         self.bytes = 0
 
         self.db_offset = None
-
         self.hw_regs = self.driver.hw_regs
 
     async def open(self, cq, size):
@@ -261,6 +268,7 @@ class Sq:
             return
 
         self.log.info("Opened SQ %d (CQ %d)", self.sqn, cq.cqn)
+        self.log.info("Using doorbell at offset 0x%08x", self.db_offset)
 
         self.enabled = True
 
@@ -292,6 +300,15 @@ class Sq:
 
         # TODO free buffer
 
+    def is_ring_empty(self):
+        return self.prod_ptr == self.cons_ptr
+
+    def is_ring_full(self):
+        return ((self.prod_ptr - self.cons_ptr) & 0xffffffff) > self.size
+
+    async def write_prod_ptr(self):
+        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
+
     async def start_xmit(self, data):
         headroom = 10
         tx_buf = self.driver.alloc_pkt()
@@ -301,7 +318,7 @@ class Sq:
         struct.pack_into('<xxxxLQ', self.buf, 16*index, len(data), ptr+headroom)
         self.tx_info[index] = tx_buf
         self.prod_ptr += 1
-        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
+        await self.write_prod_ptr()
 
     def free_tx_desc(self, index):
         pkt = self.tx_info[index]
@@ -309,7 +326,7 @@ class Sq:
         self.tx_info[index] = None
 
     def free_tx_buf(self):
-        while self.cons_ptr != self.txq_prod:
+        while not self.is_ring_empty():
             index = self.cons_ptr & self.size_mask
             self.free_tx_desc(index)
             self.cons_ptr += 1
@@ -345,6 +362,8 @@ class Sq:
         cq.cons_ptr = cq_cons_ptr
         sq.cons_ptr = cons_ptr
 
+        await cq.write_cons_ptr_arm()
+
 
 class Rq:
     def __init__(self, driver, port):
@@ -375,7 +394,6 @@ class Rq:
         self.bytes = 0
 
         self.db_offset = None
-
         self.hw_regs = self.driver.hw_regs
 
     async def open(self, cq, size):
@@ -433,6 +451,7 @@ class Rq:
             return
 
         self.log.info("Opened RQ %d (CQ %d)", self.rqn, cq.cqn)
+        self.log.info("Using doorbell at offset 0x%08x", self.db_offset)
 
         self.enabled = True
 
@@ -466,13 +485,22 @@ class Rq:
 
         # TODO free buffer
 
+    def is_ring_empty(self):
+        return self.prod_ptr == self.cons_ptr
+
+    def is_ring_full(self):
+        return ((self.prod_ptr - self.cons_ptr) & 0xffffffff) > self.size
+
+    async def write_prod_ptr(self):
+        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
+
     def free_rx_desc(self, index):
         pkt = self.rx_info[index]
         self.driver.free_pkt(pkt)
         self.rx_info[index] = None
 
     def free_rx_buf(self):
-        while self.cons_ptr != self.prod_ptr:
+        while not self.is_ring_empty():
             index = self.cons_ptr & self.size_mask
             self.free_rx_desc(index)
             self.cons_ptr += 1
@@ -496,7 +524,7 @@ class Rq:
             self.prepare_rx_desc(self.prod_ptr & self.size_mask)
             self.prod_ptr += 1
 
-        await self.hw_regs.write_dword(self.db_offset, self.prod_ptr & 0xffff)
+        await self.write_prod_ptr()
 
     @staticmethod
     async def process_rx_cq(cq):
@@ -537,6 +565,7 @@ class Rq:
         rq.cons_ptr = cons_ptr
 
         await rq.refill_rx_buffers()
+        await cq.write_cons_ptr_arm()
 
 
 class Port:

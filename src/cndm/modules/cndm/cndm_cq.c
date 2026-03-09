@@ -89,6 +89,8 @@ int cndm_open_cq(struct cndm_cq *cq, int irqn, int size)
 
 	cq->enabled = 1;
 
+	cndm_cq_write_cons_ptr_arm(cq);
+
 	netdev_dbg(cq->priv->ndev, "Opened CQ %d", cq->cqn);
 
 	return 0;
@@ -124,4 +126,14 @@ void cndm_close_cq(struct cndm_cq *cq)
 		cq->buf = NULL;
 		cq->buf_dma_addr = 0;
 	}
+}
+
+void cndm_cq_write_cons_ptr(const struct cndm_cq *cq)
+{
+	iowrite32(cq->cons_ptr & 0xffff, cq->db_addr);
+}
+
+void cndm_cq_write_cons_ptr_arm(const struct cndm_cq *cq)
+{
+	iowrite32((cq->cons_ptr & 0xffff) | 0x80000000, cq->db_addr);
 }

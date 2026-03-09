@@ -152,6 +152,21 @@ void cndm_close_sq(struct cndm_ring *sq)
 	sq->priv = NULL;
 }
 
+bool cndm_is_sq_ring_empty(const struct cndm_ring *sq)
+{
+	return sq->prod_ptr == sq->cons_ptr;
+}
+
+bool cndm_is_sq_ring_full(const struct cndm_ring *sq)
+{
+	return (sq->prod_ptr - sq->cons_ptr) >= sq->size;
+}
+
+void cndm_sq_write_prod_ptr(const struct cndm_ring *sq)
+{
+	iowrite32(sq->prod_ptr & 0xffff, sq->db_addr);
+}
+
 static void cndm_free_tx_desc(struct cndm_ring *sq, int index, int napi_budget)
 {
 	struct cndm_priv *priv = sq->priv;
@@ -173,7 +188,7 @@ int cndm_free_tx_buf(struct cndm_ring *sq)
 	u32 index;
 	int cnt = 0;
 
-	while (sq->prod_ptr != sq->cons_ptr) {
+	while (!cndm_is_sq_ring_empty(sq)) {
 		index = sq->cons_ptr & sq->size_mask;
 		cndm_free_tx_desc(sq, index, 0);
 		sq->cons_ptr++;
@@ -229,6 +244,8 @@ static int cndm_process_tx_cq(struct cndm_cq *cq, int napi_budget)
 	cq->cons_ptr = cq_cons_ptr;
 	sq->cons_ptr = cons_ptr;
 
+	cndm_cq_write_cons_ptr(cq);
+
 	if (netif_tx_queue_stopped(sq->tx_queue) && (done != 0 || sq->prod_ptr == sq->cons_ptr))
 		netif_tx_wake_queue(sq->tx_queue);
 
@@ -248,6 +265,7 @@ int cndm_poll_tx_cq(struct napi_struct *napi, int budget)
 	napi_complete(napi);
 
 	// TODO re-enable interrupts
+	cndm_cq_write_cons_ptr_arm(cq);
 
 	return done;
 }
@@ -315,7 +333,7 @@ int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	}
 
 	dma_wmb();
-	iowrite32(sq->prod_ptr & 0xffff, sq->db_addr);
+	cndm_sq_write_prod_ptr(sq);
 
 	return NETDEV_TX_OK;
 

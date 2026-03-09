@@ -163,6 +163,21 @@ void cndm_close_rq(struct cndm_ring *rq)
 	rq->priv = NULL;
 }
 
+bool cndm_is_rq_ring_empty(const struct cndm_ring *rq)
+{
+	return rq->prod_ptr == rq->cons_ptr;
+}
+
+bool cndm_is_rq_ring_full(const struct cndm_ring *rq)
+{
+	return (rq->prod_ptr - rq->cons_ptr) >= rq->size;
+}
+
+void cndm_rq_write_prod_ptr(const struct cndm_ring *rq)
+{
+	iowrite32(rq->prod_ptr & 0xffff, rq->db_addr);
+}
+
 static void cndm_free_rx_desc(struct cndm_ring *rq, int index)
 {
 	struct cndm_priv *priv = rq->priv;
@@ -185,7 +200,7 @@ int cndm_free_rx_buf(struct cndm_ring *rq)
 	u32 index;
 	int cnt = 0;
 
-	while (rq->prod_ptr != rq->cons_ptr) {
+	while (!cndm_is_rq_ring_empty(rq)) {
 		index = rq->cons_ptr & rq->size_mask;
 		cndm_free_rx_desc(rq, index);
 		rq->cons_ptr++;
@@ -247,7 +262,7 @@ int cndm_refill_rx_buffers(struct cndm_ring *rq)
 	}
 
 	dma_wmb();
-	iowrite32(rq->prod_ptr & 0xffff, rq->db_addr);
+	cndm_rq_write_prod_ptr(rq);
 
 	return ret;
 }
@@ -332,6 +347,7 @@ rx_drop:
 	rq->cons_ptr = cons_ptr;
 
 	cndm_refill_rx_buffers(rq);
+	cndm_cq_write_cons_ptr(cq);
 
 	return done;
 }
@@ -349,6 +365,7 @@ int cndm_poll_rx_cq(struct napi_struct *napi, int budget)
 	napi_complete(napi);
 
 	// TODO re-enable interrupts
+	cndm_cq_write_cons_ptr_arm(cq);
 
 	return done;
 }

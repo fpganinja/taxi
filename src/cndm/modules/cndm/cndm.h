@@ -235,12 +235,17 @@ struct cndm_cq *cndm_create_cq(struct cndm_priv *priv);
 void cndm_destroy_cq(struct cndm_cq *cq);
 int cndm_open_cq(struct cndm_cq *cq, int irqn, int size);
 void cndm_close_cq(struct cndm_cq *cq);
+void cndm_cq_write_cons_ptr(const struct cndm_cq *cq);
+void cndm_cq_write_cons_ptr_arm(const struct cndm_cq *cq);
 
 // cndm_sq.c
 struct cndm_ring *cndm_create_sq(struct cndm_priv *priv);
 void cndm_destroy_sq(struct cndm_ring *sq);
 int cndm_open_sq(struct cndm_ring *sq, struct cndm_priv *priv, struct cndm_cq *cq, int size);
 void cndm_close_sq(struct cndm_ring *sq);
+bool cndm_is_sq_ring_empty(const struct cndm_ring *sq);
+bool cndm_is_sq_ring_full(const struct cndm_ring *sq);
+void cndm_sq_write_prod_ptr(const struct cndm_ring *sq);
 int cndm_free_tx_buf(struct cndm_ring *sq);
 int cndm_poll_tx_cq(struct napi_struct *napi, int budget);
 int cndm_start_xmit(struct sk_buff *skb, struct net_device *ndev);
@@ -250,6 +255,9 @@ struct cndm_ring *cndm_create_rq(struct cndm_priv *priv);
 void cndm_destroy_rq(struct cndm_ring *rq);
 int cndm_open_rq(struct cndm_ring *rq, struct cndm_priv *priv, struct cndm_cq *cq, int size);
 void cndm_close_rq(struct cndm_ring *rq);
+bool cndm_is_rq_ring_empty(const struct cndm_ring *rq);
+bool cndm_is_rq_ring_full(const struct cndm_ring *rq);
+void cndm_rq_write_prod_ptr(const struct cndm_ring *rq);
 int cndm_free_rx_buf(struct cndm_ring *rq);
 int cndm_refill_rx_buffers(struct cndm_ring *rq);
 int cndm_poll_rx_cq(struct napi_struct *napi, int budget);

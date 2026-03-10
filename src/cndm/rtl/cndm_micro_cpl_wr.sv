@@ -61,10 +61,13 @@ logic                   cq_req_ready;
 logic [IRQN_W-1:0]      cq_rsp_irqn;
 logic [DMA_ADDR_W-1:0]  cq_rsp_addr;
 logic                   cq_rsp_phase_tag;
-logic                   cq_rsp_arm;
 logic                   cq_rsp_error;
 logic                   cq_rsp_valid;
 logic                   cq_rsp_ready_reg = 1'b0;
+
+logic [CQN_W-1:0]       notify_req_qn_reg = '0;
+logic                   notify_req_valid_reg = 1'b0;
+logic                   notify_req_ready;
 
 cndm_micro_queue_state #(
     .QN_W(CQN_W),
@@ -100,10 +103,21 @@ cq_mgr_inst (
     .rsp_dqn(cq_rsp_irqn),
     .rsp_addr(cq_rsp_addr),
     .rsp_phase_tag(cq_rsp_phase_tag),
-    .rsp_arm(cq_rsp_arm),
     .rsp_error(cq_rsp_error),
     .rsp_valid(cq_rsp_valid),
-    .rsp_ready(cq_rsp_ready_reg)
+    .rsp_ready(cq_rsp_ready_reg),
+
+    /*
+     * Notification interface
+     */
+    .notify_req_qn(notify_req_qn_reg),
+    .notify_req_valid(notify_req_valid_reg),
+    .notify_req_ready(notify_req_ready),
+
+    /*
+     * Interrupts
+     */
+    .m_axis_irq(m_axis_irq)
 );
 
 typedef enum logic [1:0] {
@@ -115,19 +129,6 @@ typedef enum logic [1:0] {
 state_t state_reg = STATE_IDLE;
 
 logic phase_tag_reg = 1'b0;
-logic arm_reg = 1'b0;
-
-logic [IRQN_W-1:0] m_axis_irq_irqn_reg = '0;
-logic m_axis_irq_tvalid_reg = 1'b0;
-
-assign m_axis_irq.tdata  = m_axis_irq_irqn_reg;
-assign m_axis_irq.tkeep  = '1;
-assign m_axis_irq.tstrb  = m_axis_irq.tkeep;
-assign m_axis_irq.tvalid = m_axis_irq_tvalid_reg;
-assign m_axis_irq.tlast  = 1'b1;
-assign m_axis_irq.tid    = '0;
-assign m_axis_irq.tdest  = '0;
-assign m_axis_irq.tuser  = '0;
 
 always_ff @(posedge clk) begin
     s_axis_cpl.tready <= 1'b0;
@@ -148,7 +149,7 @@ always_ff @(posedge clk) begin
     cq_req_valid_reg <= cq_req_valid_reg && !cq_req_ready;
     cq_rsp_ready_reg <= 1'b0;
 
-    m_axis_irq_tvalid_reg <= m_axis_irq_tvalid_reg && !m_axis_irq.tready;
+    notify_req_valid_reg <= notify_req_valid_reg && !notify_req_ready;
 
     case (state_reg)
         STATE_IDLE: begin
@@ -156,8 +157,9 @@ always_ff @(posedge clk) begin
 
             cq_req_cqn_reg <= s_axis_cpl.tdest;
 
-            if (s_axis_cpl.tvalid && !s_axis_cpl.tready) begin
+            if (s_axis_cpl.tvalid && !s_axis_cpl.tready && (!notify_req_valid_reg || notify_req_ready)) begin
                 cq_req_valid_reg <= 1'b1;
+                notify_req_qn_reg <= s_axis_cpl.tdest;
                 state_reg <= STATE_QUERY_CQ;
             end else begin
                 state_reg <= STATE_IDLE;
@@ -170,10 +172,8 @@ always_ff @(posedge clk) begin
             if (cq_rsp_valid && cq_rsp_ready_reg) begin
                 cq_rsp_ready_reg <= 1'b0;
 
-                m_axis_irq_irqn_reg <= cq_rsp_irqn;
                 dma_wr_desc_req.req_dst_addr <= cq_rsp_addr;
                 phase_tag_reg <= cq_rsp_phase_tag;
-                arm_reg <= cq_rsp_arm;
 
                 if (cq_rsp_error) begin
                     // drop completion
@@ -188,7 +188,7 @@ always_ff @(posedge clk) begin
         STATE_WRITE_DATA: begin
             if (dma_wr_desc_sts.sts_valid) begin
                 s_axis_cpl.tready <= 1'b1;
-                m_axis_irq_tvalid_reg <= arm_reg; // only generate interrupt when armed
+                notify_req_valid_reg <= 1'b1;
                 state_reg <= STATE_IDLE;
             end
         end
@@ -201,7 +201,6 @@ always_ff @(posedge clk) begin
         state_reg <= STATE_IDLE;
         cq_req_valid_reg <= 1'b0;
         cq_rsp_ready_reg <= 1'b0;
-        m_axis_irq_tvalid_reg <= 1'b0;
     end
 end
 

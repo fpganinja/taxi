@@ -66,6 +66,8 @@ logic                   wq_rsp_error;
 logic                   wq_rsp_valid;
 logic                   wq_rsp_ready_reg = 1'b0;
 
+taxi_axis_if axis_irq_stub();
+
 cndm_micro_queue_state #(
     .QN_W(WQN_W),
     .DQN_W(CQN_W),
@@ -100,10 +102,21 @@ wq_mgr_inst (
     .rsp_dqn(wq_rsp_cqn),
     .rsp_addr(wq_rsp_addr),
     .rsp_phase_tag(),
-    .rsp_arm(),
     .rsp_error(wq_rsp_error),
     .rsp_valid(wq_rsp_valid),
-    .rsp_ready(wq_rsp_ready_reg)
+    .rsp_ready(wq_rsp_ready_reg),
+
+    /*
+     * Notification interface
+     */
+    .notify_req_qn('0),
+    .notify_req_valid(1'b0),
+    .notify_req_ready(),
+
+    /*
+     * Interrupts
+     */
+    .m_axis_irq(axis_irq_stub)
 );
 
 taxi_dma_desc_if #(

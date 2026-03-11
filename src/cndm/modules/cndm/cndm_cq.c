@@ -130,6 +130,11 @@ void cndm_close_cq(struct cndm_cq *cq)
 
 	cq->enabled = 0;
 
+	if (cq->eq) {
+		cndm_eq_detach_cq(cq->eq, cq);
+		cq->eq = NULL;
+	}
+
 	if (cq->cqn != -1) {
 		cmd.opcode = CNDM_CMD_OP_DESTROY_CQ;
 		cmd.flags = 0x00000000;
@@ -141,11 +146,6 @@ void cndm_close_cq(struct cndm_cq *cq)
 		cq->cqn = -1;
 		cq->db_offset = 0;
 		cq->db_addr = NULL;
-	}
-
-	if (cq->eq) {
-		cndm_eq_detach_cq(cq->eq, cq);
-		cq->eq = NULL;
 	}
 
 	if (cq->irq) {

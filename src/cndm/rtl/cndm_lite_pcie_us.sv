@@ -318,6 +318,35 @@ always_ff @(posedge pcie_clk) begin
     end
 end
 
+// Register on RC path to break timing paths from PCIe HIP
+// The HIP commonly has some combination of long clock-to-output delays
+// and/or a 500 MHz to 250 MHz multicycle path
+taxi_axis_if #(
+    .DATA_W(s_axis_pcie_rc.DATA_W),
+    .KEEP_EN(1),
+    .KEEP_W(s_axis_pcie_rc.KEEP_W),
+    .USER_EN(1),
+    .USER_W(s_axis_pcie_rc.USER_W)
+) axis_pcie_rc_int();
+
+taxi_axis_register #(
+    .REG_TYPE(2)
+)
+rc_reg_inst (
+    .clk(pcie_clk),
+    .rst(pcie_rst),
+
+    /*
+     * AXI4-Stream input (sink)
+     */
+    .s_axis(s_axis_pcie_rc),
+
+    /*
+     * AXI4-Stream output (source)
+     */
+    .m_axis(axis_pcie_rc_int)
+);
+
 taxi_dma_if_pcie_us #(
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
     .RQ_SEQ_NUM_EN(RQ_SEQ_NUM_EN),
@@ -339,7 +368,7 @@ dma_if_inst (
      * UltraScale PCIe interface
      */
     .m_axis_rq(m_axis_pcie_rq),
-    .s_axis_rc(s_axis_pcie_rc),
+    .s_axis_rc(axis_pcie_rc_int),
 
     /*
      * Transmit sequence number input

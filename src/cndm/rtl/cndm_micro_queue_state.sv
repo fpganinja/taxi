@@ -344,7 +344,7 @@ always_comb begin
                 // s_axil_ctrl_awaddr_reg_index
 
                 state_next = STATE_AXIL_WR;
-            end else if (s_apb_dp_ctrl.penable && s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
+            end else if (s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
                 // APB read/write
 
                 queue_mem_addr_next = s_apb_dp_ctrl_paddr_queue_index;

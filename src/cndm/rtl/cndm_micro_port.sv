@@ -176,7 +176,7 @@ logic [WQN_W-1:0] rx_queue_reg = '0;
 always_ff @(posedge clk) begin
     apb_dp_ctrl_pready_reg <= 1'b0;
 
-    if (apb_dp_ctrl[2].penable && apb_dp_ctrl[2].psel && !apb_dp_ctrl_pready_reg) begin
+    if (apb_dp_ctrl[2].psel && !apb_dp_ctrl_pready_reg) begin
         apb_dp_ctrl_pready_reg <= 1'b1;
         apb_dp_ctrl_prdata_reg <= '0;
 

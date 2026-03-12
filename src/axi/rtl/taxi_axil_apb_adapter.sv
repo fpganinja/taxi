@@ -420,10 +420,13 @@ end else if (APB_BYTE_LANES > AXIL_BYTE_LANES) begin : upsize
                 end
             end
             STATE_DATA: begin
-                s_axil_buser_next = m_apb.pbuser;
-                s_axil_rdata_next = m_apb.prdata[m_apb_paddr_reg[APB_ADDR_BIT_OFFSET - 1:AXIL_ADDR_BIT_OFFSET] * AXIL_DATA_W +: AXIL_DATA_W];
-                s_axil_ruser_next = m_apb.pruser;
-                s_axil_resp_next = m_apb.pslverr ? AXI_RESP_SLVERR : AXI_RESP_OKAY;
+                if (m_apb_pwrite_reg) begin
+                    s_axil_buser_next = m_apb.pbuser;
+                end else begin
+                    s_axil_rdata_next = m_apb.prdata[m_apb_paddr_reg[APB_ADDR_BIT_OFFSET - 1:AXIL_ADDR_BIT_OFFSET] * AXIL_DATA_W +: AXIL_DATA_W];
+                    s_axil_ruser_next = m_apb.pruser;
+                    s_axil_resp_next = m_apb.pslverr ? AXI_RESP_SLVERR : AXI_RESP_OKAY;
+                end
 
                 m_apb_psel_next = 1'b1;
                 m_apb_penable_next = 1'b1;
@@ -603,8 +606,11 @@ end else begin : downsize
 
         case (state_reg)
             STATE_IDLE: begin
+                current_seg_next = s_axil_wr.awaddr[APB_ADDR_BIT_OFFSET +: SEG_COUNT_W];
                 data_next = s_axil_wr.wdata;
                 strb_next = s_axil_wr.wstrb;
+                m_apb_pwdata_next = data_next[current_seg_next*SEG_DATA_W +: SEG_DATA_W];
+                m_apb_pstrb_next = strb_next[current_seg_next*SEG_STRB_W +: SEG_STRB_W];
 
                 s_axil_resp_next = AXI_RESP_OKAY;
 
@@ -646,26 +652,27 @@ end else begin : downsize
                 end
             end
             STATE_DATA: begin
-                m_apb_pwdata_next = data_next[current_seg_reg*SEG_DATA_W +: SEG_DATA_W];
-                m_apb_pstrb_next = strb_next[current_seg_reg*SEG_STRB_W +: SEG_STRB_W];
-                s_axil_buser_next = m_apb.pbuser;
-                s_axil_rdata_next[current_seg_reg*SEG_DATA_W +: SEG_DATA_W] = m_apb.prdata;
-                s_axil_ruser_next = m_apb.pruser;
-
                 m_apb_psel_next = 1'b1;
                 m_apb_penable_next = 1'b1;
+
+                if (m_apb_pwrite_reg) begin
+                    s_axil_buser_next = m_apb.pbuser;
+                end else begin
+                    s_axil_rdata_next[current_seg_reg*SEG_DATA_W +: SEG_DATA_W] = m_apb.prdata;
+                    s_axil_ruser_next = m_apb.pruser;
+                end
 
                 if (m_apb.psel && m_apb.penable && m_apb.pready) begin
                     if (m_apb.pslverr) begin
                         s_axil_resp_next = AXI_RESP_SLVERR;
                     end
 
-                    m_apb_paddr_next = (m_apb_paddr_reg & APB_ADDR_MASK) + SEG_STRB_W;
                     m_apb_penable_next = 1'b0;
-
                     current_seg_next = current_seg_reg + 1;
-
-                    if (&current_seg_reg) begin
+                    m_apb_paddr_next = (m_apb_paddr_reg & APB_ADDR_MASK) + SEG_STRB_W;
+                    m_apb_pwdata_next = data_next[current_seg_next*SEG_DATA_W +: SEG_DATA_W];
+                    m_apb_pstrb_next = strb_next[current_seg_next*SEG_STRB_W +: SEG_STRB_W];
+                    if (current_seg_reg == SEG_COUNT_W'(SEG_COUNT-1)) begin
                         if (m_apb_pwrite_reg) begin
                             s_axil_bvalid_next = 1'b1;
                         end else begin

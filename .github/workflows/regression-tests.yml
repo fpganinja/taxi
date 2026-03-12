@@ -16,7 +16,7 @@ jobs:
       run: df -h
 
     - name: Check out repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
 
     - name: Install Verilator
       uses: v0xnihili/install-verilator-action@main

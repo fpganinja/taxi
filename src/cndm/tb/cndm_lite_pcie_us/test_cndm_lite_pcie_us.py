@@ -305,9 +305,11 @@ class TB:
                 rx_clk=dut.mac_rx_clk[k],
                 rx_rst=dut.mac_rx_rst[k],
                 rx_bus=AxiStreamBus.from_entity(dut.mac_axis_rx[k]),
-                tx_ptp_time=dut.mac_axis_tx[k].tid, # TODO
-                tx_ptp_ts=dut.mac_axis_tx_cpl[k].tdata, # TODO
-                tx_ptp_ts_valid=dut.mac_axis_tx_cpl[k].tvalid, # TODO
+                rx_ptp_time=dut.rx_ptp_time[k],
+                tx_ptp_time=dut.tx_ptp_time[k],
+                tx_ptp_ts=dut.mac_axis_tx_cpl[k].tdata,
+                tx_ptp_ts_tag=dut.mac_axis_tx_cpl[k].tid,
+                tx_ptp_ts_valid=dut.mac_axis_tx_cpl[k].tvalid,
                 ifg=12, speed=eth_speed
             )
             self.port_mac.append(mac)

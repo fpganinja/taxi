@@ -195,6 +195,122 @@ taxi_axis_if #(
     .USER_W(PTP_TS_W+1)
 ) mac_axis_rx[PORTS]();
 
+// PTP leaf clocks for MAC timestamping
+logic [PTP_TS_W-1:0] tx_ptp_time[PORTS];
+logic tx_ptp_step[PORTS];
+logic [PTP_TS_W-1:0] rx_ptp_time[PORTS];
+logic rx_ptp_step[PORTS];
+
+if (PTP_TS_EN) begin : ptp
+
+    for (genvar n = 0; n < PORTS; n = n + 1) begin : ch
+
+        // TX
+        wire [PTP_TS_W-1:0] tx_ptp_ts_rel;
+        wire tx_ptp_ts_rel_step;
+        wire [PTP_TS_W-1:0] tx_ptp_ts_tod;
+        wire tx_ptp_ts_tod_step;
+
+        taxi_ptp_td_leaf #(
+            .TS_REL_EN(!PTP_TS_FMT_TOD),
+            .TS_TOD_EN(PTP_TS_FMT_TOD),
+            .TS_FNS_W(16),
+            .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
+            .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+            .TS_REL_W(PTP_TS_W),
+            .TS_TOD_W(PTP_TS_W),
+            .TD_SDI_PIPELINE(2)
+        )
+        tx_leaf_inst (
+            .clk(mac_tx_clk[n]),
+            .rst(mac_tx_rst[n]),
+            .sample_clk(ptp_sample_clk),
+
+            /*
+             * PTP clock interface
+             */
+            .ptp_clk(ptp_clk),
+            .ptp_rst(ptp_rst),
+            .ptp_td_sdi(ptp_td_sdo),
+
+            /*
+             * Timestamp output
+             */
+            .output_ts_rel(tx_ptp_ts_rel),
+            .output_ts_rel_step(tx_ptp_ts_rel_step),
+            .output_ts_tod(tx_ptp_ts_tod),
+            .output_ts_tod_step(tx_ptp_ts_tod_step),
+
+            /*
+             * PPS output (ToD format only)
+             */
+            .output_pps(),
+            .output_pps_str(),
+
+            /*
+             * Status
+             */
+            .locked()
+        );
+
+        assign tx_ptp_time[n] = PTP_TS_FMT_TOD ? tx_ptp_ts_tod : tx_ptp_ts_rel;
+        assign tx_ptp_step[n] = PTP_TS_FMT_TOD ? tx_ptp_ts_tod_step : tx_ptp_ts_rel_step;
+
+        // RX
+        wire [PTP_TS_W-1:0] rx_ptp_ts_rel;
+        wire rx_ptp_ts_rel_step;
+        wire [PTP_TS_W-1:0] rx_ptp_ts_tod;
+        wire rx_ptp_ts_tod_step;
+
+        taxi_ptp_td_leaf #(
+            .TS_REL_EN(!PTP_TS_FMT_TOD),
+            .TS_TOD_EN(PTP_TS_FMT_TOD),
+            .TS_FNS_W(16),
+            .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
+            .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+            .TS_REL_W(PTP_TS_W),
+            .TS_TOD_W(PTP_TS_W),
+            .TD_SDI_PIPELINE(2)
+        )
+        rx_leaf_inst (
+            .clk(mac_rx_clk[n]),
+            .rst(mac_rx_rst[n]),
+            .sample_clk(ptp_sample_clk),
+
+            /*
+             * PTP clock interface
+             */
+            .ptp_clk(ptp_clk),
+            .ptp_rst(ptp_rst),
+            .ptp_td_sdi(ptp_td_sdo),
+
+            /*
+             * Timestamp output
+             */
+            .output_ts_rel(rx_ptp_ts_rel),
+            .output_ts_rel_step(rx_ptp_ts_rel_step),
+            .output_ts_tod(rx_ptp_ts_tod),
+            .output_ts_tod_step(rx_ptp_ts_tod_step),
+
+            /*
+             * PPS output (ToD format only)
+             */
+            .output_pps(),
+            .output_pps_str(),
+
+            /*
+             * Status
+             */
+            .locked()
+        );
+
+        assign rx_ptp_time[n] = PTP_TS_FMT_TOD ? rx_ptp_ts_tod : rx_ptp_ts_rel;
+        assign rx_ptp_step[n] = PTP_TS_FMT_TOD ? rx_ptp_ts_tod_step : rx_ptp_ts_rel_step;
+
+    end
+
+end
+
 cndm_lite_pcie_us #(
     .SIM(SIM),
     .VENDOR(VENDOR),

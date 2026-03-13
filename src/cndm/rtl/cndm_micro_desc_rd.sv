@@ -204,7 +204,7 @@ always_ff @(posedge clk) begin
     s_axis_desc_req_tready_reg <= 1'b0;
 
     // queue state query
-    s_axis_desc_req_tready_reg <= ((slot_start_ptr_reg ^ slot_finish_ptr_reg) != 2'b10) && (!wq_req_valid_reg || wq_req_ready);
+    s_axis_desc_req_tready_reg <= ((slot_start_ptr_reg ^ slot_finish_ptr_reg) != {1'b1, {SLOT_AW{1'b0}}}) && (!wq_req_valid_reg || wq_req_ready);
 
     if (s_axis_desc_req.tvalid && s_axis_desc_req.tready) begin
         s_axis_desc_req_tready_reg <= 1'b0;

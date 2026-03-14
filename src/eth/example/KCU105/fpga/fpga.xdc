@@ -45,6 +45,10 @@ create_clock -period 8.000 -name clk_125mhz [get_ports clk_125mhz_p]
 #set_property -dict {LOC C23 IOSTANDARD LVDS} [get_ports clk_user_sma_n] ;# J35
 #create_clock -period 10.000 -name clk_user_sma [get_ports clk_user_sma_p]
 
+# User SMA GPIO J36/J37
+#set_property -dict {LOC H27 IOSTANDARD LVDS} [get_ports user_sma_gpio_p] ;# J36
+#set_property -dict {LOC G27 IOSTANDARD LVDS} [get_ports user_sma_gpio_n] ;# J37
+
 # LEDs
 set_property -dict {LOC AP8  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 8} [get_ports {led[0]}] ;# to DS7
 set_property -dict {LOC H23  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 8} [get_ports {led[1]}] ;# to DS6
@@ -172,7 +176,9 @@ set_property -dict {LOC P5  } [get_ports sfp_mgt_refclk_0_n] ;# MGTREFCLK0N_227 
 #set_property -dict {LOC AH11 IOSTANDARD LVDS} [get_ports sfp_recclk_n] ;# to U57 CKIN1 SI5328
 
 set_property -dict {LOC AL8  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 8} [get_ports {sfp_tx_disable_b[0]}]
+set_property -dict {LOC K21  IOSTANDARD LVCMOS18} [get_ports {sfp_rx_los[0]}]
 set_property -dict {LOC D28  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 8} [get_ports {sfp_tx_disable_b[1]}]
+set_property -dict {LOC AM9  IOSTANDARD LVCMOS18} [get_ports {sfp_rx_los[1]}]
 
 # 156.25 MHz MGT reference clock
 create_clock -period 6.400 -name sfp_mgt_refclk_0 [get_ports sfp_mgt_refclk_0_p]

@@ -106,7 +106,8 @@ module fpga_core #
     output wire logic        sfp1_gmii_tx_en,
     output wire logic        sfp1_gmii_tx_er,
 
-    output wire logic [1:0]  sfp_tx_disable_b
+    output wire logic [1:0]  sfp_tx_disable_b,
+    input  wire logic [1:0]  sfp_rx_los
 );
 
 assign led = sw;

@@ -83,7 +83,8 @@ module fpga #
     input  wire logic        sfp_mgt_refclk_0_p,
     input  wire logic        sfp_mgt_refclk_0_n,
 
-    output wire logic [1:0]  sfp_tx_disable_b
+    output wire logic [1:0]  sfp_tx_disable_b,
+    input  wire logic [1:0]  sfp_rx_los
 );
 
 // Clock and reset
@@ -644,7 +645,8 @@ core_inst (
     .sfp1_gmii_tx_en(sfp1_gmii_tx_en_int),
     .sfp1_gmii_tx_er(sfp1_gmii_tx_er_int),
 
-    .sfp_tx_disable_b(sfp_tx_disable_b)
+    .sfp_tx_disable_b(sfp_tx_disable_b),
+    .sfp_rx_los(sfp_rx_los)
 );
 
 endmodule

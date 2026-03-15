@@ -48,7 +48,10 @@ if (m_axi_rd.DATA_W != DATA_W)
 if (m_axi_rd.STRB_W != STRB_W)
     $fatal(0, "Error: Interface STRB_W parameter mismatch (instance %m)");
 
-assign m_axi_rd.arid = s_axi_rd.arid;
+if (m_axi_rd.ID_W < ID_W)
+    $fatal(0, "Error: Output ID_W is narrower than input ID_W, cannot discard ID bits (instance %m)");
+
+assign m_axi_rd.arid = m_axi_rd.ID_W'(s_axi_rd.arid);
 assign m_axi_rd.araddr = m_axi_wr.ADDR_W'(s_axi_rd.araddr);
 assign m_axi_rd.arlen = s_axi_rd.arlen;
 assign m_axi_rd.arsize = s_axi_rd.arsize;
@@ -62,7 +65,7 @@ assign m_axi_rd.aruser = ARUSER_EN ? s_axi_rd.aruser : '0;
 assign m_axi_rd.arvalid = s_axi_rd.arvalid;
 assign s_axi_rd.arready = m_axi_rd.arready;
 
-assign s_axi_rd.rid = m_axi_rd.rid;
+assign s_axi_rd.rid = s_axi_rd.ID_W'(m_axi_rd.rid);
 assign s_axi_rd.rdata = m_axi_rd.rdata;
 assign s_axi_rd.rresp = m_axi_rd.rresp;
 assign s_axi_rd.rlast = m_axi_rd.rlast;

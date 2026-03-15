@@ -50,8 +50,10 @@ if (m_axi_wr.DATA_W != DATA_W)
 if (m_axi_wr.STRB_W != STRB_W)
     $fatal(0, "Error: Interface STRB_W parameter mismatch (instance %m)");
 
-// bypass AW channel
-assign m_axi_wr.awid = s_axi_wr.awid;
+if (m_axi_wr.ID_W < ID_W)
+    $fatal(0, "Error: Output ID_W is narrower than input ID_W, cannot discard ID bits (instance %m)");
+
+assign m_axi_wr.awid = m_axi_wr.ID_W'(s_axi_wr.awid);
 assign m_axi_wr.awaddr = m_axi_wr.ADDR_W'(s_axi_wr.awaddr);
 assign m_axi_wr.awlen = s_axi_wr.awlen;
 assign m_axi_wr.awsize = s_axi_wr.awsize;
@@ -72,7 +74,7 @@ assign m_axi_wr.wuser = WUSER_EN ? s_axi_wr.wuser : '0;
 assign m_axi_wr.wvalid = s_axi_wr.wvalid;
 assign s_axi_wr.wready = m_axi_wr.wready;
 
-assign s_axi_wr.bid = m_axi_wr.bid;
+assign s_axi_wr.bid = s_axi_wr.ID_W'(m_axi_wr.bid);
 assign s_axi_wr.bresp = m_axi_wr.bresp;
 assign s_axi_wr.buser = BUSER_EN ? m_axi_wr.buser : '0;
 assign s_axi_wr.bvalid = m_axi_wr.bvalid;

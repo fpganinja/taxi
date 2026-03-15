@@ -38,13 +38,16 @@ localparam logic RUSER_EN = s_axil_rd.RUSER_EN && m_axil_rd.RUSER_EN;
 localparam RUSER_W = s_axil_rd.RUSER_W;
 
 // check configuration
+if (m_axil_rd.ADDR_W > ADDR_W)
+    $fatal(0, "Error: Output ADDR_W is wider than input ADDR_W, cannot access entire address space (instance %m)");
+
 if (m_axil_rd.DATA_W != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
 if (m_axil_rd.STRB_W != STRB_W)
     $fatal(0, "Error: Interface STRB_W parameter mismatch (instance %m)");
 
-assign m_axil_rd.araddr = s_axil_rd.araddr;
+assign m_axil_rd.araddr = m_axil_rd.ADDR_W'(s_axil_rd.araddr);
 assign m_axil_rd.arprot = s_axil_rd.arprot;
 assign m_axil_rd.aruser = ARUSER_EN ? s_axil_rd.aruser : '0;
 assign m_axil_rd.arvalid = s_axil_rd.arvalid;

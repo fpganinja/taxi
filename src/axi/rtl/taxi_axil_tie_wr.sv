@@ -40,6 +40,9 @@ localparam logic BUSER_EN = s_axil_wr.BUSER_EN && m_axil_wr.BUSER_EN;
 localparam BUSER_W = s_axil_wr.BUSER_W;
 
 // check configuration
+if (m_axil_wr.ADDR_W > ADDR_W)
+    $fatal(0, "Error: Output ADDR_W is wider than input ADDR_W, cannot access entire address space (instance %m)");
+
 if (m_axil_wr.DATA_W != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
@@ -47,7 +50,7 @@ if (m_axil_wr.STRB_W != STRB_W)
     $fatal(0, "Error: Interface STRB_W parameter mismatch (instance %m)");
 
 // bypass AW channel
-assign m_axil_wr.awaddr = s_axil_wr.awaddr;
+assign m_axil_wr.awaddr = m_axil_wr.ADDR_W'(s_axil_wr.awaddr);
 assign m_axil_wr.awprot = s_axil_wr.awprot;
 assign m_axil_wr.awuser = AWUSER_EN ? s_axil_wr.awuser : '0;
 assign m_axil_wr.awvalid = s_axil_wr.awvalid;

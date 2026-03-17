@@ -188,7 +188,6 @@ typedef enum logic [3:0] {
     PHY_STATE_READ_BIT_1,
     PHY_STATE_READ_BIT_2,
     PHY_STATE_READ_BIT_3,
-    PHY_STATE_READ_BIT_4,
     PHY_STATE_STOP_1,
     PHY_STATE_STOP_2,
     PHY_STATE_STOP_3
@@ -204,6 +203,7 @@ logic phy_release_bus;
 
 logic phy_tx_data;
 
+logic phy_ready_reg = 1'b0, phy_ready_next;
 logic phy_rx_data_reg = 1'b0, phy_rx_data_next;
 
 logic [6:0] addr_reg = '0, addr_next;
@@ -310,7 +310,7 @@ always_comb begin
     missed_ack_next = 1'b0;
 
     // generate delays
-    if (phy_state_reg != PHY_STATE_IDLE && phy_state_reg != PHY_STATE_ACTIVE) begin
+    if (!phy_ready_reg) begin
         // wait for phy operation
         state_next = state_reg;
     end else begin
@@ -592,6 +592,7 @@ end
 always_comb begin
     phy_state_next = PHY_STATE_IDLE;
 
+    phy_ready_next = 1'b0;
     phy_rx_data_next = phy_rx_data_reg;
 
     delay_count_next = delay_count_reg;
@@ -642,9 +643,11 @@ always_comb begin
         case (phy_state_reg)
             PHY_STATE_IDLE: begin
                 // bus idle - wait for start command
+                phy_ready_next = 1'b1;
                 sda_o_next = 1'b1;
                 scl_o_next = 1'b1;
-                if (phy_start_bit) begin
+                if (phy_start_bit && phy_ready_reg) begin
+                    phy_ready_next = 1'b0;
                     sda_o_next = 1'b0;
                     delay_run_next = 1'b1;
                     phy_state_next = PHY_STATE_START_1;
@@ -654,19 +657,24 @@ always_comb begin
             end
             PHY_STATE_ACTIVE: begin
                 // bus active
-                if (phy_start_bit) begin
+                phy_ready_next = 1'b1;
+                if (phy_start_bit && phy_ready_reg) begin
+                    phy_ready_next = 1'b0;
                     sda_o_next = 1'b1;
                     delay_run_next = 1'b1;
                     phy_state_next = PHY_STATE_REPEATED_START_1;
-                end else if (phy_write_bit) begin
+                end else if (phy_write_bit && phy_ready_reg) begin
+                    phy_ready_next = 1'b0;
                     sda_o_next = phy_tx_data;
                     delay_run_next = 1'b1;
                     phy_state_next = PHY_STATE_WRITE_BIT_1;
-                end else if (phy_read_bit) begin
+                end else if (phy_read_bit && phy_ready_reg) begin
+                    phy_ready_next = 1'b0;
                     sda_o_next = 1'b1;
                     delay_run_next = 1'b1;
                     phy_state_next = PHY_STATE_READ_BIT_1;
-                end else if (phy_stop_bit) begin
+                end else if (phy_stop_bit && phy_ready_reg) begin
+                    phy_ready_next = 1'b0;
                     sda_o_next = 1'b0;
                     delay_run_next = 1'b1;
                     phy_state_next = PHY_STATE_STOP_1;
@@ -741,7 +749,6 @@ always_comb begin
                 //        ____
                 // scl __/    \__
 
-                scl_o_next = 1'b0;
                 delay_run_next = 1'b1;
                 phy_state_next = PHY_STATE_WRITE_BIT_3;
             end
@@ -752,6 +759,8 @@ always_comb begin
                 //        ____
                 // scl __/    \__
 
+                scl_o_next = 1'b0;
+                delay_run_next = 1'b1;
                 phy_state_next = PHY_STATE_ACTIVE;
             end
             PHY_STATE_READ_BIT_1: begin
@@ -786,15 +795,6 @@ always_comb begin
 
                 scl_o_next = 1'b0;
                 delay_run_next = 1'b1;
-                phy_state_next = PHY_STATE_READ_BIT_4;
-            end
-            PHY_STATE_READ_BIT_4: begin
-                // read bit
-                //      ________
-                // sda X________X
-                //        ____
-                // scl __/    \__
-
                 phy_state_next = PHY_STATE_ACTIVE;
             end
             PHY_STATE_STOP_1: begin
@@ -841,6 +841,7 @@ always_ff @(posedge clk) begin
     state_reg <= state_next;
     phy_state_reg <= phy_state_next;
 
+    phy_ready_reg <= phy_ready_next;
     phy_rx_data_reg <= phy_rx_data_next;
 
     addr_reg <= addr_next;
@@ -875,7 +876,7 @@ always_ff @(posedge clk) begin
     last_scl_i_reg <= scl_i_reg;
     last_sda_i_reg <= sda_i_reg;
 
-    busy_reg <= !(state_reg == STATE_IDLE || state_reg == STATE_ACTIVE_WRITE || state_reg == STATE_ACTIVE_READ) || !(phy_state_reg == PHY_STATE_IDLE || phy_state_reg == PHY_STATE_ACTIVE);
+    busy_reg <= !(state_reg == STATE_IDLE || state_reg == STATE_ACTIVE_WRITE || state_reg == STATE_ACTIVE_READ) || !phy_ready_reg;
 
     if (start_bit) begin
         bus_active_reg <= 1'b1;

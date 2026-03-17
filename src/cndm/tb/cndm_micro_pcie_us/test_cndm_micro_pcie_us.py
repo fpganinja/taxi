@@ -20,7 +20,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
-from cocotbext.axi import AxiStreamBus
+from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink
 from cocotbext.eth import EthMac
 from cocotbext.pcie.core import RootComplex
 from cocotbext.pcie.xilinx.us import UltraScalePlusPcieDevice
@@ -271,6 +271,10 @@ class TB:
 
         self.dev.functions[0].configure_bar(0, 2**int(dut.uut.axil_ctrl_bar.ADDR_W))
 
+        # Board control
+        self.brd_ctrl_cmd = AxiStreamSink(AxiStreamBus(dut.m_axis_brd_ctrl_cmd), dut.pcie_clk, dut.pcie_rst)
+        self.brd_ctrl_rsp = AxiStreamSource(AxiStreamBus(dut.s_axis_brd_ctrl_rsp), dut.pcie_clk, dut.pcie_rst)
+
         # PTP
         cocotb.start_soon(Clock(dut.ptp_clk, 3.102, units="ns").start())
         cocotb.start_soon(Clock(dut.ptp_sample_clk, 8, units="ns").start())
@@ -483,6 +487,7 @@ def test_cndm_micro_pcie_us(request, pcie_data_w, mac_data_w):
 
     # Structural configuration
     parameters['PORTS'] = 2
+    parameters['BRD_CTRL_EN'] = 0
     parameters['SYS_CLK_PER_NS_NUM'] = 4
     parameters['SYS_CLK_PER_NS_DEN'] = 1
 

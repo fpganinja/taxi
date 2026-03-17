@@ -35,6 +35,7 @@ module cndm_micro_core #(
 
     // Structural configuration
     parameter PORTS = 2,
+    parameter logic BRD_CTRL_EN = 1'b0,
     parameter SYS_CLK_PER_NS_NUM = 4,
     parameter SYS_CLK_PER_NS_DEN = 1,
 
@@ -72,6 +73,12 @@ module cndm_micro_core #(
      * Interrupts
      */
     taxi_axis_if.src               m_axis_irq,
+
+    /*
+     * Board control
+     */
+    taxi_axis_if.src               m_axis_brd_ctrl_cmd,
+    taxi_axis_if.snk               s_axis_brd_ctrl_rsp,
 
     /*
      * PTP
@@ -115,10 +122,13 @@ localparam RAM_SEG_DATA_W = dma_ram_wr.SEG_DATA_W;
 localparam RAM_SEG_BE_W = dma_ram_wr.SEG_BE_W;
 localparam RAM_SEL_W = dma_ram_wr.SEL_W;
 
-localparam PORT_OFFSET_DP = PTP_TS_EN ? 1 : 0;
+localparam PTP_OFFSET_DP = 0;
+localparam PORT_OFFSET_DP = PTP_OFFSET_DP + (PTP_TS_EN ? 1 : 0);
 localparam PORT_OFFSET_HOST = 2;
-localparam PORT_BASE_ADDR_DP = PTP_TS_EN ? 32'h00010000 : 32'h00000000;
-localparam PORT_BASE_ADDR_HOST = 32'h00020000;
+
+localparam PTP_BASE_ADDR_DP = PTP_OFFSET_DP * 32'h00010000;
+localparam PORT_BASE_ADDR_DP = PORT_OFFSET_DP * 32'h00010000;
+localparam PORT_BASE_ADDR_HOST = PORT_OFFSET_HOST * 32'h00010000;
 
 localparam SYS_CLK_CYC_PER_US = (1000*SYS_CLK_PER_NS_DEN+SYS_CLK_PER_NS_NUM-1)/SYS_CLK_PER_NS_NUM;
 
@@ -331,6 +341,7 @@ cndm_micro_dp_mgr #(
 
     // Structural configuration
     .PORTS(PORTS),
+    .BRD_CTRL_EN(BRD_CTRL_EN),
     .SYS_CLK_PER_NS_NUM(SYS_CLK_PER_NS_NUM),
     .SYS_CLK_PER_NS_DEN(SYS_CLK_PER_NS_DEN),
 
@@ -346,7 +357,7 @@ cndm_micro_dp_mgr #(
     .PTP_CLK_PER_NS_DEN(PTP_CLK_PER_NS_DEN),
 
     // Addressing
-    .PTP_BASE_ADDR_DP(0),
+    .PTP_BASE_ADDR_DP(PTP_BASE_ADDR_DP),
     .PORT_BASE_ADDR_DP(PORT_BASE_ADDR_DP),
     .PORT_BASE_ADDR_HOST(PORT_BASE_ADDR_HOST)
 )
@@ -363,7 +374,13 @@ dp_mgr_inst (
     /*
      * APB master interface (datapath control)
      */
-    .m_apb_dp_ctrl(apb_dp_ctrl)
+    .m_apb_dp_ctrl(apb_dp_ctrl),
+
+    /*
+     * Board control
+     */
+    .m_axis_brd_ctrl_cmd(m_axis_brd_ctrl_cmd),
+    .s_axis_brd_ctrl_rsp(s_axis_brd_ctrl_rsp)
 );
 
 taxi_apb_if #(
@@ -408,7 +425,7 @@ if (PTP_TS_EN) begin : ptp
         /*
          * Control register interface
          */
-        .s_apb(apb_port_dp_ctrl[0]),
+        .s_apb(apb_port_dp_ctrl[PTP_OFFSET_DP]),
 
         /*
          * PTP

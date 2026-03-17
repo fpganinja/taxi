@@ -34,6 +34,7 @@ module test_cndm_micro_pcie_us #
 
     // Structural configuration
     parameter PORTS = 2,
+    parameter logic BRD_CTRL_EN = 1'b0,
     parameter SYS_CLK_PER_NS_NUM = 4,
     parameter SYS_CLK_PER_NS_DEN = 1,
 
@@ -154,6 +155,15 @@ logic         cfg_interrupt_msi_tph_present;
 logic [1:0]   cfg_interrupt_msi_tph_type;
 logic [7:0]   cfg_interrupt_msi_tph_st_tag;
 logic [7:0]   cfg_interrupt_msi_function_number;
+
+taxi_axis_if #(
+    .DATA_W(32),
+    .KEEP_EN(1),
+    .ID_EN(1),
+    .ID_W(4),
+    .USER_EN(1),
+    .USER_W(1)
+) m_axis_brd_ctrl_cmd(), s_axis_brd_ctrl_rsp();
 
 logic        ptp_rst;
 logic        ptp_clk;
@@ -328,6 +338,7 @@ cndm_micro_pcie_us #(
 
     // Structural configuration
     .PORTS(PORTS),
+    .BRD_CTRL_EN(BRD_CTRL_EN),
     .SYS_CLK_PER_NS_NUM(SYS_CLK_PER_NS_NUM),
     .SYS_CLK_PER_NS_DEN(SYS_CLK_PER_NS_DEN),
 
@@ -401,6 +412,12 @@ uut (
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
     .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * Board control
+     */
+    .m_axis_brd_ctrl_cmd(m_axis_brd_ctrl_cmd),
+    .s_axis_brd_ctrl_rsp(s_axis_brd_ctrl_rsp),
 
     /*
      * PTP

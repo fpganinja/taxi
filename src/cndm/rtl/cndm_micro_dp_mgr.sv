@@ -29,6 +29,7 @@ module cndm_micro_dp_mgr #
 
     // Structural configuration
     parameter PORTS = 2,
+    parameter logic BRD_CTRL_EN = 1'b0,
     parameter SYS_CLK_PER_NS_NUM = 4,
     parameter SYS_CLK_PER_NS_DEN = 1,
 
@@ -73,13 +74,23 @@ module cndm_micro_dp_mgr #
     /*
      * APB master interface (datapath control)
      */
-    taxi_apb_if.mst      m_apb_dp_ctrl
+    taxi_apb_if.mst      m_apb_dp_ctrl,
+
+    /*
+     * Board control
+     */
+    taxi_axis_if.src     m_axis_brd_ctrl_cmd,
+    taxi_axis_if.snk     s_axis_brd_ctrl_rsp
 );
 
 // extract parameters
+localparam CMD_ID_W = s_axis_cmd.ID_W;
+
 localparam DP_APB_ADDR_W = m_apb_dp_ctrl.ADDR_W;
 localparam DP_APB_DATA_W = m_apb_dp_ctrl.DATA_W;
 localparam DP_APB_STRB_W = m_apb_dp_ctrl.STRB_W;
+
+localparam BRD_CMD_ID_W = m_axis_brd_ctrl_cmd.ID_W;
 
 typedef enum logic [15:0] {
     CMD_OP_NOP = 16'h0000,
@@ -88,6 +99,9 @@ typedef enum logic [15:0] {
 
     CMD_OP_ACCESS_REG = 16'h0180,
     CMD_OP_PTP        = 16'h0190,
+    CMD_OP_HWID       = 16'h01A0,
+    CMD_OP_HWMON      = 16'h01B0,
+    CMD_OP_PLL        = 16'h01C0,
 
     CMD_OP_CREATE_EQ  = 16'h0200,
     CMD_OP_MODIFY_EQ  = 16'h0201,
@@ -143,6 +157,8 @@ typedef enum logic [4:0] {
     STATE_PTP_READ_1,
     STATE_PTP_READ_2,
     STATE_PTP_SET,
+    STATE_BOARD_CMD,
+    STATE_BOARD_RSP,
     STATE_SEND_RSP,
     STATE_PAD_RSP
 } state_t;
@@ -154,6 +170,7 @@ logic s_axis_cmd_tready_reg = 1'b0, s_axis_cmd_tready_next;
 logic [31:0] m_axis_rsp_tdata_reg = '0, m_axis_rsp_tdata_next;
 logic m_axis_rsp_tvalid_reg = 1'b0, m_axis_rsp_tvalid_next;
 logic m_axis_rsp_tlast_reg = 1'b0, m_axis_rsp_tlast_next;
+logic [CMD_ID_W-1:0] m_axis_rsp_tid_reg = '0, m_axis_rsp_tid_next;
 
 logic [DP_APB_ADDR_W-1:0] m_apb_dp_ctrl_paddr_reg = '0, m_apb_dp_ctrl_paddr_next;
 logic m_apb_dp_ctrl_psel_reg = 1'b0, m_apb_dp_ctrl_psel_next;
@@ -161,6 +178,13 @@ logic m_apb_dp_ctrl_penable_reg = 1'b0, m_apb_dp_ctrl_penable_next;
 logic m_apb_dp_ctrl_pwrite_reg = 1'b0, m_apb_dp_ctrl_pwrite_next;
 logic [DP_APB_DATA_W-1:0] m_apb_dp_ctrl_pwdata_reg = '0, m_apb_dp_ctrl_pwdata_next;
 logic [DP_APB_STRB_W-1:0] m_apb_dp_ctrl_pstrb_reg = '0, m_apb_dp_ctrl_pstrb_next;
+
+logic [31:0] m_axis_brd_ctrl_cmd_tdata_reg = '0, m_axis_brd_ctrl_cmd_tdata_next;
+logic m_axis_brd_ctrl_cmd_tvalid_reg = 1'b0, m_axis_brd_ctrl_cmd_tvalid_next;
+logic m_axis_brd_ctrl_cmd_tlast_reg = 1'b0, m_axis_brd_ctrl_cmd_tlast_next;
+logic [BRD_CMD_ID_W-1:0] m_axis_brd_ctrl_cmd_tid_reg = '0, m_axis_brd_ctrl_cmd_tid_next;
+
+logic s_axis_brd_ctrl_rsp_tready_reg = 1'b0, s_axis_brd_ctrl_rsp_tready_next;
 
 // command RAM
 localparam CMD_AW = 4;
@@ -267,7 +291,7 @@ assign m_axis_rsp.tkeep  = '1;
 assign m_axis_rsp.tstrb  = m_axis_rsp.tkeep;
 assign m_axis_rsp.tvalid = m_axis_rsp_tvalid_reg;
 assign m_axis_rsp.tlast  = m_axis_rsp_tlast_reg;
-assign m_axis_rsp.tid    = '0;
+assign m_axis_rsp.tid    = m_axis_rsp_tid_reg;
 assign m_axis_rsp.tdest  = '0;
 assign m_axis_rsp.tuser  = '0;
 
@@ -280,6 +304,17 @@ assign m_apb_dp_ctrl.pwdata = m_apb_dp_ctrl_pwdata_reg;
 assign m_apb_dp_ctrl.pstrb = m_apb_dp_ctrl_pstrb_reg;
 assign m_apb_dp_ctrl.pauser = '0;
 assign m_apb_dp_ctrl.pwuser = '0;
+
+assign m_axis_brd_ctrl_cmd.tdata  = m_axis_brd_ctrl_cmd_tdata_reg;
+assign m_axis_brd_ctrl_cmd.tkeep  = '1;
+assign m_axis_brd_ctrl_cmd.tstrb  = m_axis_brd_ctrl_cmd.tkeep;
+assign m_axis_brd_ctrl_cmd.tvalid = m_axis_brd_ctrl_cmd_tvalid_reg;
+assign m_axis_brd_ctrl_cmd.tlast  = m_axis_brd_ctrl_cmd_tlast_reg;
+assign m_axis_brd_ctrl_cmd.tid    = m_axis_brd_ctrl_cmd_tid_reg;
+assign m_axis_brd_ctrl_cmd.tdest  = '0;
+assign m_axis_brd_ctrl_cmd.tuser  = '0;
+
+assign s_axis_brd_ctrl_rsp.tready = s_axis_brd_ctrl_rsp_tready_reg;
 
 logic cmd_frame_reg = 1'b0, cmd_frame_next;
 logic [3:0] cmd_wr_ptr_reg = '0, cmd_wr_ptr_next;
@@ -308,6 +343,7 @@ always_comb begin
     m_axis_rsp_tdata_next = m_axis_rsp_tdata_reg;
     m_axis_rsp_tvalid_next = m_axis_rsp_tvalid_reg && !m_axis_rsp.tready;
     m_axis_rsp_tlast_next = m_axis_rsp_tlast_reg;
+    m_axis_rsp_tid_next = m_axis_rsp_tid_reg;
 
     m_apb_dp_ctrl_paddr_next = m_apb_dp_ctrl_paddr_reg;
     m_apb_dp_ctrl_psel_next = m_apb_dp_ctrl_psel_reg && !m_apb_dp_ctrl.pready;
@@ -315,6 +351,13 @@ always_comb begin
     m_apb_dp_ctrl_pwrite_next = m_apb_dp_ctrl_pwrite_reg;
     m_apb_dp_ctrl_pwdata_next = m_apb_dp_ctrl_pwdata_reg;
     m_apb_dp_ctrl_pstrb_next = m_apb_dp_ctrl_pstrb_reg;
+
+    m_axis_brd_ctrl_cmd_tdata_next = m_axis_brd_ctrl_cmd_tdata_reg;
+    m_axis_brd_ctrl_cmd_tvalid_next = m_axis_brd_ctrl_cmd_tvalid_reg && !m_axis_brd_ctrl_cmd.tready;
+    m_axis_brd_ctrl_cmd_tlast_next = m_axis_brd_ctrl_cmd_tlast_reg;
+    m_axis_brd_ctrl_cmd_tid_next = m_axis_brd_ctrl_cmd_tid_reg;
+
+    s_axis_brd_ctrl_rsp_tready_next = s_axis_brd_ctrl_rsp_tready_reg;
 
     cmd_ram_wr_data = s_axis_cmd.tdata;
     cmd_ram_wr_addr = cmd_wr_ptr_reg;
@@ -481,16 +524,30 @@ always_comb begin
                         if (flags_reg[15:0] != 0) begin
                             // update something
                             cmd_ptr_next = 2;
-                            dp_ptr_next = PTP_BASE_ADDR_DP + 'h50;
+                            dp_ptr_next = DP_APB_ADDR_W'(PTP_BASE_ADDR_DP + 'h50);
                             cnt_next = '0;
                             state_next = STATE_PTP_SET;
                         end else begin
                             // dump state
                             cmd_ptr_next = 2;
-                            dp_ptr_next = PTP_BASE_ADDR_DP + 'h30;
+                            dp_ptr_next = DP_APB_ADDR_W'(PTP_BASE_ADDR_DP + 'h30);
                             cnt_next = '0;
                             state_next = STATE_PTP_READ_1;
                         end
+                    end else begin
+                        // PTP not enabled
+                        m_axis_rsp_tdata_next = '0; // TODO
+                        m_axis_rsp_tvalid_next = 1'b1;
+                        m_axis_rsp_tlast_next = 1'b0;
+
+                        state_next = STATE_SEND_RSP;
+                    end
+                end
+                CMD_OP_HWID, CMD_OP_HWMON, CMD_OP_PLL: begin
+                    if (BRD_CTRL_EN) begin
+                        // Forward board command
+                        cmd_ptr_next = 2;
+                        state_next = STATE_BOARD_CMD;
                     end else begin
                         // PTP not enabled
                         m_axis_rsp_tdata_next = '0; // TODO
@@ -866,7 +923,7 @@ always_comb begin
                     state_next = STATE_SEND_RSP;
                 end else if (cnt_reg == 7) begin
                     // jump to period registers
-                    dp_ptr_next = PTP_BASE_ADDR_DP + 'h70;
+                    dp_ptr_next = DP_APB_ADDR_W'(PTP_BASE_ADDR_DP + 'h70);
                     state_next = STATE_PTP_READ_1;
                 end else begin
                     // more to read
@@ -959,6 +1016,51 @@ always_comb begin
                 state_next = STATE_PTP_SET;
             end
         end
+        STATE_BOARD_CMD: begin
+            // send board command
+            cmd_ram_rd_addr = cmd_ptr_reg;
+
+            if (m_axis_brd_ctrl_cmd.tready || !m_axis_brd_ctrl_cmd.tvalid) begin
+                m_axis_brd_ctrl_cmd_tdata_next = cmd_ram_rd_data;
+                m_axis_brd_ctrl_cmd_tvalid_next = 1'b1;
+                m_axis_brd_ctrl_cmd_tlast_next = &cmd_ptr_reg;
+
+                cmd_ptr_next = cmd_ptr_reg + 1;
+
+                if (&cmd_ptr_reg) begin
+                    cmd_ptr_next = 2;
+                    state_next = STATE_BOARD_RSP;
+                end else begin
+                    state_next = STATE_BOARD_CMD;
+                end
+            end else begin
+                state_next = STATE_BOARD_CMD;
+            end
+        end
+        STATE_BOARD_RSP: begin
+            // store response
+            s_axis_brd_ctrl_rsp_tready_next = 1'b1;
+
+            cmd_ram_wr_data = s_axis_brd_ctrl_rsp.tdata;
+            cmd_ram_wr_addr = cmd_ptr_reg;
+            cmd_ram_wr_en = 1'b1;
+
+            if (s_axis_brd_ctrl_rsp.tready && s_axis_brd_ctrl_rsp.tvalid) begin
+                cmd_ptr_next = cmd_ptr_reg + 1;
+
+                if (s_axis_brd_ctrl_rsp.tlast) begin
+                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tvalid_next = 1'b1;
+                    m_axis_rsp_tlast_next = 1'b0;
+
+                    state_next = STATE_SEND_RSP;
+                end else begin
+                    state_next = STATE_BOARD_RSP;
+                end
+            end else begin
+                state_next = STATE_BOARD_RSP;
+            end
+        end
         STATE_SEND_RSP: begin
             // send response in the form of an edited command
             cmd_ram_rd_addr = rsp_rd_ptr_reg;
@@ -1037,6 +1139,7 @@ always_ff @(posedge clk) begin
     m_axis_rsp_tdata_reg <= m_axis_rsp_tdata_next;
     m_axis_rsp_tvalid_reg <= m_axis_rsp_tvalid_next;
     m_axis_rsp_tlast_reg <= m_axis_rsp_tlast_next;
+    m_axis_rsp_tid_reg <= m_axis_rsp_tid_next;
 
     m_apb_dp_ctrl_paddr_reg <= m_apb_dp_ctrl_paddr_next;
     m_apb_dp_ctrl_psel_reg <= m_apb_dp_ctrl_psel_next;
@@ -1044,6 +1147,13 @@ always_ff @(posedge clk) begin
     m_apb_dp_ctrl_pwrite_reg <= m_apb_dp_ctrl_pwrite_next;
     m_apb_dp_ctrl_pwdata_reg <= m_apb_dp_ctrl_pwdata_next;
     m_apb_dp_ctrl_pstrb_reg <= m_apb_dp_ctrl_pstrb_next;
+
+    m_axis_brd_ctrl_cmd_tdata_reg <= m_axis_brd_ctrl_cmd_tdata_next;
+    m_axis_brd_ctrl_cmd_tvalid_reg <= m_axis_brd_ctrl_cmd_tvalid_next;
+    m_axis_brd_ctrl_cmd_tlast_reg <= m_axis_brd_ctrl_cmd_tlast_next;
+    m_axis_brd_ctrl_cmd_tid_reg <= m_axis_brd_ctrl_cmd_tid_next;
+
+    s_axis_brd_ctrl_rsp_tready_reg <= s_axis_brd_ctrl_rsp_tready_next;
 
     cmd_frame_reg <= cmd_frame_next;
     cmd_wr_ptr_reg <= cmd_wr_ptr_next;
@@ -1072,6 +1182,9 @@ always_ff @(posedge clk) begin
 
         m_apb_dp_ctrl_psel_reg <= 1'b0;
         m_apb_dp_ctrl_penable_reg <= 1'b0;
+
+        m_axis_brd_ctrl_cmd_tvalid_reg <= 1'b0;
+        s_axis_brd_ctrl_rsp_tready_reg <= 1'b0;
 
         cmd_frame_reg <= 1'b0;
         cmd_wr_ptr_reg <= '0;

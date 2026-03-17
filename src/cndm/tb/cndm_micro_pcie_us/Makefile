@@ -38,6 +38,7 @@ export PARAM_FAMILY := "\"virtexuplus\""
 
 # Structural configuration
 export PARAM_PORTS := 2
+export PARAM_BRD_CTRL_EN := 0
 export PARAM_SYS_CLK_PER_NS_NUM := 4
 export PARAM_SYS_CLK_PER_NS_DEN := 1
 

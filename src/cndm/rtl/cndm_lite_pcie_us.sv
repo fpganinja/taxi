@@ -35,6 +35,7 @@ module cndm_lite_pcie_us #(
 
     // Structural configuration
     parameter PORTS = 2,
+    parameter logic BRD_CTRL_EN = 1'b0,
     parameter SYS_CLK_PER_NS_NUM = 4,
     parameter SYS_CLK_PER_NS_DEN = 1,
 
@@ -108,6 +109,12 @@ module cndm_lite_pcie_us #(
     output wire logic [1:0]               cfg_interrupt_msi_tph_type,
     output wire logic [7:0]               cfg_interrupt_msi_tph_st_tag,
     output wire logic [7:0]               cfg_interrupt_msi_function_number,
+
+    /*
+     * Board control
+     */
+    taxi_axis_if.src                      m_axis_brd_ctrl_cmd,
+    taxi_axis_if.snk                      s_axis_brd_ctrl_rsp,
 
     /*
      * PTP
@@ -561,6 +568,7 @@ cndm_lite_core #(
 
     // Structural configuration
     .PORTS(PORTS),
+    .BRD_CTRL_EN(BRD_CTRL_EN),
     .SYS_CLK_PER_NS_NUM(SYS_CLK_PER_NS_NUM),
     .SYS_CLK_PER_NS_DEN(SYS_CLK_PER_NS_DEN),
 
@@ -598,6 +606,12 @@ core_inst (
      * Interrupts
      */
     .m_axis_irq(axis_irq),
+
+    /*
+     * Board control
+     */
+    .m_axis_brd_ctrl_cmd(m_axis_brd_ctrl_cmd),
+    .s_axis_brd_ctrl_rsp(s_axis_brd_ctrl_rsp),
 
     /*
      * PTP

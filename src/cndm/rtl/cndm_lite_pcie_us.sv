@@ -565,6 +565,7 @@ cndm_lite_core #(
     .SYS_CLK_PER_NS_DEN(SYS_CLK_PER_NS_DEN),
 
     // Queue configuration
+    .WQN_W(WQN_W),
     .CQN_W(CQN_W),
 
     // PTP configuration

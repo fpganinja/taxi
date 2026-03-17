@@ -52,7 +52,7 @@ if (m_axi_rd.ID_W < ID_W)
     $fatal(0, "Error: Output ID_W is narrower than input ID_W, cannot discard ID bits (instance %m)");
 
 assign m_axi_rd.arid = m_axi_rd.ID_W'(s_axi_rd.arid);
-assign m_axi_rd.araddr = m_axi_wr.ADDR_W'(s_axi_rd.araddr);
+assign m_axi_rd.araddr = m_axi_rd.ADDR_W'(s_axi_rd.araddr);
 assign m_axi_rd.arlen = s_axi_rd.arlen;
 assign m_axi_rd.arsize = s_axi_rd.arsize;
 assign m_axi_rd.arburst = s_axi_rd.arburst;

@@ -255,6 +255,15 @@ xfcp_stats_inst (
     .s_axis_stat(axis_stat)
 );
 
+taxi_axis_if #(
+    .DATA_W(32),
+    .KEEP_EN(1),
+    .ID_EN(1),
+    .ID_W(4),
+    .USER_EN(1),
+    .USER_W(1)
+) axis_brd_ctrl_cmd(), axis_brd_ctrl_rsp();
+
 // SFP+
 wire sfp_tx_clk[2];
 wire sfp_tx_rst[2];
@@ -609,7 +618,10 @@ cndm_micro_pcie_us #(
     .RELEASE_INFO(RELEASE_INFO),
 
     // Structural configuration
-    .PORTS(2),
+    .PORTS($size(axis_sfp_tx)),
+    .BRD_CTRL_EN(1'b0),
+    .SYS_CLK_PER_NS_NUM(4),
+    .SYS_CLK_PER_NS_DEN(1),
 
     // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
@@ -677,6 +689,12 @@ cndm_inst (
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
     .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * Board control
+     */
+    .m_axis_brd_ctrl_cmd(axis_brd_ctrl_cmd),
+    .s_axis_brd_ctrl_rsp(axis_brd_ctrl_rsp),
 
     /*
      * PTP

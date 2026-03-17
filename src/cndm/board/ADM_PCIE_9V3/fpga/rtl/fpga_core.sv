@@ -224,6 +224,15 @@ pyrite_inst (
     .qspi_1_cs(qspi_1_cs)
 );
 
+taxi_axis_if #(
+    .DATA_W(32),
+    .KEEP_EN(1),
+    .ID_EN(1),
+    .ID_W(4),
+    .USER_EN(1),
+    .USER_W(1)
+) axis_brd_ctrl_cmd(), axis_brd_ctrl_rsp();
+
 // QSFP28
 assign qsfp_0_sel_l = 1'b1;
 assign qsfp_1_sel_l = 1'b1;
@@ -573,7 +582,10 @@ cndm_micro_pcie_us #(
     .RELEASE_INFO(RELEASE_INFO),
 
     // Structural configuration
-    .PORTS(8),
+    .PORTS($size(axis_qsfp_tx)),
+    .BRD_CTRL_EN(1'b0),
+    .SYS_CLK_PER_NS_NUM(4),
+    .SYS_CLK_PER_NS_DEN(1),
 
     // PTP configuration
     .PTP_TS_EN(PTP_TS_EN),
@@ -641,6 +653,12 @@ cndm_inst (
     .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
     .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
     .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
+
+    /*
+     * Board control
+     */
+    .m_axis_brd_ctrl_cmd(axis_brd_ctrl_cmd),
+    .s_axis_brd_ctrl_rsp(axis_brd_ctrl_rsp),
 
     /*
      * PTP

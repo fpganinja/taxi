@@ -25,33 +25,55 @@ static int cndm_devlink_info_get(struct devlink *devlink,
 		return ret;
 #endif
 
-	snprintf(str, sizeof(str), "%08x", 0); // TODO
+	snprintf(str, sizeof(str), "%08x", cdev->fpga_id);
 
 	ret = devlink_info_version_fixed_put(req, "fpga.id", str);
 	if (ret)
 		return ret;
 
-	snprintf(str, sizeof(str), "%08x", 0); // TODO
+	snprintf(str, sizeof(str), "%08x", cdev->board_id);
 
 	ret = devlink_info_version_fixed_put(req, DEVLINK_INFO_VERSION_GENERIC_BOARD_ID, str);
 	if (ret)
 		return ret;
 
-	snprintf(str, sizeof(str), "%08x", 0); // TODO
+	snprintf(str, sizeof(str), "%d.%d.%d", cdev->board_ver >> 20,
+		(cdev->board_ver >> 12) & 0xff, cdev->board_ver & 0xfff);
 
 	ret = devlink_info_version_fixed_put(req, DEVLINK_INFO_VERSION_GENERIC_BOARD_REV, str);
 	if (ret)
 		return ret;
 
-	snprintf(str, sizeof(str), "%08x", 0); // TODO
+	snprintf(str, sizeof(str), "%08x", cdev->fw_id);
 
 	ret = devlink_info_version_running_put(req, "fw.id", str);
 	if (ret)
 		return ret;
 
-	snprintf(str, sizeof(str), "%08x", 0); // TODO
+	snprintf(str, sizeof(str), "%d.%d.%d", cdev->fw_ver >> 20,
+		(cdev->fw_ver >> 12) & 0xff, cdev->fw_ver & 0xfff);
+
+	ret = devlink_info_version_running_put(req, "fw.version", str);
+	if (ret)
+		return ret;
 
 	ret = devlink_info_version_running_put(req, DEVLINK_INFO_VERSION_GENERIC_FW, str);
+	if (ret)
+		return ret;
+
+	ret = devlink_info_version_running_put(req, "fw.build_date", cdev->build_date_str);
+	if (ret)
+		return ret;
+
+	snprintf(str, sizeof(str), "%08x", cdev->git_hash);
+
+	ret = devlink_info_version_running_put(req, "fw.git_hash", str);
+	if (ret)
+		return ret;
+
+	snprintf(str, sizeof(str), "%08x", cdev->release_info);
+
+	ret = devlink_info_version_running_put(req, "fw.rel_info", str);
 	if (ret)
 		return ret;
 

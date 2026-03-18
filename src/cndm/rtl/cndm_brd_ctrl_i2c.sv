@@ -684,7 +684,7 @@ always_comb begin
         STATE_I2C_SET_BANK_2: begin
             // Set bank register
             if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg) begin
-                axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_WRITE;
+                axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_WRITE | I2C_CMD_STOP;
                 axis_i2c_cmd_tvalid_next = 1'b1;
 
                 axis_i2c_tx_tdata_next = dev_bank_reg;
@@ -718,7 +718,7 @@ always_comb begin
         STATE_I2C_SET_PAGE_2: begin
             // Set page register
             if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg) begin
-                axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_WRITE;
+                axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_WRITE | I2C_CMD_STOP;
                 axis_i2c_cmd_tvalid_next = 1'b1;
 
                 axis_i2c_tx_tdata_next = dev_page_reg;

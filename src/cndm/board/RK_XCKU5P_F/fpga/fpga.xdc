@@ -153,10 +153,10 @@ set_output_delay 0 [get_ports {qsfp_modsell qsfp_resetl qsfp_lpmode}]
 set_false_path -from [get_ports {qsfp_modprsl qsfp_intl}]
 set_input_delay 0 [get_ports {qsfp_modprsl qsfp_intl}]
 
-#set_false_path -to [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
-#set_output_delay 0 [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
-#set_false_path -from [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
-#set_input_delay 0 [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
+set_false_path -to [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
+set_output_delay 0 [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
+set_false_path -from [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
+set_input_delay 0 [get_ports {qsfp_i2c_sda[*] qsfp_i2c_scl[*]}]
 
 # PCIe Interface
 set_property -dict {LOC AB2 } [get_ports {pcie_rx_p[0]}] ;# MGTYRXP3_224 GTYE4_CHANNEL_X0Y3 / GTYE4_COMMON_X0Y0

@@ -142,8 +142,8 @@ set_property -dict {LOC W12  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 8} [get_ports q
 set_property -dict {LOC AA13 IOSTANDARD LVCMOS33 PULLUP true} [get_ports qsfp_modprsl]
 set_property -dict {LOC Y13  IOSTANDARD LVCMOS33 PULLUP true} [get_ports qsfp_intl]
 set_property -dict {LOC W14  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 8} [get_ports qsfp_lpmode]
-#set_property -dict {LOC AE15 IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {qsfp_i2c_scl}]
-#set_property -dict {LOC AE13 IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {qsfp_i2c_sda}]
+set_property -dict {LOC AE15 IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {qsfp_i2c_scl}]
+set_property -dict {LOC AE13 IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {qsfp_i2c_sda}]
 
 # 156.25 MHz MGT reference clock
 create_clock -period 6.4 -name qsfp_mgt_refclk [get_ports {qsfp_mgt_refclk_p}]

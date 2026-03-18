@@ -11,6 +11,7 @@ Authors:
 
 import logging
 import os
+import struct
 import sys
 
 import pytest
@@ -22,6 +23,8 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 from cocotbext.axi import AxiStreamBus
 from cocotbext.eth import XgmiiFrame
+from cocotbext.uart import UartSource, UartSink
+from cocotbext.i2c import I2cMemory
 from cocotbext.pcie.core import RootComplex
 from cocotbext.pcie.xilinx.us import UltraScalePlusPcieDevice
 
@@ -324,6 +327,33 @@ class TB:
                 gbx_cfg=gbx_cfg
             ))
 
+        # UART
+        self.uart_source = UartSource(dut.uart_rxd, baud=3000000, bits=8, stop_bits=1)
+        self.uart_sink = UartSink(dut.uart_txd, baud=3000000, bits=8, stop_bits=1)
+
+        # I2C
+        self.qsfp_i2c = I2cMemory(sda=dut.qsfp_i2c_sda_o, sda_o=dut.qsfp_i2c_sda_i,
+            scl=dut.qsfp_i2c_scl_o, scl_o=dut.qsfp_i2c_scl_i, addr=0x50, size=256)
+
+        self.qsfp_i2c.write_mem(0, bytes.fromhex("""
+            11 07 00 2f 00 af 00 00 00 55 55 00 00 00 00 00
+            00 00 00 00 00 00 1a 87 00 00 80 5c 00 00 00 00
+            00 00 00 00 00 00 00 2e 00 00 5a 0f 00 00 5a 0f
+            5a 0f 33 6d 00 00 30 a7 33 4a 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 aa aa 00 00 00 00 01 00 00
+            00 00 ff 00 00 00 00 00 00 00 00 00 00 0a 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            11 cc 07 80 00 00 00 00 00 00 00 05 ff 02 01 00
+            00 00 00 40 49 4e 54 45 4c 20 43 4f 52 50 20 20
+            20 20 20 20 00 00 02 b3 53 50 54 53 42 50 32 43
+            4c 43 4b 53 20 20 20 20 30 32 66 58 05 14 37 5e
+            06 07 ff be 43 52 43 4c 32 30 31 37 31 41 35 35
+            50 20 20 20 32 30 30 35 30 38 30 30 0c 08 68 4f
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+        """))
+
         dut.btn.setimmediatevalue(0)
 
         dut.qsfp_modprsl.setimmediatevalue(0)
@@ -375,6 +405,28 @@ async def run_test(dut):
     await driver.init_pcie_dev(tb.rc.find_device(tb.dev.functions[0].pcie_id))
 
     tb.log.info("Init complete")
+
+    tb.log.info("Read QSFP")
+
+    rsp = await driver.exec_cmd(struct.pack("<HHLHHLbbbbLLL",
+        0, # rsvd
+        cndm.CNDM_CMD_OP_HWMON, # opcode
+        0x00000000, # flags
+        0, # index
+        cndm.CNDM_CMD_BRD_OP_OPTIC_RD, # board op
+        0, # flags
+        0, # rsvd
+        0, # dev addr offset
+        0, # bank
+        0, # page
+        0x00, # addr
+        32, # len
+        0, # rsvd
+    ))
+
+    print(rsp)
+
+    tb.log.info("Data: %s", rsp[32:32+32].hex())
 
     tb.log.info("Wait for block lock")
     for k in range(1200):
@@ -476,10 +528,12 @@ def test_fpga_core(request, mac_data_w):
         os.path.join(tests_dir, f"{toplevel}.sv"),
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_micro_pcie_us.f"),
+        os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_brd_ctrl_i2c.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_async_fifo.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_if_uart.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_switch.sv"),
+        os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_mod_i2c_master.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_mod_apb.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_mod_stats.f"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_reset.sv"),

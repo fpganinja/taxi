@@ -91,8 +91,8 @@ module fpga #
     input  wire logic        qsfp_modprsl,
     input  wire logic        qsfp_intl,
     output wire logic        qsfp_lpmode,
-    // inout  wire logic        qsfp_i2c_scl,
-    // inout  wire logic        qsfp_i2c_sda.
+    inout  wire logic        qsfp_i2c_scl,
+    inout  wire logic        qsfp_i2c_sda,
 
     /*
      * PCIe
@@ -250,6 +250,36 @@ sync_signal_inst (
     .in({uart_rxd}),
     .out({uart_rxd_int})
 );
+
+wire qsfp_modprsl_int;
+wire qsfp_intl_int;
+wire qsfp_i2c_scl_i;
+wire qsfp_i2c_scl_o;
+wire qsfp_i2c_sda_i;
+wire qsfp_i2c_sda_o;
+
+reg qsfp_i2c_scl_o_reg;
+reg qsfp_i2c_sda_o_reg;
+
+always @(posedge pcie_user_clk) begin
+    qsfp_i2c_scl_o_reg <= qsfp_i2c_scl_o;
+    qsfp_i2c_sda_o_reg <= qsfp_i2c_sda_o;
+end
+
+taxi_sync_signal #(
+    .WIDTH(4),
+    .N(2)
+)
+qsfp_sync_inst (
+    .clk(pcie_user_clk),
+    .in({qsfp_modprsl, qsfp_intl,
+        qsfp_i2c_scl, qsfp_i2c_sda}),
+    .out({qsfp_modprsl_int, qsfp_intl_int,
+        qsfp_i2c_scl_i, qsfp_i2c_sda_i})
+);
+
+assign qsfp_i2c_scl = qsfp_i2c_scl_o_reg ? 1'bz : qsfp_i2c_scl_o_reg;
+assign qsfp_i2c_sda = qsfp_i2c_sda_o_reg ? 1'bz : qsfp_i2c_sda_o_reg;
 
 // Flash
 wire qspi_clk_int;
@@ -806,9 +836,14 @@ core_inst (
     .qsfp_mgt_refclk_n(qsfp_mgt_refclk_n),
     .qsfp_modsell(qsfp_modsell),
     .qsfp_resetl(qsfp_resetl),
-    .qsfp_modprsl(qsfp_modprsl),
-    .qsfp_intl(qsfp_intl),
+    .qsfp_modprsl(qsfp_modprsl_int),
+    .qsfp_intl(qsfp_intl_int),
     .qsfp_lpmode(qsfp_lpmode),
+
+    .qsfp_i2c_scl_i(qsfp_i2c_scl_i),
+    .qsfp_i2c_scl_o(qsfp_i2c_scl_o),
+    .qsfp_i2c_sda_i(qsfp_i2c_sda_i),
+    .qsfp_i2c_sda_o(qsfp_i2c_sda_o),
 
     /*
      * PCIe

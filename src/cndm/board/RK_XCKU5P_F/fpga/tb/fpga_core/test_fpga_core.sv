@@ -76,6 +76,11 @@ logic qsfp_modprsl;
 logic qsfp_intl;
 logic qsfp_lpmode;
 
+logic qsfp_i2c_scl_i;
+logic qsfp_i2c_scl_o;
+logic qsfp_i2c_sda_i;
+logic qsfp_i2c_sda_o;
+
 logic pcie_clk;
 logic pcie_rst;
 
@@ -234,6 +239,11 @@ uut (
     .qsfp_modprsl(qsfp_modprsl),
     .qsfp_intl(qsfp_intl),
     .qsfp_lpmode(qsfp_lpmode),
+
+    .qsfp_i2c_scl_i(qsfp_i2c_scl_i),
+    .qsfp_i2c_scl_o(qsfp_i2c_scl_o),
+    .qsfp_i2c_sda_i(qsfp_i2c_sda_i),
+    .qsfp_i2c_sda_o(qsfp_i2c_sda_o),
 
     /*
      * PCIe

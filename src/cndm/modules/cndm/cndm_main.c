@@ -212,7 +212,7 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	dev_info(dev, "Read HW IDs");
 
 	ret = cndm_hwid_sn_rd(cdev, NULL, &cdev->sn_str);
-	if (ret) {
+	if (ret || !strlen(cdev->sn_str)) {
 		dev_info(dev, "No readable serial number");
 	} else {
 		dev_info(dev, "SN: %s", cdev->sn_str);

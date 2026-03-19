@@ -96,6 +96,7 @@ int cndm_hwid_sn_rd(struct cndm_dev *cdev, int *len, void *data)
 {
 	struct cndm_cmd_hwid cmd;
 	struct cndm_cmd_hwid rsp;
+	int k = 0;
 	int ret = 0;
 	char buf[64];
 	char *ptr;
@@ -116,6 +117,14 @@ int cndm_hwid_sn_rd(struct cndm_dev *cdev, int *len, void *data)
 	// memcpy(&buf, ((void *)&rsp.data), min(cmd.len, 32)); // TODO
 	memcpy(&buf, ((void *)&rsp.data), 32);
 	buf[32] = 0;
+
+	for (k = 0; k < 32; k++) {
+		if (!isascii(buf[k]) || !isprint(buf[k])) {
+			buf[k] = 0;
+			break;
+		}
+	}
+
 	ptr = strim(buf);
 
 	if (len)

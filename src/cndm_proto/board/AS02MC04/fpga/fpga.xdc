@@ -53,6 +53,9 @@ set_input_delay 0 [get_ports {reset}]
 #set_property -dict {LOC C9  IOSTANDARD LVCMOS33} [get_ports {gpio[4]}] ;# J5.11,12
 #set_property -dict {LOC D9  IOSTANDARD LVCMOS33} [get_ports {gpio[5]}] ;# J5.13,14
 
+# 1-wire for DS28E15
+#set_property -dict {LOC A15  IOSTANDARD LVCMOS33} [get_ports {onewire}] ;# U3 DS28E15
+
 # SFP28 Interfaces
 set_property -dict {LOC A4  } [get_ports {sfp_rx_p[0]}] ;# MGTYRXP3_227 GTYE4_CHANNEL_X0Y15 / GTYE4_COMMON_X0Y3
 set_property -dict {LOC A3  } [get_ports {sfp_rx_n[0]}] ;# MGTYRXN3_227 GTYE4_CHANNEL_X0Y15 / GTYE4_COMMON_X0Y3
@@ -87,15 +90,26 @@ set_input_delay 0 [get_ports {sfp_npres[*] sfp_tx_fault[*] sfp_los[*]}]
 #set_input_delay 0 [get_ports {sfp_i2c_sda[*] sfp_i2c_scl[*]}]
 
 # I2C interface
-#set_property -dict {LOC G9   IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_scl[0]}]
-#set_property -dict {LOC G10  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_sda[0]}]
-#set_property -dict {LOC J14  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_scl[1]}]
-#set_property -dict {LOC J15  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_sda[1]}]
+# U12 M24C24 0x51 "FPGA_FRU"
+#set_property -dict {LOC J14  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_scl}]
+#set_property -dict {LOC J15  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {i2c_sda}]
 
-#set_false_path -to [get_ports {i2c_sda[*] i2c_scl[*]}]
-#set_output_delay 0 [get_ports {i2c_sda[*] i2c_scl[*]}]
-#set_false_path -from [get_ports {i2c_sda[*] i2c_scl[*]}]
-#set_input_delay 0 [get_ports {i2c_sda[*] i2c_scl[*]}]
+#set_false_path -to [get_ports {i2c_sda i2c_scl}]
+#set_output_delay 0 [get_ports {i2c_sda i2c_scl}]
+#set_false_path -from [get_ports {i2c_sda i2c_scl}]
+#set_input_delay 0 [get_ports {i2c_sda i2c_scl}]
+
+# SMBus interface
+# PCIe SMBus pins
+# U4 PCA9535 0x20
+# U10 M24C24 0x50 "SYS_FRU"
+#set_property -dict {LOC G9   IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {smbclk}]
+#set_property -dict {LOC G10  IOSTANDARD LVCMOS33 SLEW SLOW DRIVE 12 PULLUP true} [get_ports {smbdat}]
+
+#set_false_path -to [get_ports {smbdat smbclk}]
+#set_output_delay 0 [get_ports {smbdat smbclk}]
+#set_false_path -from [get_ports {smbdat smbclk}]
+#set_input_delay 0 [get_ports {smbdat smbclk}]
 
 # PCIe Interface
 set_property -dict {LOC P2  } [get_ports {pcie_rx_p[0]}] ;# MGTYRXP3_225 GTYE4_CHANNEL_X0Y7 / GTYE4_COMMON_X0Y1

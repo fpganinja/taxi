@@ -31,7 +31,7 @@ module taxi_apb_interconnect_1s #
     // Master interface address widths
     // M_CNT concatenated fields of M_REGIONS concatenated fields of 32 bits
     parameter M_ADDR_W = {M_CNT{{M_REGIONS{32'd24}}}},
-    // Secure master (fail operations based on awprot/arprot)
+    // Secure master (fail operations based on pprot)
     // M_CNT bits
     parameter M_SECURE = {M_CNT{1'b0}}
 )

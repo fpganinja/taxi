@@ -10,6 +10,8 @@ Authors:
 
 #include "cndm.h"
 
+#include <linux/ctype.h>
+
 int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp)
 {
 	bool done = false;

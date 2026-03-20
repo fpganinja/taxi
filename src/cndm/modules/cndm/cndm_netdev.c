@@ -60,7 +60,11 @@ static int cndm_open(struct net_device *ndev)
 
 		priv->rxq = q;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		netif_napi_add(ndev, &cq->napi, cndm_poll_rx_cq);
+#else
+		netif_napi_add(ndev, &cq->napi, cndm_poll_rx_cq, NAPI_POLL_WEIGHT);
+#endif
 		napi_enable(&cq->napi);
 	}
 
@@ -99,7 +103,11 @@ static int cndm_open(struct net_device *ndev)
 
 		priv->txq = q;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		netif_napi_add_tx(ndev, &cq->napi, cndm_poll_tx_cq);
+#else
+		netif_tx_napi_add(ndev, &cq->napi, cndm_poll_tx_cq, NAPI_POLL_WEIGHT);
+#endif
 		napi_enable(&cq->napi);
 	}
 

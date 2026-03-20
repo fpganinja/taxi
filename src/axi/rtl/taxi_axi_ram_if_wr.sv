@@ -76,6 +76,12 @@ if (2**$clog2(BYTE_LANES) != BYTE_LANES)
 if (s_axi_wr.ADDR_W < ADDR_W)
     $fatal(0, "Error: AXI address width is insufficient (instance %m)");
 
+if (s_axi_wr.AWUSER_EN && s_axi_wr.AWUSER_W > AUSER_W)
+    $fatal(0, "Error: AUESR_W setting is insufficient (instance %m)");
+
+if (s_axi_wr.WUSER_EN && s_axi_wr.WUSER_W > WUSER_W)
+    $fatal(0, "Error: WUESR_W setting is insufficient (instance %m)");
+
 typedef enum logic [1:0] {
     STATE_IDLE,
     STATE_BURST,
@@ -156,7 +162,7 @@ always_comb begin
                 write_prot_next = s_axi_wr.awprot;
                 write_qos_next = s_axi_wr.awqos;
                 write_region_next = s_axi_wr.awregion;
-                write_auser_next = s_axi_wr.awuser;
+                write_auser_next = AUSER_W'(s_axi_wr.awuser);
                 write_count_next = s_axi_wr.awlen;
                 write_size_next = s_axi_wr.awsize <= 3'($clog2(STRB_W)) ? s_axi_wr.awsize : 3'($clog2(STRB_W));
                 write_burst_next = s_axi_wr.awburst;

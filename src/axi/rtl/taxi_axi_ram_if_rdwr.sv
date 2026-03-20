@@ -31,8 +31,6 @@ module taxi_axi_ram_if_rdwr #
     parameter WUSER_W = 1,
     // Width of ruser signal
     parameter RUSER_W = 1,
-    // Width of auser output
-    // parameter AUSER_W = (ARUSER_EN && (!AWUSER_EN || ARUSER_W > AWUSER_W)) ? ARUSER_W : AWUSER_W,
     // Extra pipeline register on output
     parameter logic PIPELINE_OUTPUT = 1'b0,
     // Interleave read and write burst cycles

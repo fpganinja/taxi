@@ -59,12 +59,12 @@ int cndm_open_sq(struct cndm_ring *sq, struct cndm_priv *priv, struct cndm_cq *c
 
 	sq->tx_info = kvzalloc(sizeof(*sq->tx_info) * sq->size, GFP_KERNEL);
 	if (!sq->tx_info)
-		ret = -ENOMEM;
+		return -ENOMEM;
 
 	sq->buf_size = sq->size * sq->stride;
 	sq->buf = dma_alloc_coherent(sq->dev, sq->buf_size, &sq->buf_dma_addr, GFP_KERNEL);
 	if (!sq->buf) {
-		return -ENOMEM;
+		ret = -ENOMEM;
 		goto fail;
 	}
 

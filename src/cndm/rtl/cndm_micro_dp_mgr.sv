@@ -839,9 +839,9 @@ always_comb begin
                 m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
                 m_apb_dp_ctrl_pstrb_next = '1;
 
-                state_next = STATE_CREATE_Q_ENABLE;
-            end else begin
                 state_next = STATE_CREATE_Q_SET_DQN;
+            end else begin
+                state_next = STATE_CREATE_Q_SET_BASE_H;
             end
         end
         STATE_CREATE_Q_SET_DQN: begin

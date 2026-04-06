@@ -550,7 +550,7 @@ assign qsfp_rx_n[4*1 +: 4] = qsfp2_rx_n;
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP1[4] = '{"QSFP1.1", "QSFP1.2", "QSFP1.3",  "QSFP1.4"};
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP2[4] = '{"QSFP2.1", "QSFP2.2", "QSFP2.3",  "QSFP2.4"};
 
-for (genvar n = 0; n < 2; n = n + 1) begin : gty_quad
+for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
 
     localparam CNT = 4;
 

@@ -135,7 +135,7 @@ wire qsfp_mgt_refclk_bufg[2];
 
 wire qsfp_rst[2];
 
-for (genvar n = 0; n < 2; n = n + 1) begin : gty_clk
+for (genvar n = 0; n < 2; n = n + 1) begin : gt_clk
 
     wire qsfp_mgt_refclk_int;
 
@@ -192,7 +192,7 @@ assign qsfp_rx_n[4*0 +: 4] = qsfp_0_rx_n;
 assign qsfp_rx_p[4*1 +: 4] = qsfp_1_rx_p;
 assign qsfp_rx_n[4*1 +: 4] = qsfp_1_rx_n;
 
-for (genvar n = 0; n < 2; n = n + 1) begin : gty_quad
+for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
 
     localparam CLK = n;
     localparam CNT = 4;

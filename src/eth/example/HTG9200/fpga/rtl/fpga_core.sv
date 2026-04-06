@@ -317,7 +317,7 @@ wire eth_gty_mgt_refclk_bufg[GTY_CLK_CNT];
 
 wire eth_gty_rst[GTY_CLK_CNT];
 
-for (genvar n = 0; n < GTY_CLK_CNT; n = n + 1) begin : gty_clk
+for (genvar n = 0; n < GTY_CLK_CNT; n = n + 1) begin : gt_clk
 
     wire eth_gty_mgt_refclk_int;
 
@@ -378,7 +378,7 @@ localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP13[4] = '{"QSFP13.1", "QSFP13.2",
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP14[4] = '{"QSFP14.1", "QSFP14.2", "QSFP14.3",  "QSFP14.4"};
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP15[4] = '{"QSFP15.1", "QSFP15.2", "QSFP15.3",  "QSFP15.4"};
 
-for (genvar n = 0; n < GTY_QUAD_CNT; n = n + 1) begin : gty_quad
+for (genvar n = 0; n < GTY_QUAD_CNT; n = n + 1) begin : gt_quad
 
     localparam CLK = n;
     localparam CNT = 4;

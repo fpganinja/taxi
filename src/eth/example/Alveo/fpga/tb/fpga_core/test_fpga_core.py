@@ -43,8 +43,8 @@ class TB:
 
         cocotb.start_soon(Clock(dut.clk_125mhz, 8, units="ns").start())
 
-        self.uart_source = UartSource(dut.uart_rxd, baud=3000000, bits=8, stop_bits=1)
-        self.uart_sink = UartSink(dut.uart_txd, baud=3000000, bits=8, stop_bits=1)
+        self.uart_sources = [UartSource(pin, baud=3000000, bits=8, stop_bits=1) for pin in dut.uart_rxd]
+        self.uart_sinks = [UartSink(pin, baud=3000000, bits=8, stop_bits=1) for pin in dut.uart_txd]
 
         self.qsfp_sources = []
         self.qsfp_sinks = []

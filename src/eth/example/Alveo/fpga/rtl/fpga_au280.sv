@@ -215,6 +215,12 @@ assign eth_gty_mgt_refclk_n[1] = qsfp1_mgt_refclk_0_n;
 
 assign clk_156mhz_ref_int = eth_gty_mgt_refclk_out[0];
 
+wire uart_txd_int[1];
+wire uart_rxd_int[1];
+
+assign uart_txd = uart_txd_int[0];
+assign uart_rxd_int[0] = uart_rxd;
+
 fpga_core #(
     .SIM(SIM),
     .VENDOR(VENDOR),
@@ -252,8 +258,8 @@ core_inst (
     /*
      * UART
      */
-    .uart_txd(uart_txd),
-    .uart_rxd(uart_rxd),
+    .uart_txd(uart_txd_int),
+    .uart_rxd(uart_rxd_int),
 
     /*
      * Ethernet

@@ -59,8 +59,8 @@ module fpga_core #
     /*
      * UART
      */
-    output wire [UART_CNT-1:0]           uart_txd,
-    input  wire [UART_CNT-1:0]           uart_rxd,
+    output wire                          uart_txd[UART_CNT],
+    input  wire                          uart_rxd[UART_CNT],
 
     /*
      * Ethernet

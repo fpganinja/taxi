@@ -44,8 +44,8 @@ module fpga #
     /*
      * UART
      */
-    output wire logic [UART_CNT-1:0]  uart_txd,
-    input  wire logic [UART_CNT-1:0]  uart_rxd,
+    output wire logic                 uart_txd[UART_CNT],
+    input  wire logic                 uart_rxd[UART_CNT],
 
     /*
      * Ethernet: QSFP28

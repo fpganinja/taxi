@@ -9,6 +9,7 @@ Authors:
 
 """
 
+import itertools
 import logging
 import os
 import sys
@@ -259,48 +260,47 @@ class TB:
         self.qsfp_sources = []
         self.qsfp_sinks = []
 
-        for inst in dut.uut.gt_quad:
-            for ch in inst.mac_inst.ch:
-                gt_inst = ch.ch_inst.gt.gt_inst
+        for ch in itertools.chain.from_iterable([inst.mac_inst.ch for inst in dut.uut.gt_quad]):
+            gt_inst = ch.ch_inst.gt.gt_inst
 
-                if ch.ch_inst.DATA_W.value == 64:
-                    if ch.ch_inst.CFG_LOW_LATENCY.value:
-                        clk = 6.206
-                        gbx_cfg = (66, [64, 65])
-                    else:
-                        clk = 6.4
-                        gbx_cfg = None
+            if ch.ch_inst.DATA_W.value == 64:
+                if ch.ch_inst.CFG_LOW_LATENCY.value:
+                    clk = 6.206
+                    gbx_cfg = (66, [64, 65])
                 else:
-                    if ch.ch_inst.CFG_LOW_LATENCY.value:
-                        clk = 3.102
-                        gbx_cfg = (66, [64, 65])
-                    else:
-                        clk = 3.2
-                        gbx_cfg = None
+                    clk = 6.4
+                    gbx_cfg = None
+            else:
+                if ch.ch_inst.CFG_LOW_LATENCY.value:
+                    clk = 3.102
+                    gbx_cfg = (66, [64, 65])
+                else:
+                    clk = 3.2
+                    gbx_cfg = None
 
-                cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
-                cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
+            cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
+            cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
 
-                self.qsfp_sources.append(BaseRSerdesSource(
-                    data=gt_inst.serdes_rx_data,
-                    data_valid=gt_inst.serdes_rx_data_valid,
-                    hdr=gt_inst.serdes_rx_hdr,
-                    hdr_valid=gt_inst.serdes_rx_hdr_valid,
-                    clock=gt_inst.rx_clk,
-                    slip=gt_inst.serdes_rx_bitslip,
-                    reverse=True,
-                    gbx_cfg=gbx_cfg
-                ))
-                self.qsfp_sinks.append(BaseRSerdesSink(
-                    data=gt_inst.serdes_tx_data,
-                    data_valid=gt_inst.serdes_tx_data_valid,
-                    hdr=gt_inst.serdes_tx_hdr,
-                    hdr_valid=gt_inst.serdes_tx_hdr_valid,
-                    gbx_sync=gt_inst.serdes_tx_gbx_sync,
-                    clock=gt_inst.tx_clk,
-                    reverse=True,
-                    gbx_cfg=gbx_cfg
-                ))
+            self.qsfp_sources.append(BaseRSerdesSource(
+                data=gt_inst.serdes_rx_data,
+                data_valid=gt_inst.serdes_rx_data_valid,
+                hdr=gt_inst.serdes_rx_hdr,
+                hdr_valid=gt_inst.serdes_rx_hdr_valid,
+                clock=gt_inst.rx_clk,
+                slip=gt_inst.serdes_rx_bitslip,
+                reverse=True,
+                gbx_cfg=gbx_cfg
+            ))
+            self.qsfp_sinks.append(BaseRSerdesSink(
+                data=gt_inst.serdes_tx_data,
+                data_valid=gt_inst.serdes_tx_data_valid,
+                hdr=gt_inst.serdes_tx_hdr,
+                hdr_valid=gt_inst.serdes_tx_hdr_valid,
+                gbx_sync=gt_inst.serdes_tx_gbx_sync,
+                clock=gt_inst.tx_clk,
+                reverse=True,
+                gbx_cfg=gbx_cfg
+            ))
 
         self.loopback_enable = False
         cocotb.start_soon(self._run_loopback())

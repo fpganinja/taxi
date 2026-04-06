@@ -412,7 +412,7 @@ wire eth_gty_mgt_refclk_bufg[GTY_CLK_CNT];
 
 wire eth_gty_rst[GTY_CLK_CNT];
 
-for (genvar n = 0; n < GTY_CLK_CNT; n = n + 1) begin : gty_clk
+for (genvar n = 0; n < GTY_CLK_CNT; n = n + 1) begin : gt_clk
 
     wire eth_gty_mgt_refclk_int;
 
@@ -469,7 +469,7 @@ assign led[0] = ptp_pps_str;
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP1[4] = '{"QSFP1.1", "QSFP1.2", "QSFP1.3",  "QSFP1.4"};
 localparam logic [8*8-1:0] STAT_PREFIX_STR_QSFP2[4] = '{"QSFP2.1", "QSFP2.2", "QSFP2.3",  "QSFP2.4"};
 
-for (genvar n = 0; n < GTY_QUAD_CNT; n = n + 1) begin : gty_quad
+for (genvar n = 0; n < GTY_QUAD_CNT; n = n + 1) begin : gt_quad
 
     localparam CLK = n;
     localparam CNT = 4;

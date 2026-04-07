@@ -38,12 +38,12 @@ module zircon_ip_rx_parse #
 // Metadata output (64 bit blocks):
 // 00: flags / payload len, pkt sum
 // 01: RSS hash / header and payload offsets
-// 02: vlan tags / dscp, ecn
+// 02: vlan tags
 // 03: eth dst
 // 04: eth src, ethtype
 // 05: protos/hdrs with offsets
 // 06: protos/hdrs with offsets
-// 07: ip id/fl / protocol, ttl/hl
+// 07: protocol, ttl/hl / dscp, ecn, ip id/fl
 // 08: ipv6 dst
 // 09: ipv6 dst
 // 10: ipv6 src
@@ -51,7 +51,7 @@ module zircon_ip_rx_parse #
 // 12: l4 ports / tcp flags
 // 13: tcp wnd/urg
 // 14: tcp seq/ack
-// 15: 
+// 15:
 
 localparam DATA_W = s_axis_pkt.DATA_W;
 localparam META_W = m_axis_meta.DATA_W;
@@ -176,7 +176,7 @@ logic s_axis_pkt_tready_reg = 1'b0, s_axis_pkt_tready_next;
 // metadata RAM
 localparam META_AW = 5;
 
-logic [31:0] meta_ram_a[2**META_AW];
+logic [31:0] meta_ram_a[2**META_AW] = '{default: '0};
 logic [31:0] meta_ram_a_wr_data;
 logic [3:0] meta_ram_a_wr_strb;
 logic [META_AW-1:0] meta_ram_a_wr_addr;
@@ -185,7 +185,7 @@ logic [31:0] meta_ram_a_rd_data_reg = '0;
 logic [META_AW-1:0] meta_ram_a_rd_addr;
 logic meta_ram_a_rd_en;
 
-logic [31:0] meta_ram_b[2**META_AW];
+logic [31:0] meta_ram_b[2**META_AW] = '{default: '0};
 logic [31:0] meta_ram_b_wr_data;
 logic [3:0] meta_ram_b_wr_strb;
 logic [META_AW-1:0] meta_ram_b_wr_addr;
@@ -504,6 +504,12 @@ always_comb begin
                 meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd4};
                 meta_ram_b_wr_en = 1'b1;
 
+                // clear VLAN tags
+                meta_ram_a_wr_data = '0;
+                meta_ram_a_wr_strb = 4'b1111;
+                meta_ram_a_wr_addr = {meta_wr_slot_reg[0], 4'd2};
+                meta_ram_a_wr_en = 1'b1;
+
                 l3_offset_next = offset_reg;
                 payload_offset_next = offset_reg;
 
@@ -580,9 +586,9 @@ always_comb begin
                 payload_len_next = pkt_data_be[15:0] - 4;
 
                 // store DSCP and ECN
-                meta_ram_b_wr_data = {pkt_data_be[15:0], pkt_data_be[31:16]};
-                meta_ram_b_wr_strb = 4'b0001;
-                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd2};
+                meta_ram_b_wr_data = {pkt_data_be[23:0], pkt_data_be[31:24]};
+                meta_ram_b_wr_strb = 4'b1000;
+                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd7};
                 meta_ram_b_wr_en = 1'b1;
 
                 if (pkt_data_be[31:28] == 4'd4) begin
@@ -594,10 +600,10 @@ always_comb begin
             end
             STATE_IPV4_2: begin
                 // store IP ID
-                meta_ram_a_wr_data = {pkt_data_be[15:0], pkt_data_be[31:16]};
-                meta_ram_a_wr_strb = 4'b0011;
-                meta_ram_a_wr_addr = {meta_wr_slot_reg[0], 4'd7};
-                meta_ram_a_wr_en = 1'b1;
+                meta_ram_b_wr_data = {pkt_data_be[15:0], pkt_data_be[31:16]};
+                meta_ram_b_wr_strb = 4'b0011;
+                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd7};
+                meta_ram_b_wr_en = 1'b1;
 
                 if (pkt_data_be[13] || pkt_data_be[12:0] != 0) begin
                     // MF bit set or nonzero fragment offset
@@ -608,10 +614,10 @@ always_comb begin
             end
             STATE_IPV4_3: begin
                 // store TTL and protocol
-                meta_ram_b_wr_data = {pkt_data_be[15:0], pkt_data_be[31:16]}; // TODO check this
-                meta_ram_b_wr_strb = 4'b0011;
-                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd7};
-                meta_ram_b_wr_en = 1'b1;
+                meta_ram_a_wr_data = {pkt_data_be[15:0], pkt_data_be[31:16]}; // TODO check this
+                meta_ram_a_wr_strb = 4'b0011;
+                meta_ram_a_wr_addr = {meta_wr_slot_reg[0], 4'd7};
+                meta_ram_a_wr_en = 1'b1;
 
                 next_hdr_next = pkt_data_be[23:16];
 
@@ -693,16 +699,10 @@ always_comb begin
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
             // from https://www.ietf.org/rfc/rfc2460.txt
             STATE_IPV6_1: begin
-                // store flow label
-                meta_ram_a_wr_data = pkt_data_be;
-                meta_ram_a_wr_strb = 4'b0111;
-                meta_ram_a_wr_addr = {meta_wr_slot_reg[0], 4'd7};
-                meta_ram_a_wr_en = 1'b1;
-
-                // store DSCP and ECN
-                meta_ram_b_wr_data = {24'd0, pkt_data_be[27:20]};
-                meta_ram_b_wr_strb = 4'b0001;
-                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd2};
+                // store flow label, DSCP, and ECN
+                meta_ram_b_wr_data = {pkt_data_be[27:20], 4'd0, pkt_data_be[19:0]};
+                meta_ram_b_wr_strb = 4'b1111;
+                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd7};
                 meta_ram_b_wr_en = 1'b1;
 
                 if (pkt_data_be[31:28] == 4'd6) begin
@@ -714,10 +714,10 @@ always_comb begin
             end
             STATE_IPV6_2: begin
                 // store next header, hop limit
-                meta_ram_b_wr_data = pkt_data; // TODO check this
-                meta_ram_b_wr_strb = 4'b0011;
-                meta_ram_b_wr_addr = {meta_wr_slot_reg[0], 4'd7};
-                meta_ram_b_wr_en = 1'b1;
+                meta_ram_a_wr_data = pkt_data; // TODO check this
+                meta_ram_a_wr_strb = 4'b0011;
+                meta_ram_a_wr_addr = {meta_wr_slot_reg[0], 4'd7};
+                meta_ram_a_wr_en = 1'b1;
 
                 payload_len_next = pkt_data_be[31:16];
                 next_hdr_next = pkt_data_be[15:8];
@@ -870,8 +870,8 @@ always_comb begin
                 end
             end
             // TCP header
-            //  0                   1                   2                   3   
-            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+            //  0                   1                   2                   3
+            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
             // |          Source Port          |       Destination Port        |
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -965,8 +965,8 @@ always_comb begin
                 end
             end
             // UDP header
-            //  0                   1                   2                   3   
-            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+            //  0                   1                   2                   3
+            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
             // |          Source Port          |       Destination Port        |
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+

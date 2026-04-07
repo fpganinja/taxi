@@ -288,11 +288,10 @@ async def run_test(dut):
         tb.log.info("L4 offset: %d (%d)", l4_offset*4+2, l4_offset)
         tb.log.info("Payload offset: %d (%d)", payload_offset*4+2, payload_offset)
 
-        s_tag, c_tag, dscp_ecn = struct.unpack_from('>HHB', meta.tdata, 16)
+        s_tag, c_tag = struct.unpack_from('>HH', meta.tdata, 16)
 
         tb.log.info("VLAN S-tag: 0x%04x", s_tag)
         tb.log.info("VLAN C-tag: 0x%04x", c_tag)
-        tb.log.info("DSCP/ECN: 0x%02x", dscp_ecn)
 
         eth_dst = meta.tdata[24:30]
         eth_src = meta.tdata[32:38]

@@ -39,13 +39,13 @@ module zircon_ip_tx_deparse #
 
 // Metadata input (64 bit blocks):
 // 00: flags / payload len, payload sum
-// 01: 
-// 02: vlan tags / dscp, ecn
+// 01:
+// 02: vlan tags
 // 03: eth dst
 // 04: eth src, ethtype
-// 05: 
-// 06: 
-// 07: ip id/fl / protocol, ttl/hl
+// 05:
+// 06:
+// 07: protocol, ttl/hl / dscp, ecn, ip id/fl
 // 08: ipv6 dst
 // 09: ipv6 dst
 // 10: ipv6 src
@@ -53,7 +53,7 @@ module zircon_ip_tx_deparse #
 // 12: l4 ports / tcp flags
 // 13: tcp wnd/urg
 // 14: tcp seq/ack
-// 15: 
+// 15:
 
 localparam DATA_W = m_axis_pkt.DATA_W;
 localparam KEEP_W = m_axis_pkt.KEEP_W;
@@ -193,7 +193,7 @@ logic m_axis_pkt_tlast_reg = 1'b0, m_axis_pkt_tlast_next;
 // metadata RAM
 localparam META_AW = 5;
 
-logic [31:0] meta_ram_a[2**META_AW];
+logic [31:0] meta_ram_a[2**META_AW] = '{default: '0};
 logic [31:0] meta_ram_a_wr_data;
 logic [3:0] meta_ram_a_wr_strb;
 logic [META_AW-1:0] meta_ram_a_wr_addr;
@@ -203,7 +203,7 @@ logic [META_AW-1:0] meta_ram_a_rd_addr;
 wire [31:0] meta_ram_a_rd_data = meta_ram_a[meta_ram_a_rd_addr];
 wire [31:0] meta_ram_a_rd_data_be = swab32(meta_ram_a_rd_data);
 
-logic [31:0] meta_ram_b[2**META_AW];
+logic [31:0] meta_ram_b[2**META_AW] = '{default: '0};
 logic [31:0] meta_ram_b_wr_data;
 logic [3:0] meta_ram_b_wr_strb;
 logic [META_AW-1:0] meta_ram_b_wr_addr;
@@ -319,15 +319,16 @@ always_comb begin
                 end
             end
             4'd2: begin
-                // vlan tags / DSCP, ECN
-                meta_l3_cksum_next = 21'({8'h45, s_axis_meta.tdata[47:40]});
+                // vlan tags
+
+                meta_l3_cksum_next = 21'({8'h45, 8'd0}); // IP version, IHL
 
                 meta_common_cksum_next = 21'(meta_payload_len_reg);
             end
             4'd3: begin
                 // eth dst
 
-                meta_l3_cksum_next = meta_l3_cksum_reg + 21'd20;
+                meta_l3_cksum_next = meta_l3_cksum_reg + 21'd20; // IP header length
 
                 if (meta_flag_reg[FLG_UDP]) begin
                     meta_l4_cksum_next = meta_l4_cksum_reg + 21'(meta_payload_len_reg);
@@ -343,10 +344,11 @@ always_comb begin
                 // nothing
             end
             4'd7: begin
-                // IP ID/FL / protocol, TTL/HL
-                meta_cksum_in[31:0] = {16'd0, s_axis_meta.tdata[15:0]};
-                meta_cksum_in[63:32] = {16'd0, s_axis_meta.tdata[47:40], 8'd0};
+                // protocol, TTL/HL / IP ID/FL, dscp, ecn
+                meta_cksum_in[31:0] = {8'd0, s_axis_meta.tdata[63:56], s_axis_meta.tdata[47:32]}; // DSCP, ECN, IP ID
+                meta_cksum_in[63:32] = {16'd0, s_axis_meta.tdata[15:8], 8'd0}; // TTL
 
+                // protocol
                 if (meta_flag_reg[FLG_TCP]) begin
                     meta_common_cksum_next = meta_common_cksum_reg + 21'(PROTO_TCP);
                 end else if (meta_flag_reg[FLG_UDP]) begin
@@ -354,7 +356,7 @@ always_comb begin
                 end else if (meta_flag_reg[FLG_ICMP]) begin
                     meta_common_cksum_next = meta_common_cksum_reg + 21'(PROTO_ICMP);
                 end else begin
-                    meta_common_cksum_next = meta_common_cksum_reg + 21'(s_axis_meta.tdata[39:32]);
+                    meta_common_cksum_next = meta_common_cksum_reg + 21'(s_axis_meta.tdata[7:0]);
                 end
             end
             4'd8: begin
@@ -629,8 +631,8 @@ always_comb begin
             PKT_STATE_IPV4_1: begin
                 data_next[7:4] = 4'd4; // version
                 data_next[3:0] = 4'd5; // IHL
-                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd2};
-                data_next[15:8] = meta_ram_b_rd_data[23:16]; // DSCP and ECN
+                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd7};
+                data_next[15:8] = meta_ram_b_rd_data[31:24]; // DSCP and ECN
                 data_next[31:16] = swab16(pkt_l3_len_reg); // total length
                 data_valid_next = 1'b1;
 
@@ -638,8 +640,8 @@ always_comb begin
             end
             PKT_STATE_IPV4_2: begin
                 // IP ID
-                meta_ram_a_rd_addr = {meta_rd_slot_reg[0], 4'd7};
-                data_next[15:0] = swab16(meta_ram_a_rd_data[15:0]);
+                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd7};
+                data_next[15:0] = swab16(meta_ram_b_rd_data[15:0]);
                 data_next[31:16] = '0; // flags, fragment offset
                 data_valid_next = 1'b1;
 
@@ -647,9 +649,9 @@ always_comb begin
             end
             PKT_STATE_IPV4_3: begin
                 // TTL, protocol, header checksum
-                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd7};
-                data_next[7:0] = meta_ram_b_rd_data[15:8]; // TTL
-                data_next[15:8] = meta_ram_b_rd_data[7:0]; // protocol
+                meta_ram_a_rd_addr = {meta_rd_slot_reg[0], 4'd7};
+                data_next[7:0] = meta_ram_a_rd_data[15:8]; // TTL
+                data_next[15:8] = meta_ram_a_rd_data[7:0]; // protocol
                 data_next[31:16] = swab16(pkt_l3_cksum_reg[15:0]); // header checksum
                 data_valid_next = 1'b1;
 
@@ -660,7 +662,7 @@ always_comb begin
                 end else if (pkt_flag_reg[FLG_ICMP]) begin
                     data_next[15:8] = PROTO_ICMP;
                 end else begin
-                    data_next[15:8] = meta_ram_b_rd_data[7:0];
+                    data_next[15:8] = meta_ram_a_rd_data[7:0];
                 end
 
                 pkt_state_next = PKT_STATE_IPV4_4;
@@ -715,19 +717,18 @@ always_comb begin
             PKT_STATE_IPV6_1: begin
                 // flow label
                 data_next[7:4] = 4'd6; // version
-                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd2};
-                {data_next[3:0], data_next[15:12]} = meta_ram_b_rd_data[23:16]; // Traffic class
-                meta_ram_a_rd_addr = {meta_rd_slot_reg[0], 4'd7};
-                {data_next[11:8], data_next[23:16], data_next[31:24]} = meta_ram_a_rd_data[19:0]; // Flow label
+                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd7};
+                {data_next[3:0], data_next[15:12]} = meta_ram_b_rd_data[31:24]; // Traffic class
+                {data_next[11:8], data_next[23:16], data_next[31:24]} = meta_ram_b_rd_data[19:0]; // Flow label
                 data_valid_next = 1'b1;
 
                 pkt_state_next = PKT_STATE_IPV6_2;
             end
             PKT_STATE_IPV6_2: begin
                 // hop limit
-                meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd7};
-                data_next[31:24] = meta_ram_b_rd_data[15:8]; // hop limit
-                data_next[23:16] = meta_ram_b_rd_data[7:0]; // next header
+                meta_ram_a_rd_addr = {meta_rd_slot_reg[0], 4'd7};
+                data_next[31:24] = meta_ram_a_rd_data[15:8]; // hop limit
+                data_next[23:16] = meta_ram_a_rd_data[7:0]; // next header
                 data_next[15:0] = swab16(pkt_l3_len_reg); // payload length
                 data_valid_next = 1'b1;
 
@@ -738,7 +739,7 @@ always_comb begin
                 end else if (pkt_flag_reg[FLG_ICMP]) begin
                     data_next[23:16] = PROTO_IPV6_ICMP;
                 end else begin
-                    data_next[23:16] = meta_ram_b_rd_data[7:0];
+                    data_next[23:16] = meta_ram_a_rd_data[7:0];
                 end
 
                 pkt_state_next = PKT_STATE_IPV6_3;
@@ -814,8 +815,8 @@ always_comb begin
                 end
             end
             // Build TCP header
-            //  0                   1                   2                   3   
-            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+            //  0                   1                   2                   3
+            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
             // |          Source Port          |       Destination Port        |
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -880,8 +881,8 @@ always_comb begin
                 pkt_state_next = PKT_STATE_FINISH_1;
             end
             // Build UDP header
-            //  0                   1                   2                   3   
-            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+            //  0                   1                   2                   3
+            //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
             // |          Source Port          |       Destination Port        |
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+

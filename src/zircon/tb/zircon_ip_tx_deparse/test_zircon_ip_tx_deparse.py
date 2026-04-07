@@ -264,8 +264,8 @@ async def run_test(dut):
             meta[64:68] = scapy.utils.inet_aton(pkt[IP].dst)
             meta[80:84] = scapy.utils.inet_aton(pkt[IP].src)
 
-            struct.pack_into('<L', meta, 56, pkt[IP].id)
-            struct.pack_into('BB', meta, 60, pkt[IP].proto, pkt[IP].ttl)
+            struct.pack_into('BB', meta, 56, pkt[IP].proto, pkt[IP].ttl)
+            struct.pack_into('<L', meta, 60, pkt[IP].id)
 
             payload = bytes(pkt[IP].payload)
             hdr_size += len(pkt[IP]) - len(payload)
@@ -277,8 +277,8 @@ async def run_test(dut):
             meta[64:80] = scapy.pton_ntop.inet_pton(socket.AF_INET6, pkt[IPv6].dst)
             meta[80:96] = scapy.pton_ntop.inet_pton(socket.AF_INET6, pkt[IPv6].src)
 
-            struct.pack_into('<L', meta, 56, pkt[IPv6].fl)
-            struct.pack_into('BB', meta, 60, pkt[IPv6].nh, pkt[IPv6].hlim)
+            struct.pack_into('BB', meta, 56, pkt[IPv6].nh, pkt[IPv6].hlim)
+            struct.pack_into('<L', meta, 60, pkt[IPv6].fl)
 
             payload = bytes(pkt[IPv6].payload)
             hdr_size += len(pkt[IPv6]) - len(payload)

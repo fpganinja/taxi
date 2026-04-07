@@ -61,8 +61,8 @@ set_property -dict {LOC B28  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports 
 set_property -dict {LOC C27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][1]}] ;# D28
 set_property -dict {LOC J25  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][2]}] ;# D29
 set_property -dict {LOC K26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][3]}] ;# D30
-set_property -dict {LOC D26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_red}] ;# D52
-set_property -dict {LOC D27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_green}] ;# D52
+set_property -dict {LOC D27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_red}] ;# D52
+set_property -dict {LOC D26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_green}] ;# D52
 set_property -dict {LOC AN21 IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_sync[0]}] ;# D54
 set_property -dict {LOC AT24 IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_sync[1]}] ;# D56
 set_property -dict {LOC M15  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {eth_led_yellow}] ;# J28
@@ -252,11 +252,11 @@ set_input_delay 0 [get_ports {qsfp1_i2c_scl qsfp1_i2c_sda}]
 #set_property -dict {LOC AR8 } [get_ports pcie_refclk_0_n] ;# MGTREFCLK0N_224
 #set_property -dict {LOC AC9 } [get_ports pcie_refclk_1_p] ;# MGTREFCLK0P_227
 #set_property -dict {LOC AC8 } [get_ports pcie_refclk_1_n] ;# MGTREFCLK0N_227
-#set_property -dict {LOC AM17 IOSTANDARD LVCMOS12 PULLUP true} [get_ports pcie_reset_n]
+#set_property -dict {LOC AM17 IOSTANDARD LVCMOS12 PULLUP true} [get_ports pcie_reset]
 
 # 100 MHz MGT reference clock
 #create_clock -period 10.000 -name pcie_mgt_refclk_0 [get_ports pcie_refclk_0_p]
 #create_clock -period 10.000 -name pcie_mgt_refclk_1 [get_ports pcie_refclk_1_p]
 
-#set_false_path -from [get_ports {pcie_reset_n}]
-#set_input_delay 0 [get_ports {pcie_reset_n}]
+#set_false_path -from [get_ports {pcie_reset}]
+#set_input_delay 0 [get_ports {pcie_reset}]

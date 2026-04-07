@@ -61,8 +61,8 @@ set_property -dict {LOC B28  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports 
 set_property -dict {LOC C27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][1]}] ;# D28
 set_property -dict {LOC J25  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][2]}] ;# D29
 set_property -dict {LOC K26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {qsfp_led[1][3]}] ;# D30
-set_property -dict {LOC D26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_red}] ;# D52
-set_property -dict {LOC D27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_green}] ;# D52
+set_property -dict {LOC D27  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_red}] ;# D52
+set_property -dict {LOC D26  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_green}] ;# D52
 set_property -dict {LOC AN21 IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_sync[0]}] ;# D54
 set_property -dict {LOC AT24 IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {led_sync[1]}] ;# D56
 set_property -dict {LOC M15  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {eth_led_yellow}] ;# J28
@@ -248,12 +248,12 @@ set_input_delay 0 [get_ports {qsfp1_i2c_scl qsfp1_i2c_sda}]
 #set_property -dict {LOC BB1 } [get_ports {pcie_rx_n[15]}] ;# MGTYRXN0_224 GTYE4_CHANNEL_X1Y0 / GTYE4_COMMON_X1Y0
 #set_property -dict {LOC BE5 } [get_ports {pcie_tx_p[15]}] ;# MGTYTXP0_224 GTYE4_CHANNEL_X1Y0 / GTYE4_COMMON_X1Y0
 #set_property -dict {LOC BE4 } [get_ports {pcie_tx_n[15]}] ;# MGTYTXN0_224 GTYE4_CHANNEL_X1Y0 / GTYE4_COMMON_X1Y0
-#set_property -dict {LOC AA9 } [get_ports pcie_refclk_p] ;# MGTREFCLK1P_227
-#set_property -dict {LOC AA8 } [get_ports pcie_refclk_n] ;# MGTREFCLK1N_227
-#set_property -dict {LOC AM17 IOSTANDARD LVCMOS12 PULLUP true} [get_ports pcie_reset_n]
+#set_property -dict {LOC AG9 } [get_ports pcie_refclk_p] ;# MGTREFCLK0P_226
+#set_property -dict {LOC AG8 } [get_ports pcie_refclk_n] ;# MGTREFCLK0N_226
+#set_property -dict {LOC AM17 IOSTANDARD LVCMOS12 PULLUP true} [get_ports pcie_reset]
 
 # 100 MHz MGT reference clock
 #create_clock -period 10.000 -name pcie_mgt_refclk_0 [get_ports pcie_refclk_0_p]
 
-#set_false_path -from [get_ports {pcie_reset_n}]
-#set_input_delay 0 [get_ports {pcie_reset_n}]
+#set_false_path -from [get_ports {pcie_reset}]
+#set_input_delay 0 [get_ports {pcie_reset}]

@@ -1,3 +1,11 @@
+# SPDX-License-Identifier: MIT
+#
+# Copyright (c) 2021-2026 FPGA Ninja, LLC
+#
+# Authors:
+# - Alex Forencich
+#
+
 # XDC constraints for the HiTech Global HTG-9200 board with HTG-FMC-X6QSFP28 FMC+
 # part: xcvu9p-flgb2104-2-e
 # part: xcvu13p-fhgb2104-2-e

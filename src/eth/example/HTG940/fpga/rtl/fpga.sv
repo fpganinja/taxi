@@ -22,7 +22,7 @@ module fpga #
     // vendor ("GENERIC", "XILINX", "ALTERA")
     parameter string VENDOR = "XILINX",
     // device family
-    parameter string FAMILY = "zynquplus",
+    parameter string FAMILY = "virtexuplus",
     // Use 90 degree clock for RGMII transmit
     parameter logic USE_CLK90 = 1'b0
 )
@@ -88,13 +88,13 @@ wire mmcm_locked;
 wire mmcm_clkfb;
 
 IBUFGDS #(
-   .DIFF_TERM("FALSE"),
-   .IBUF_LOW_PWR("FALSE")   
+    .DIFF_TERM("FALSE"),
+    .IBUF_LOW_PWR("FALSE")
 )
 ref_clk_ibufg_inst (
-   .O   (ref_clk_ibufg),
-   .I   (ref_clk_p),
-   .IB  (ref_clk_n) 
+    .O   (ref_clk_ibufg),
+    .I   (ref_clk_p),
+    .IB  (ref_clk_n)
 );
 
 // MMCM instance
@@ -269,7 +269,7 @@ idelayctrl_inst (
 );
 
 for (genvar n = 0; n < 4; n = n + 1) begin : phy_rxd_idelay_bit
-    
+
     IDELAYE3 #(
         .DELAY_SRC("IDATAIN"),
         .CASCADE("NONE"),

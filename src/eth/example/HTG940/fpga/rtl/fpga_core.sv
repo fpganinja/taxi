@@ -22,7 +22,7 @@ module fpga_core #
     // vendor ("GENERIC", "XILINX", "ALTERA")
     parameter string VENDOR = "XILINX",
     // device family
-    parameter string FAMILY = "zynquplus",
+    parameter string FAMILY = "virtexuplus",
     // Use 90 degree clock for RGMII transmit
     parameter logic USE_CLK90 = 1'b1
 )

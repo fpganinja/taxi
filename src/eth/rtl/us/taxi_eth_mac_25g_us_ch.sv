@@ -296,6 +296,7 @@ module taxi_eth_mac_25g_us_ch #
 );
 
 localparam GT_7 = FAMILY == "virtex7" || FAMILY == "kintex7";
+localparam GBX_EN = CFG_LOW_LATENCY || GT_7;
 
 localparam HDR_W = 2;
 
@@ -882,8 +883,8 @@ if (COMBINED_MAC_PCS) begin : mac
     taxi_eth_mac_phy_10g #(
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
-        .TX_GBX_IF_EN(CFG_LOW_LATENCY),
-        .RX_GBX_IF_EN(CFG_LOW_LATENCY),
+        .TX_GBX_IF_EN(GBX_EN),
+        .RX_GBX_IF_EN(GBX_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TD_EN(PTP_TD_EN),
@@ -1109,8 +1110,8 @@ end else begin : mac
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
         .HDR_W(HDR_W),
-        .TX_GBX_IF_EN(CFG_LOW_LATENCY),
-        .RX_GBX_IF_EN(CFG_LOW_LATENCY),
+        .TX_GBX_IF_EN(GBX_EN),
+        .RX_GBX_IF_EN(GBX_EN),
         .BIT_REVERSE(1'b1),
         .SCRAMBLER_DISABLE(1'b0),
         .PRBS31_EN(PRBS31_EN),
@@ -1177,8 +1178,8 @@ end else begin : mac
     taxi_eth_mac_10g #(
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
-        .TX_GBX_IF_EN(CFG_LOW_LATENCY),
-        .RX_GBX_IF_EN(CFG_LOW_LATENCY),
+        .TX_GBX_IF_EN(GBX_EN),
+        .RX_GBX_IF_EN(GBX_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TD_EN(PTP_TD_EN),

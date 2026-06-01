@@ -143,11 +143,13 @@ The Taxi transport library contains many smaller components that can be composed
     *  10/100/1000 RGMII MAC + FIFO
     *  1G MAC
     *  1G MAC + FIFO
+    *  1000BASE-X MAC/PHY
+    *  1000BASE-X MAC/PHY + FIFO
     *  10G/25G MAC
     *  10G/25G MAC + FIFO
-    *  10G/25G MAC/PHY
-    *  10G/25G MAC/PHY + FIFO
-    *  10G/25G PHY
+    *  10GBASE-R/25GBASE-R MAC/PHY
+    *  10GBASE-R/25GBASE-R MAC/PHY + FIFO
+    *  10GBASE-R/25GBASE-R PHY
     *  MII PHY interface
     *  GMII PHY interface
     *  RGMII PHY interface

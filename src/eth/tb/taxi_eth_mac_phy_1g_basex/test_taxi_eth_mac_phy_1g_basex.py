@@ -644,12 +644,12 @@ async def run_test_pfc(dut, gbx_cfg=None, ifg=12):
     dut.rx_pfc_ack.value = 0xff
 
     for i in range(8):
-        for k in range(500):
+        for k in range(750):
             await RisingEdge(dut.tx_clk)
 
         dut.tx_pfc_req.value = 0xff >> (7-i)
 
-    for k in range(500):
+    for k in range(750):
         await RisingEdge(dut.tx_clk)
 
     dut.tx_pfc_req.value = 0x00

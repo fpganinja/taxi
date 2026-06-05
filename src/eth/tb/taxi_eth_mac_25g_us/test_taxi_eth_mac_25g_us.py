@@ -226,14 +226,14 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
+            pipe_delay = 3
+        else:
+            pipe_delay = 4
+    else:
+        if dut.COMBINED_MAC_PCS.value:
             pipe_delay = 4
         else:
             pipe_delay = 5
-    else:
-        if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 6
-        else:
-            pipe_delay = 7
 
     tb = TB(dut)
 
@@ -280,13 +280,6 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
 
-        if tx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            if dut.DATA_W.value == 64:
-                tx_frame_sfd_ns -= tb.clk_period[port]/2
-            else:
-                tx_frame_sfd_ns -= tb.clk_period[port]
-
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))
@@ -310,14 +303,14 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 5
-        else:
-            pipe_delay = 5
-    else:
-        if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 5
+            pipe_delay = 6
         else:
             pipe_delay = 6
+    else:
+        if dut.COMBINED_MAC_PCS.value:
+            pipe_delay = 7
+        else:
+            pipe_delay = 8
 
     tb = TB(dut)
 
@@ -357,13 +350,6 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
 
-        if rx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            if dut.DATA_W.value == 64:
-                rx_frame_sfd_ns -= tb.clk_period[port]/2
-            else:
-                rx_frame_sfd_ns -= tb.clk_period[port]
-
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
@@ -390,14 +376,14 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 5
-        else:
-            pipe_delay = 5
-    else:
-        if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 5
+            pipe_delay = 6
         else:
             pipe_delay = 6
+    else:
+        if dut.COMBINED_MAC_PCS.value:
+            pipe_delay = 7
+        else:
+            pipe_delay = 8
 
     tb = TB(dut)
 
@@ -444,13 +430,6 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
             ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
             rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
-
-            if rx_frame.start_lane == 4:
-                # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-                if dut.DATA_W.value == 64:
-                    rx_frame_sfd_ns -= tb.clk_period[port]/2
-                else:
-                    rx_frame_sfd_ns -= tb.clk_period[port]
 
             tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
             tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)

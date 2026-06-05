@@ -198,6 +198,7 @@ class BaseRSerdesSource():
     async def _run(self):
         frame = None
         frame_offset = 0
+        in_pre = False
         ifg_cnt = 0
         deficit_idle_cnt = 0
         scrambler_state = 0
@@ -214,11 +215,10 @@ class BaseRSerdesSource():
         while True:
             await RisingEdge(self.clock)
 
-            if not clk_period:
-                if last_clk:
-                    clk_period = get_sim_time() - last_clk
-                else:
-                    last_clk = get_sim_time()
+            sim_time = get_sim_time()
+            if last_clk:
+                clk_period = sim_time - last_clk
+            last_clk = sim_time
 
             # clock enable
             if self.enable is not None and not self.enable.value:
@@ -288,7 +288,7 @@ class BaseRSerdesSource():
                     self.queue_occupancy_bytes -= len(frame)
                     self.queue_occupancy_frames -= 1
                     self.current_frame = frame
-                    frame.sim_time_start = get_sim_time() - gbx_delay
+                    frame.sim_time_start = sim_time - gbx_delay
                     frame.sim_time_sfd = None
                     frame.sim_time_end = None
                     self.log.info("TX frame: %s", frame)
@@ -318,6 +318,7 @@ class BaseRSerdesSource():
                     ifg_cnt = 0
                     self.active = True
                     frame_offset = 0
+                    in_pre = True
                 else:
                     # clear counters
                     deficit_idle_cnt = 0
@@ -330,15 +331,17 @@ class BaseRSerdesSource():
                 for k in range(8):
                     if frame is not None:
                         d = frame.data[frame_offset]
-                        if frame.sim_time_sfd is None and d == EthPre.SFD:
-                            frame.sim_time_sfd = get_sim_time() - gbx_delay
+                        if frame.sim_time_sfd is None and not in_pre:
+                            frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                        if d == EthPre.SFD:
+                            in_pre = False
                         dl.append(d)
                         cl.append(frame.ctrl[frame_offset])
                         frame_offset += 1
 
                         if frame_offset >= len(frame.data):
                             ifg_cnt = max(self.ifg - (8-k), 0)
-                            frame.sim_time_end = get_sim_time() - gbx_delay
+                            frame.sim_time_end = sim_time - gbx_delay
                             frame.handle_tx_complete()
                             frame = None
                             self.current_frame = None
@@ -642,6 +645,7 @@ class BaseRSerdesSink:
     async def _run(self):
         frame = None
         scrambler_state = 0
+        in_pre = False
         self.active = False
 
         clk_period = 0
@@ -655,11 +659,10 @@ class BaseRSerdesSink:
         while True:
             await RisingEdge(self.clock)
 
-            if not clk_period:
-                if last_clk:
-                    clk_period = get_sim_time() - last_clk
-                else:
-                    last_clk = get_sim_time()
+            sim_time = get_sim_time()
+            if last_clk:
+                clk_period = sim_time - last_clk
+            last_clk = sim_time
 
             # clock enable
             if self.enable is not None and not self.enable.value:
@@ -869,16 +872,17 @@ class BaseRSerdesSink:
                 dl = [XgmiiCtrl.ERROR]*8
                 cl = [1]*8
 
-            for offset in range(8):
-                d_val = dl[offset]
-                c_val = cl[offset]
+            for k in range(8):
+                d_val = dl[k]
+                c_val = cl[k]
 
                 if frame is None:
                     if c_val and d_val == XgmiiCtrl.START:
                         # start
                         frame = XgmiiFrame(bytearray([EthPre.PRE]), [0])
-                        frame.sim_time_start = get_sim_time() + gbx_delay
-                        frame.start_lane = offset
+                        frame.sim_time_start = sim_time + gbx_delay
+                        frame.start_lane = k
+                        in_pre = True
                 else:
                     if c_val:
                         # got a control character; terminate frame reception
@@ -888,7 +892,7 @@ class BaseRSerdesSink:
                             frame.ctrl.append(c_val)
 
                         frame.compact()
-                        frame.sim_time_end = get_sim_time() + gbx_delay
+                        frame.sim_time_end = sim_time + gbx_delay
                         self.log.info("RX frame: %s", frame)
 
                         self.queue_occupancy_bytes += len(frame)
@@ -899,8 +903,10 @@ class BaseRSerdesSink:
 
                         frame = None
                     else:
-                        if frame.sim_time_sfd is None and d_val == EthPre.SFD:
-                            frame.sim_time_sfd = get_sim_time() + gbx_delay
+                        if frame.sim_time_sfd is None and not in_pre:
+                            frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
+                        if d_val == EthPre.SFD:
+                            in_pre = False
 
                         frame.data.append(d_val)
                         frame.ctrl.append(c_val)

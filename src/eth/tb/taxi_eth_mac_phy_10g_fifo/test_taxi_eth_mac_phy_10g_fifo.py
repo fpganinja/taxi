@@ -144,9 +144,9 @@ class TB:
 async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 64:
-        pipe_delay = 4
+        pipe_delay = 3
     else:
-        pipe_delay = 6
+        pipe_delay = 4
 
     tb = TB(dut, gbx_cfg)
 
@@ -187,13 +187,6 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
 
-        if tx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            if len(dut.serdes_tx_data) == 64:
-                tx_frame_sfd_ns -= tb.clk_period/2
-            else:
-                tx_frame_sfd_ns -= tb.clk_period
-
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))
@@ -215,9 +208,9 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 64:
-        pipe_delay = 5
+        pipe_delay = 6
     else:
-        pipe_delay = 5
+        pipe_delay = 7
 
     tb = TB(dut, gbx_cfg)
 
@@ -251,13 +244,6 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
 
-        if rx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            if len(dut.serdes_tx_data) == 64:
-                rx_frame_sfd_ns -= tb.clk_period/2
-            else:
-                rx_frame_sfd_ns -= tb.clk_period
-
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
@@ -280,9 +266,9 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 async def run_test_tx_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 64:
-        pipe_delay = 5
+        pipe_delay = 6
     else:
-        pipe_delay = 5
+        pipe_delay = 7
 
     dic_en = int(cocotb.top.DIC_EN.value)
 
@@ -325,13 +311,6 @@ async def run_test_tx_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
             ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
             rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
-
-            if rx_frame.start_lane == 4:
-                # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-                if len(dut.serdes_tx_data) == 64:
-                    rx_frame_sfd_ns -= tb.clk_period/2
-                else:
-                    rx_frame_sfd_ns -= tb.clk_period
 
             tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
             tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)

@@ -152,7 +152,8 @@ logic m_axis_rx_tvalid_reg = 1'b0, m_axis_rx_tvalid_next;
 logic m_axis_rx_tlast_reg = 1'b0, m_axis_rx_tlast_next;
 logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
 
-logic [1:0] start_packet_reg = '0, start_packet_next;
+logic start_packet_int_reg = 1'b0;
+logic [1:0] start_packet_reg = '0;
 logic frame_reg = 1'b0;
 
 logic [1:0] stat_rx_byte_reg = '0, stat_rx_byte_next;
@@ -171,7 +172,10 @@ logic stat_rx_err_bad_block_reg = 1'b0;
 logic stat_rx_err_framing_reg = 1'b0, stat_rx_err_framing_next;
 logic stat_rx_err_preamble_reg = 1'b0, stat_rx_err_preamble_next;
 
+logic [PTP_TS_W-1:0] ptp_ts_reg = '0;
 logic [PTP_TS_W-1:0] ptp_ts_out_reg = '0, ptp_ts_out_next;
+logic [PTP_TS_W-1:0] ptp_ts_adj_reg = '0;
+logic ptp_ts_borrow_reg = '0;
 
 logic [31:0] crc_state_reg = '1;
 
@@ -183,8 +187,8 @@ logic [1:0] crc_valid_reg = '0;
 assign crc_valid[1] = crc_state == ~32'h2144df1c;
 assign crc_valid[0] = crc_state == ~32'hc622f71d;
 
-logic [4+16-1:0] last_ts_reg = '0;
-logic [4+16-1:0] ts_inc_reg = '0;
+logic [5+16-1:0] last_ts_reg = '0;
+logic [5+16-1:0] ts_inc_reg = '0;
 
 assign m_axis_rx.tdata = m_axis_rx_tdata_reg;
 assign m_axis_rx.tkeep = m_axis_rx_tkeep_reg;
@@ -216,13 +220,22 @@ assign stat_rx_err_bad_block = stat_rx_err_bad_block_reg;
 assign stat_rx_err_framing = stat_rx_err_framing_reg;
 assign stat_rx_err_preamble = stat_rx_err_preamble_reg;
 
+// Lane swapping with truncated preamble
+logic in_pre_reg = 1'b0;
+logic lanes_swapped_reg = 1'b0;
+logic [7:0] swap_data_reg = '0;
+logic swap_data_k_reg = '0;
+
+wire [DATA_W-1:0] swap_rx_data   = lanes_swapped_reg ? {encoded_rx_data[7:0], swap_data_reg} : encoded_rx_data;
+wire [CTRL_W-1:0] swap_rx_data_k = lanes_swapped_reg ? {encoded_rx_data_k[0], swap_data_k_reg} : encoded_rx_data_k;
+
 // Mask input data
-wire [DATA_W-1:0] encoded_rx_data_masked;
-wire [CTRL_W-1:0] encoded_rx_data_term;
+wire [DATA_W-1:0] swap_rx_data_masked;
+wire [CTRL_W-1:0] swap_rx_data_term;
 
 for (genvar n = 0; n < CTRL_W; n = n + 1) begin
-    assign encoded_rx_data_masked[n*8 +: 8] = (n > 0 && encoded_rx_data_k[n]) ? 8'd0 : encoded_rx_data[n*8 +: 8];
-    assign encoded_rx_data_term[n] = encoded_rx_data_k[n] && (encoded_rx_data[n*8 +: 8] == CTRL_T);
+    assign swap_rx_data_masked[n*8 +: 8] = (n > 0 && swap_rx_data_k[n]) ? 8'd0 : swap_rx_data[n*8 +: 8];
+    assign swap_rx_data_term[n] = swap_rx_data_k[n] && (swap_rx_data[n*8 +: 8] == CTRL_T);
 end
 
 taxi_lfsr #(
@@ -266,8 +279,6 @@ always_comb begin
 
     ptp_ts_out_next = ptp_ts_out_reg;
 
-    start_packet_next = '0;
-
     stat_rx_byte_next = '0;
     stat_rx_pkt_len_next = '0;
     stat_rx_pkt_fragment_next = 1'b0;
@@ -289,7 +300,7 @@ always_comb begin
     end else begin
         // counter to measure frame length
         if (&frame_len_reg[15:1] == 0) begin
-            casez (encoded_rx_data_k)
+            casez (swap_rx_data_k)
                 2'b00:   frame_len_next = frame_len_reg + 16'(KEEP_W);
                 2'b10:   frame_len_next = frame_len_reg + 1;
                 default: frame_len_next = frame_len_reg + 0;
@@ -364,9 +375,7 @@ always_comb begin
                 frame_len_lim_check_next = 1'b0;
                 hdr_ptr_next = 0;
 
-                ptp_ts_out_next = ptp_ts;
-
-                if (encoded_rx_data_k != 0) begin
+                if (swap_rx_data_k != 0) begin
                     // control character
                     stat_rx_err_framing_next = 1'b1;
                     state_next = STATE_IDLE;
@@ -376,20 +385,9 @@ always_comb begin
                         // normal preamble
                         state_next = STATE_PREAMBLE;
                     end else if (input_data_d0_reg == {ETH_SFD, ETH_PRE}) begin
-                        // start in lane 0
-                        start_packet_next[0] = 1'b1;
+                        // start
                         if (cfg_rx_enable) begin
                             stat_rx_byte_next = 2'd2;
-                            state_next = STATE_PIPE;
-                        end else begin
-                            state_next = STATE_IDLE;
-                        end
-                    end else if (input_data_d0_reg[0 +: 8] == ETH_SFD) begin
-                        // start in lane 1 (truncated preamble)
-                        // TODO!!
-                        start_packet_next[1] = 1'b1;
-                        if (cfg_rx_enable) begin
-                            stat_rx_byte_next = 2'd1;
                             state_next = STATE_PIPE;
                         end else begin
                             state_next = STATE_IDLE;
@@ -406,7 +404,7 @@ always_comb begin
 
                 hdr_ptr_next = 0;
 
-                if (encoded_rx_data_k != 0) begin
+                if (swap_rx_data_k != 0) begin
                     // control or error characters in packet
                     stat_rx_err_framing_next = 1'b1;
                     state_next = STATE_IDLE;
@@ -415,7 +413,7 @@ always_comb begin
                     stat_rx_byte_next = 2'(KEEP_W);
                     state_next = STATE_PIPE;
                 end else if (input_data_d2_reg == 16'hD555) begin
-                    // start in lane 0
+                    // start
                     stat_rx_byte_next = 2'(KEEP_W);
                     state_next = STATE_PAYLOAD;
                 end else begin
@@ -432,9 +430,9 @@ always_comb begin
                 m_axis_rx_tlast_next = 1'b0;
                 m_axis_rx_tuser_next = 1'b0;
 
-                if (encoded_rx_data_k[0]) begin
+                if (swap_rx_data_k[0]) begin
                     stat_rx_byte_next = 2'd0;
-                end else if (encoded_rx_data_k[1]) begin
+                end else if (swap_rx_data_k[1]) begin
                     stat_rx_byte_next = 2'd1;
                     if (frame_len_lim_check_reg) begin
                         if (frame_len_lim_last_reg < 1) begin
@@ -447,6 +445,10 @@ always_comb begin
                         // at the limit but this isn't a termination character
                         frame_oversize_next = 1'b1;
                     end
+                end
+
+                if (PTP_TS_EN) begin
+                    ptp_ts_out_next = (!PTP_TS_FMT_TOD || ptp_ts_borrow_reg) ? ptp_ts_reg : ptp_ts_adj_reg;
                 end
 
                 // if (encoded_rx_data_k && encoded_rx_data != CTRL_T) begin
@@ -472,11 +474,11 @@ always_comb begin
                 //     reset_crc = 1'b1;
                 //     state_next = STATE_IDLE;
                 // end else if (term_first_cycle_reg) begin
-                if (encoded_rx_data_k[0]) begin
+                if (swap_rx_data_k[0]) begin
                     // end this cycle
                     m_axis_rx_tkeep_next = 2'b11;
                     m_axis_rx_tlast_next = 1'b1;
-                    if (encoded_rx_data[0 +: 8] != CTRL_T) begin
+                    if (swap_rx_data[0 +: 8] != CTRL_T) begin
                         // not a termination character
                         m_axis_rx_tuser_next = 1'b1;
                         stat_rx_err_framing_next = 1'b1;
@@ -510,7 +512,7 @@ always_comb begin
                     stat_rx_err_preamble_next = !pre_ok_reg;
                     reset_crc = 1'b1;
                     state_next = STATE_IDLE;
-                end else if (encoded_rx_data_k[1]) begin
+                end else if (swap_rx_data_k[1]) begin
                     // need extra cycle
                     // TODO check term char
                     state_next = STATE_LAST;
@@ -579,6 +581,8 @@ always_ff @(posedge clk) begin
     frame_len_lim_last_reg <= frame_len_lim_last_next;
     frame_len_lim_check_reg <= frame_len_lim_check_next;
 
+    start_packet_reg <= '0;
+
     m_axis_rx_tdata_reg <= m_axis_rx_tdata_next;
     m_axis_rx_tkeep_reg <= m_axis_rx_tkeep_next;
     m_axis_rx_tvalid_reg <= m_axis_rx_tvalid_next;
@@ -586,8 +590,6 @@ always_ff @(posedge clk) begin
     m_axis_rx_tuser_reg <= m_axis_rx_tuser_next;
 
     ptp_ts_out_reg <= ptp_ts_out_next;
-
-    start_packet_reg <= start_packet_next;
 
     stat_rx_byte_reg <= stat_rx_byte_next;
     stat_rx_pkt_len_reg <= stat_rx_pkt_len_next;
@@ -606,15 +608,63 @@ always_ff @(posedge clk) begin
     stat_rx_err_preamble_reg <= stat_rx_err_preamble_next;
 
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
-        input_data_d0_reg <= encoded_rx_data_masked;
+
+        swap_data_reg <= encoded_rx_data[15:8];
+        swap_data_k_reg <= encoded_rx_data_k[1];
+
+        input_data_d0_reg <= swap_rx_data_masked;
         input_data_d1_reg <= input_data_d0_reg;
         input_data_d2_reg <= input_data_d1_reg;
 
         input_start_d0_reg <= 1'b0;
 
+        if (PTP_TS_EN && PTP_TS_FMT_TOD) begin
+            // ns field rollover
+            // workaround for verilator lint bug: unreachable by parameter value
+            /* verilator lint_off SELRANGE */
+            ptp_ts_adj_reg[15:0] <= ptp_ts_reg[15:0];
+            {ptp_ts_borrow_reg, ptp_ts_adj_reg[45:16]} <= $signed({1'b0, ptp_ts_reg[45:16]}) - $signed(31'd1000000000);
+            ptp_ts_adj_reg[47:46] <= 0;
+            ptp_ts_adj_reg[95:48] <= ptp_ts_reg[95:48] + 1;
+            /* verilator lint_on SELRANGE */
+        end
+
         // start control character detection
         if (encoded_rx_data_k[0] && encoded_rx_data[7:0] == CTRL_S) begin
             input_start_d0_reg <= 1'b1;
+            in_pre_reg <= 1'b1;
+            lanes_swapped_reg <= 1'b0;
+        end
+
+        // SFD detection
+        start_packet_int_reg <= 1'b0;
+        if (in_pre_reg) begin
+            if (encoded_rx_data[7]) begin
+                // truncated preamble
+                in_pre_reg <= 1'b0;
+                lanes_swapped_reg <= 1'b1;
+                input_data_d0_reg <= {ETH_SFD, ETH_PRE};
+                start_packet_reg <= 2'b10;
+                if (PTP_TS_FMT_TOD) begin
+                    // workaround for verilator lint bug: unreachable by parameter value
+                    /* verilator lint_off SELRANGE */
+                    ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                    ptp_ts_reg[95:48] <= ptp_ts[95:48];
+                    /* verilator lint_on SELRANGE */
+                end else begin
+                    ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+                end
+            end else if (encoded_rx_data[15]) begin
+                // normal preamble
+                in_pre_reg <= 1'b0;
+                lanes_swapped_reg <= 1'b0;
+                start_packet_int_reg <= 1'b1;
+            end
+        end
+
+        if (start_packet_int_reg) begin
+            start_packet_reg <= 2'b01;
+            ptp_ts_reg <= ptp_ts;
         end
 
         if (reset_crc) begin
@@ -626,14 +676,15 @@ always_ff @(posedge clk) begin
         crc_valid_reg <= crc_valid;
     end
 
-    last_ts_reg <= (4+16)'(ptp_ts);
-    ts_inc_reg <= (4+16)'(ptp_ts) - last_ts_reg;
+    last_ts_reg <= (5+16)'(ptp_ts);
+    ts_inc_reg <= (5+16)'(ptp_ts) - last_ts_reg;
 
     if (rst) begin
         state_reg <= STATE_IDLE;
 
         m_axis_rx_tvalid_reg <= 1'b0;
 
+        start_packet_int_reg <= 1'b0;
         start_packet_reg <= '0;
         frame_reg <= 1'b0;
 

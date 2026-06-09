@@ -15,7 +15,7 @@ dict set params SFP_RATE "0"
 # 10G MAC configuration
 dict set params CFG_LOW_LATENCY "1"
 dict set params COMBINED_MAC_PCS "1"
-dict set params MAC_DATA_W "32"
+dict set params MAC_DATA_W "16"
 
 # apply parameters to top-level
 set param_list {}

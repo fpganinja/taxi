@@ -312,6 +312,7 @@ class BaseRSerdesSource():
                     if ifg_cnt > min_ifg or self.force_offset_start:
                         ifg_cnt = ifg_cnt-4
                         frame.start_lane = 4
+                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * 4) - gbx_delay
                         frame.data = bytearray([XgmiiCtrl.IDLE]*4)+frame.data
                         frame.ctrl = [1]*4+frame.ctrl
 
@@ -343,7 +344,7 @@ class BaseRSerdesSource():
 
                         if frame_offset >= len(frame.data):
                             ifg_cnt = max(self.ifg - (8-k), 0)
-                            frame.sim_time_end = sim_time - gbx_delay
+                            frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
                             frame.handle_tx_complete()
                             frame = None
                             self.current_frame = None
@@ -884,7 +885,7 @@ class BaseRSerdesSink:
                     if c_val and d_val == XgmiiCtrl.START:
                         # start
                         frame = XgmiiFrame(bytearray([EthPre.PRE]), [0])
-                        frame.sim_time_start = sim_time + gbx_delay
+                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
                         frame.start_lane = k
                         in_pre = True
                 else:
@@ -896,7 +897,7 @@ class BaseRSerdesSink:
                             frame.ctrl.append(c_val)
 
                         frame.compact()
-                        frame.sim_time_end = sim_time + gbx_delay
+                        frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
                         self.log.info("RX frame: %s", frame)
 
                         self.queue_occupancy_bytes += len(frame)

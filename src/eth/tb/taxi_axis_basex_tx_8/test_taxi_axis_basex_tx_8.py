@@ -150,7 +150,7 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
         if gbx_cfg is None:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*0) < 0.01
 
     assert tb.sink.empty()
 

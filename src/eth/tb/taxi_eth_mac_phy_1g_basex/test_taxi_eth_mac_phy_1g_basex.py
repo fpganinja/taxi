@@ -175,9 +175,9 @@ class TB:
 async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 16:
-        pipe_delay = 3
+        pipe_delay = 4
     else:
-        pipe_delay = 3
+        pipe_delay = 4
 
     tb = TB(dut, gbx_cfg)
 
@@ -243,9 +243,9 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 16:
-        pipe_delay = 4
+        pipe_delay = 3
     else:
-        pipe_delay = 4
+        pipe_delay = 3
 
     tb = TB(dut, gbx_cfg)
 

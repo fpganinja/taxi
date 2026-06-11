@@ -226,11 +226,11 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12, spee
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
         if speed == 10e6:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 800) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 400) < 0.01
         elif speed == 100e6:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 80) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 40) < 0.01
         else:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 12) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - 4) < 0.01
 
     assert tb.gmii_phy.tx.empty()
 

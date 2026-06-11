@@ -152,7 +152,7 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12, enable_
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        assert abs(ptp_ts_ns - tx_frame_sfd_ns - (32 if enable_gen else 8)) < 0.01
+        assert abs(ptp_ts_ns - tx_frame_sfd_ns - 8) < 0.01
 
     assert tb.sink.empty()
 

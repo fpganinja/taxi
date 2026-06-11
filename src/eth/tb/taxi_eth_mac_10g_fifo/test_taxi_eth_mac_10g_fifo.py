@@ -127,7 +127,7 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
     tb.log.info("Wait for PTP CDC lock")
     while not int(dut.rx_ptp_locked.value):
         await RisingEdge(dut.rx_clk)
-    for k in range(2000):
+    for k in range(4000):
         await RisingEdge(dut.rx_clk)
 
     test_frames = [payload_data(x) for x in payload_lengths()]
@@ -146,10 +146,6 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
         ptp_ts_ns = ptp_ts / 2**16
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
-
-        if tx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            tx_frame_sfd_ns -= tb.clk_period/2
 
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
@@ -184,7 +180,7 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
     tb.log.info("Wait for PTP CDC lock")
     while not int(dut.tx_ptp_locked.value):
         await RisingEdge(dut.tx_clk)
-    for k in range(2000):
+    for k in range(4000):
         await RisingEdge(dut.tx_clk)
 
     test_frames = [payload_data(x) for x in payload_lengths()]
@@ -199,10 +195,6 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
         ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
-
-        if rx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            rx_frame_sfd_ns -= tb.clk_period/2
 
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
@@ -242,7 +234,7 @@ async def run_test_tx_alignment(dut, payload_data=None, ifg=12):
     tb.log.info("Wait for PTP CDC lock")
     while not int(dut.tx_ptp_locked.value):
         await RisingEdge(dut.tx_clk)
-    for k in range(2000):
+    for k in range(4000):
         await RisingEdge(dut.tx_clk)
 
     for length in range(60, 92):
@@ -263,10 +255,6 @@ async def run_test_tx_alignment(dut, payload_data=None, ifg=12):
             ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
             rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
-
-            if rx_frame.start_lane == 4:
-                # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-                rx_frame_sfd_ns -= tb.clk_period/2
 
             tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
             tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)

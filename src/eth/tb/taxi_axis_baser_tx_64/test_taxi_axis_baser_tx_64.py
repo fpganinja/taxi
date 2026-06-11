@@ -151,7 +151,7 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
         if gbx_cfg is None:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*3) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*2) < 0.01
 
     assert tb.sink.empty()
 
@@ -224,7 +224,7 @@ async def run_test_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
             if gbx_cfg is None:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*3) < 0.01
+                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*2) < 0.01
 
             start_lane.append(rx_frame.start_lane)
 

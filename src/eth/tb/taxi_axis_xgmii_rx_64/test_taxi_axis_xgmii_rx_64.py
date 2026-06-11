@@ -119,10 +119,6 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12):
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
 
-        if tx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            tx_frame_sfd_ns -= 3.2
-
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))

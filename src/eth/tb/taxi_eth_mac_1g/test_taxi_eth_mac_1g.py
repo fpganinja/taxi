@@ -215,7 +215,7 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12, enab
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        assert abs(ptp_ts_ns - tx_frame_sfd_ns - (32 if enable_gen else 8)) < 0.01
+        assert abs(ptp_ts_ns - tx_frame_sfd_ns - 8) < 0.01
 
     assert tb.axis_sink.empty()
 
@@ -263,7 +263,7 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12, enab
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
-        assert abs(rx_frame_sfd_ns - ptp_ts_ns - (32 if enable_gen else 8)) < 0.01
+        assert abs(rx_frame_sfd_ns - ptp_ts_ns - (24 if enable_gen else 0)) < 0.01
 
     assert tb.gmii_sink.empty()
 

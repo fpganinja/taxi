@@ -147,7 +147,7 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12, enable_
         assert rx_frame.get_payload() == test_data.ljust(60, b'\x00')
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
-        assert abs(rx_frame_sfd_ns - ptp_ts_ns - (32 if enable_gen else 8)) < 0.01
+        assert abs(rx_frame_sfd_ns - ptp_ts_ns - (24 if enable_gen else 0)) < 0.01
 
     assert tb.sink.empty()
 

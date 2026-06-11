@@ -112,10 +112,6 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12):
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
 
-        if rx_frame.start_lane == 4:
-            # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-            rx_frame_sfd_ns -= 3.2
-
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
@@ -183,10 +179,6 @@ async def run_test_alignment(dut, payload_data=None, ifg=12):
             ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
             rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
-
-            if rx_frame.start_lane == 4:
-                # start in lane 4 reports 1 full cycle delay, so subtract half clock period
-                rx_frame_sfd_ns -= 3.2
 
             tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
             tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)

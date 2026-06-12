@@ -39,6 +39,7 @@ module taxi_eth_phy_10g_tx_if #
     output wire logic               tx_gbx_req_sync,
     output wire logic               tx_gbx_req_stall,
     input  wire logic               tx_gbx_sync = 1'b0,
+
     /*
      * SERDES interface
      */

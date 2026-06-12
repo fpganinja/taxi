@@ -81,7 +81,7 @@ rx_if_inst (
     .rst(rst),
 
     /*
-     * 1000GBASE-X encoded interface
+     * 1000BASE-X encoded interface
      */
     .encoded_rx_data(encoded_rx_data),
     .encoded_rx_data_k(encoded_rx_data_k),
@@ -121,7 +121,7 @@ dec_inst (
     .rst(rst),
 
     /*
-     * 1000GBASE-X encoded input
+     * 1000BASE-X encoded input
      */
     .encoded_rx_data(encoded_rx_data),
     .encoded_rx_data_k(encoded_rx_data_k),

@@ -86,7 +86,7 @@ enc_inst (
     .tx_gbx_sync_in(tx_gbx_sync),
 
     /*
-     * 1000GBASE-X encoded interface
+     * 1000BASE-X encoded interface
      */
     .encoded_tx_data(encoded_tx_data),
     .encoded_tx_data_k(encoded_tx_data_k),
@@ -110,7 +110,7 @@ tx_if_inst (
     .rst(rst),
 
     /*
-     * 1000GBASE-X encoded interface
+     * 1000BASE-X encoded interface
      */
     .encoded_tx_data(encoded_tx_data),
     .encoded_tx_data_k(encoded_tx_data_k),

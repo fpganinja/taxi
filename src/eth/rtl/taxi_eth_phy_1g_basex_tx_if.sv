@@ -30,7 +30,7 @@ module taxi_eth_phy_1g_basex_tx_if #
     input  wire logic               rst,
 
     /*
-     * 10GBASE-R encoded interface
+     * 1000BASE-X encoded interface
      */
     input  wire logic [DATA_W-1:0]  encoded_tx_data,
     input  wire logic [CTRL_W-1:0]  encoded_tx_data_k,

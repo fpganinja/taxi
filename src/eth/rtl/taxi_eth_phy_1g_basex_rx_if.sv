@@ -31,7 +31,7 @@ module taxi_eth_phy_1g_basex_rx_if #
     input  wire logic               rst,
 
     /*
-     * 10GBASE-R encoded interface
+     * 1000BASE-X encoded interface
      */
     output wire logic [DATA_W-1:0]  encoded_rx_data,
     output wire logic [CTRL_W-1:0]  encoded_rx_data_k,
@@ -42,7 +42,7 @@ module taxi_eth_phy_1g_basex_rx_if #
      */
     input  wire logic [DATA_W-1:0]  serdes_rx_data,
     input  wire logic [CTRL_W-1:0]  serdes_rx_data_k,
-    input  wire logic               serdes_rx_data_valid,
+    input  wire logic               serdes_rx_data_valid = 1'b1,
     output wire logic               serdes_rx_reset_req,
 
     /*

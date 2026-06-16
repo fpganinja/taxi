@@ -175,28 +175,28 @@ always_comb begin
 end
 
 always_ff @(posedge clk) begin
-    frame_reg = frame_next;
-    odd_reg = odd_next;
+    frame_reg <= frame_next;
+    odd_reg <= odd_next;
 
-    gmii_rxd_reg = gmii_rxd_next;
-    gmii_rx_dv_reg = gmii_rx_dv_next;
-    gmii_rx_er_reg = gmii_rx_er_next;
-    gmii_rx_valid_reg = gmii_rx_valid_next;
+    gmii_rxd_reg <= gmii_rxd_next;
+    gmii_rx_dv_reg <= gmii_rx_dv_next;
+    gmii_rx_er_reg <= gmii_rx_er_next;
+    gmii_rx_valid_reg <= gmii_rx_valid_next;
 
-    stat_rx_err_bad_block_reg = stat_rx_err_bad_block_next;
-    stat_rx_err_framing_reg = stat_rx_err_framing_next;
+    stat_rx_err_bad_block_reg <= stat_rx_err_bad_block_next;
+    stat_rx_err_framing_reg <= stat_rx_err_framing_next;
 
     if (rst) begin
-        frame_reg = 1'b0;
-        odd_reg = 1'b0;
+        frame_reg <= 1'b0;
+        odd_reg <= 1'b0;
 
-        gmii_rxd_reg = '0;
-        gmii_rx_dv_reg = '0;
-        gmii_rx_er_reg = '0;
-        gmii_rx_valid_reg = 1'b0;
+        gmii_rxd_reg <= '0;
+        gmii_rx_dv_reg <= '0;
+        gmii_rx_er_reg <= '0;
+        gmii_rx_valid_reg <= 1'b0;
 
-        stat_rx_err_bad_block_reg = 1'b0;
-        stat_rx_err_framing_reg = 1'b0;
+        stat_rx_err_bad_block_reg <= 1'b0;
+        stat_rx_err_framing_reg <= 1'b0;
     end
 end
 

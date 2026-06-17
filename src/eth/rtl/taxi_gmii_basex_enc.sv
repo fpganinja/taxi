@@ -20,7 +20,8 @@ module taxi_gmii_basex_enc #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
-    parameter GBX_CNT = 1
+    parameter GBX_CNT = 1,
+    parameter logic AN_EN = 1'b1
 )
 (
     input  wire logic                clk,
@@ -43,7 +44,14 @@ module taxi_gmii_basex_enc #
     output wire logic [CTRL_W-1:0]   encoded_tx_data_dm,
     output wire logic [CTRL_W-1:0]   encoded_tx_data_dv,
     output wire logic                encoded_tx_data_valid,
-    output wire logic [GBX_CNT-1:0]  tx_gbx_sync_out
+    output wire logic [GBX_CNT-1:0]  tx_gbx_sync_out,
+
+    /*
+     * AN config register
+     */
+    input  wire logic [15:0]         tx_an_cfg = '0,
+    input  wire logic                tx_an_cfg_valid = 1'b0,
+    output wire logic                tx_an_cfg_ready
 );
 
 // check configuration
@@ -137,6 +145,10 @@ logic odd_reg = 1'b0, odd_next;
 logic odd_cyc;
 logic cext_reg = 1'b0, cext_next;
 logic cext_cyc;
+logic an_cfg_reg = 1'b0, an_cfg_next;
+logic an_cfg_cyc;
+logic an_phase_reg = 1'b0, an_phase_next;
+logic an_phase_cyc;
 logic rd_reg = 1'b0, rd_next;
 logic rd_cyc;
 
@@ -147,6 +159,8 @@ logic [CTRL_W-1:0]   encoded_tx_data_dv_reg = '0, encoded_tx_data_dv_next;
 logic                encoded_tx_data_valid_reg = '0, encoded_tx_data_valid_next;
 logic [GBX_CNT-1:0]  tx_gbx_sync_reg = '0, tx_gbx_sync_next;
 
+logic tx_an_cfg_ready_reg = 1'b0, tx_an_cfg_ready_next;
+
 assign encoded_tx_data = encoded_tx_data_reg;
 assign encoded_tx_data_k = encoded_tx_data_k_reg;
 assign encoded_tx_data_dm = encoded_tx_data_dm_reg;
@@ -154,10 +168,14 @@ assign encoded_tx_data_dv = encoded_tx_data_dv_reg;
 assign encoded_tx_data_valid = encoded_tx_data_valid_reg;
 assign tx_gbx_sync_out = tx_gbx_sync_reg;
 
+assign tx_an_cfg_ready = AN_EN ? tx_an_cfg_ready_reg : 1'b0;
+
 always_comb begin
     frame_next = frame_reg;
     odd_next = odd_reg;
     cext_next = cext_reg;
+    an_cfg_next = an_cfg_reg;
+    an_phase_next = an_phase_reg;
     rd_next = rd_reg;
 
     encoded_tx_data_next = '0;
@@ -166,12 +184,16 @@ always_comb begin
     encoded_tx_data_dv_next = '0;
     encoded_tx_data_valid_next = '0;
 
+    tx_gbx_sync_next = tx_gbx_sync_in;
+
+    tx_an_cfg_ready_next = 1'b0;
+
     frame_cyc = frame_reg;
     odd_cyc = odd_reg;
     cext_cyc = cext_reg;
+    an_cfg_cyc = an_cfg_reg;
+    an_phase_cyc = an_phase_reg;
     rd_cyc = rd_reg;
-
-    tx_gbx_sync_next = tx_gbx_sync_in;
 
     if (gmii_tx_valid) begin
         // loop over bytes
@@ -198,12 +220,29 @@ always_comb begin
                     encoded_tx_data_k_next[seg] = 1'b1;
                     cext_cyc = 1'b1;
                 end
+            end else if (AN_EN && an_cfg_cyc) begin
+                // config reg
+                if (!odd_cyc) begin
+                    encoded_tx_data_next[seg*8 +: 8] = tx_an_cfg[7:0];
+                    encoded_tx_data_k_next[seg] = 1'b0;
+                end else begin
+                    encoded_tx_data_next[seg*8 +: 8] = tx_an_cfg[15:8];
+                    encoded_tx_data_k_next[seg] = 1'b0;
+                    tx_an_cfg_ready_next = 1'b1;
+                    an_phase_cyc = !an_phase_cyc;
+                    an_cfg_cyc = 1'b0;
+                end
             end else begin
                 if (gmii_tx_en[seg] && odd_cyc == 0) begin
                     // start of frame
                     frame_cyc = 1'b1;
                     encoded_tx_data_next[seg*8 +: 8] = CTRL_S;
                     encoded_tx_data_k_next[seg] = 1'b1;
+                end else if (AN_EN && tx_an_cfg_valid && odd_cyc == 1) begin
+                    // config reg
+                    an_cfg_cyc = 1'b1;
+                    encoded_tx_data_next[seg*8 +: 8] = an_phase_reg ? D(2,2) : D(21,5);
+                    encoded_tx_data_k_next[seg] = 1'b0;
                 end else begin
                     if (cext_cyc) begin
                         // carrier extend
@@ -235,6 +274,8 @@ always_comb begin
         frame_next = frame_cyc;
         odd_next = odd_cyc;
         cext_next = cext_cyc;
+        an_cfg_next = an_cfg_cyc;
+        an_phase_next = an_phase_cyc;
         rd_next = rd_cyc;
 
         encoded_tx_data_valid_next = 1'b1;
@@ -245,6 +286,8 @@ always_ff @(posedge clk) begin
     frame_reg <= frame_next;
     odd_reg <= odd_next;
     cext_reg <= cext_next;
+    an_cfg_reg <= an_cfg_next;
+    an_phase_reg <= an_phase_next;
     rd_reg <= rd_next;
 
     encoded_tx_data_reg <= encoded_tx_data_next;
@@ -254,10 +297,14 @@ always_ff @(posedge clk) begin
     encoded_tx_data_valid_reg <= encoded_tx_data_valid_next;
     tx_gbx_sync_reg <= tx_gbx_sync_next;
 
+    tx_an_cfg_ready_reg <= tx_an_cfg_ready_next;
+
     if (rst) begin
         frame_reg <= 1'b0;
         odd_reg <= 1'b0;
         cext_reg <= 1'b0;
+        an_cfg_reg <= 1'b0;
+        an_phase_reg <= 1'b0;
         rd_reg <= 1'b0;
 
         encoded_tx_data_reg <= '0;
@@ -266,6 +313,8 @@ always_ff @(posedge clk) begin
         encoded_tx_data_dv_reg <= '0;
         encoded_tx_data_valid_reg <= 1'b0;
         tx_gbx_sync_reg <= '0;
+
+        tx_an_cfg_ready_reg <= 1'b0;
     end
 end
 

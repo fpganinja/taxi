@@ -70,7 +70,8 @@ taxi_gmii_basex_enc #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(GBX_IF_EN),
-    .GBX_CNT(1)
+    .GBX_CNT(1),
+    .AN_EN(1'b0)
 )
 enc_inst (
     .clk(clk),
@@ -93,7 +94,14 @@ enc_inst (
     .encoded_tx_data_dm(encoded_tx_data_dm),
     .encoded_tx_data_dv(encoded_tx_data_dv),
     .encoded_tx_data_valid(encoded_tx_data_valid),
-    .tx_gbx_sync_out(tx_gbx_sync_int)
+    .tx_gbx_sync_out(tx_gbx_sync_int),
+
+    /*
+     * AN config register
+     */
+    .tx_an_cfg('0),
+    .tx_an_cfg_valid(1'b0),
+    .tx_an_cfg_ready()
 );
 
 taxi_eth_phy_1g_basex_tx_if #(

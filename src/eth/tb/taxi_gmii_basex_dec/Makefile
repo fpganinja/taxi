@@ -33,6 +33,7 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 # module parameters
 export PARAM_DATA_W := 16
 export PARAM_GBX_IF_EN := 0
+export PARAM_AN_EN := "1'b1"
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

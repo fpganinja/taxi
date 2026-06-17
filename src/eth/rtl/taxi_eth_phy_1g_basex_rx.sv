@@ -114,7 +114,8 @@ rx_if_inst (
 taxi_gmii_basex_dec #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
-    .GBX_IF_EN(GBX_IF_EN)
+    .GBX_IF_EN(GBX_IF_EN),
+    .AN_EN(1'b0)
 )
 dec_inst (
     .clk(clk),
@@ -134,6 +135,15 @@ dec_inst (
     .gmii_rx_dv(gmii_rx_dv),
     .gmii_rx_er(gmii_rx_er),
     .gmii_rx_valid(gmii_rx_valid),
+
+    /*
+     * AN config register
+     */
+    .rx_an_cfg(),
+    .rx_an_cfg_valid(),
+    .rx_an_ability_match(),
+    .rx_an_ack_match(),
+    .rx_an_idle_match(),
 
     /*
      * Status

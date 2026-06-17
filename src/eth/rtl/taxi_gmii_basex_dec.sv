@@ -19,7 +19,8 @@ module taxi_gmii_basex_dec #
 (
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
-    parameter logic GBX_IF_EN = 1'b0
+    parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1
 )
 (
     input  wire logic               clk,
@@ -39,6 +40,15 @@ module taxi_gmii_basex_dec #
     output wire logic [CTRL_W-1:0]  gmii_rx_dv,
     output wire logic [CTRL_W-1:0]  gmii_rx_er,
     output wire logic               gmii_rx_valid,
+
+    /*
+     * AN config register
+     */
+    output wire logic [15:0]        rx_an_cfg,
+    output wire logic               rx_an_cfg_valid,
+    output wire logic               rx_an_ability_match,
+    output wire logic               rx_an_ack_match,
+    output wire logic               rx_an_idle_match,
 
     /*
      * Status
@@ -82,11 +92,22 @@ logic frame_reg = 1'b0, frame_next;
 logic frame_cyc;
 logic odd_reg = 1'b0, odd_next;
 logic odd_cyc;
+logic k28p5_reg = 1'b0, k28p5_next;
+logic k28p5_cyc;
+logic c_reg = 1'b0, c_next;
+logic c_cyc;
 
 logic [DATA_W-1:0]  gmii_rxd_reg = '0, gmii_rxd_next;
 logic [CTRL_W-1:0]  gmii_rx_dv_reg = '0, gmii_rx_dv_next;
 logic [CTRL_W-1:0]  gmii_rx_er_reg = '0, gmii_rx_er_next;
 logic               gmii_rx_valid_reg = '0, gmii_rx_valid_next;
+
+logic [15:0] rx_an_cfg_reg = '0, rx_an_cfg_next;
+logic rx_an_cfg_valid_reg = 1'b0, rx_an_cfg_valid_next;
+logic an_cfg_match_reg = 1'b0, an_cfg_match_next;
+logic [1:0] an_ability_match_cnt_reg = '0, an_ability_match_cnt_next;
+logic [1:0] an_ack_match_cnt_reg = '0, an_ack_match_cnt_next;
+logic [1:0] an_idle_match_cnt_reg = '0, an_idle_match_cnt_next;
 
 logic stat_rx_err_bad_block_reg = '0, stat_rx_err_bad_block_next;
 logic stat_rx_err_framing_reg = '0, stat_rx_err_framing_next;
@@ -96,23 +117,40 @@ assign gmii_rx_dv = gmii_rx_dv_reg;
 assign gmii_rx_er = gmii_rx_er_reg;
 assign gmii_rx_valid = gmii_rx_valid_reg;
 
+assign rx_an_cfg = AN_EN ? rx_an_cfg_reg : '0;
+assign rx_an_cfg_valid = AN_EN ? rx_an_cfg_valid_reg : 1'b0;
+assign rx_an_ability_match = AN_EN ? &an_ability_match_cnt_reg : 1'b0;
+assign rx_an_ack_match = AN_EN ? &an_ack_match_cnt_reg : 1'b0;
+assign rx_an_idle_match = AN_EN ? &an_idle_match_cnt_reg : 1'b0;
+
 assign stat_rx_err_bad_block = stat_rx_err_bad_block_reg;
 assign stat_rx_err_framing = stat_rx_err_framing_reg;
 
 always_comb begin
     frame_next = frame_reg;
     odd_next = odd_reg;
+    k28p5_next = k28p5_reg;
+    c_next = c_reg;
 
     gmii_rxd_next = '0;
     gmii_rx_dv_next = '0;
     gmii_rx_er_next = '0;
     gmii_rx_valid_next = 1'b0;
 
+    rx_an_cfg_next = rx_an_cfg_reg;
+    rx_an_cfg_valid_next = 1'b0;
+    an_cfg_match_next = an_cfg_match_reg;
+    an_ability_match_cnt_next = an_ability_match_cnt_reg;
+    an_ack_match_cnt_next = an_ack_match_cnt_reg;
+    an_idle_match_cnt_next = an_idle_match_cnt_reg;
+
     stat_rx_err_bad_block_next = 1'b0;
     stat_rx_err_framing_next = 1'b0;
 
     frame_cyc = frame_reg;
     odd_cyc = odd_reg;
+    k28p5_cyc = CTRL_W == 0 ? 1'b0 : k28p5_reg;
+    c_cyc = c_reg;
 
     if (encoded_rx_data_valid) begin
         // loop over bytes
@@ -123,6 +161,7 @@ always_comb begin
 
             if (encoded_rx_data_k[seg]) begin
                 // Kx.y
+                c_cyc = 1'b0;
                 if (encoded_rx_data[seg*8 +: 8] == K(28,5)) begin
                     // K28.5
                     odd_cyc = 1'b0; // sync
@@ -161,7 +200,49 @@ always_comb begin
                     gmii_rxd_next[seg*8 +: 8] = encoded_rx_data[seg*8 +: 8];
                     gmii_rx_dv_next[seg] = 1'b1;
                     gmii_rx_er_next[seg] = 1'b0;
+                end else if (AN_EN && k28p5_cyc && (encoded_rx_data[seg*8 +: 8] == D(5,6) || encoded_rx_data[seg*8 +: 8] == D(16,2))) begin
+                    // I1/I2
+                    an_ability_match_cnt_next = '0;
+                    an_ack_match_cnt_next = '0;
+                    if (!(&an_idle_match_cnt_next)) begin
+                        an_idle_match_cnt_next = an_idle_match_cnt_next + 1;
+                    end
+                end else if (AN_EN && k28p5_cyc && (encoded_rx_data[seg*8 +: 8] == D(21,5) || encoded_rx_data[seg*8 +: 8] == D(2,2))) begin
+                    // C1/C2
+                    c_cyc = 1'b1;
+                end else if (AN_EN && c_cyc) begin
+                    if (!odd_cyc) begin
+                        rx_an_cfg_next[7:0] = encoded_rx_data[seg*8 +: 8];
+                        an_cfg_match_next = rx_an_cfg_next[7:0] == encoded_rx_data[seg*8 +: 8];
+                        an_idle_match_cnt_next = '0;
+                    end else begin
+                        rx_an_cfg_next[15:8] = encoded_rx_data[seg*8 +: 8];
+                        rx_an_cfg_valid_next = 1'b1;
+                        if (an_cfg_match_next && ((rx_an_cfg_next[15:8] ^ encoded_rx_data[seg*8 +: 8]) & 8'h40) == 0) begin
+                            if (!(&an_ability_match_cnt_next)) begin
+                                an_ability_match_cnt_next = an_ability_match_cnt_next + 1;
+                            end
+                        end else begin
+                            an_ability_match_cnt_next = '0;
+                        end
+                        if (an_cfg_match_next && rx_an_cfg_next[14] && rx_an_cfg_next[15:8] == encoded_rx_data[seg*8 +: 8]) begin
+                            if (!(&an_ack_match_cnt_next)) begin
+                                an_ack_match_cnt_next = an_ack_match_cnt_next + 1;
+                            end
+                        end else begin
+                            an_ack_match_cnt_next = '0;
+                        end
+                        an_idle_match_cnt_next = '0;
+                        c_cyc = 1'b0;
+                    end
                 end
+            end
+
+            // detect K28.5 symbols
+            if (encoded_rx_data_k[seg] && encoded_rx_data[seg*8 +: 8] == K(28,5)) begin
+                k28p5_cyc = 1'b1;
+            end else begin
+                k28p5_cyc = 1'b0;
             end
 
             odd_cyc = !odd_cyc;
@@ -169,6 +250,8 @@ always_comb begin
 
         frame_next = frame_cyc;
         odd_next = odd_cyc;
+        k28p5_next = k28p5_cyc;
+        c_next = c_cyc;
 
         gmii_rx_valid_next = 1'b1;
     end
@@ -177,11 +260,20 @@ end
 always_ff @(posedge clk) begin
     frame_reg <= frame_next;
     odd_reg <= odd_next;
+    k28p5_reg <= k28p5_next;
+    c_reg <= c_next;
 
     gmii_rxd_reg <= gmii_rxd_next;
     gmii_rx_dv_reg <= gmii_rx_dv_next;
     gmii_rx_er_reg <= gmii_rx_er_next;
     gmii_rx_valid_reg <= gmii_rx_valid_next;
+
+    rx_an_cfg_reg <= rx_an_cfg_next;
+    rx_an_cfg_valid_reg <= rx_an_cfg_valid_next;
+    an_cfg_match_reg <= an_cfg_match_next;
+    an_ability_match_cnt_reg <= an_ability_match_cnt_next;
+    an_ack_match_cnt_reg <= an_ack_match_cnt_next;
+    an_idle_match_cnt_reg <= an_idle_match_cnt_next;
 
     stat_rx_err_bad_block_reg <= stat_rx_err_bad_block_next;
     stat_rx_err_framing_reg <= stat_rx_err_framing_next;
@@ -189,11 +281,18 @@ always_ff @(posedge clk) begin
     if (rst) begin
         frame_reg <= 1'b0;
         odd_reg <= 1'b0;
+        k28p5_reg <= 1'b0;
+        c_reg <= 1'b0;
 
         gmii_rxd_reg <= '0;
         gmii_rx_dv_reg <= '0;
         gmii_rx_er_reg <= '0;
         gmii_rx_valid_reg <= 1'b0;
+
+        rx_an_cfg_valid_reg <= 1'b0;
+        an_ability_match_cnt_reg <= '0;
+        an_ack_match_cnt_reg <= '0;
+        an_idle_match_cnt_reg <= '0;
 
         stat_rx_err_bad_block_reg <= 1'b0;
         stat_rx_err_framing_reg <= 1'b0;

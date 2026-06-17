@@ -20,6 +20,7 @@ module taxi_axis_basex_rx_8 #
     parameter DATA_W = 8,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96
 )
@@ -38,6 +39,15 @@ module taxi_axis_basex_rx_8 #
      * Receive interface (AXI stream)
      */
     taxi_axis_if.src                  m_axis_rx,
+
+    /*
+     * AN config register
+     */
+    output wire logic [15:0]          rx_an_cfg,
+    output wire logic                 rx_an_cfg_valid,
+    output wire logic                 rx_an_ability_match,
+    output wire logic                 rx_an_ack_match,
+    output wire logic                 rx_an_idle_match,
 
     /*
      * PTP
@@ -130,6 +140,12 @@ logic [DATA_W-1:0] encoded_rx_data_d4_reg = '0;
 
 logic encoded_rx_data_k_d0_reg = 1'b0;
 
+logic input_k28p5_d0_reg = 1'b0;
+logic input_i_d0_reg = 1'b0;
+logic input_c_d0_reg = 1'b0;
+logic input_c_d1_reg = 1'b0;
+logic input_start_d0_reg = 1'b0;
+
 logic frame_error_reg = 1'b0, frame_error_next;
 logic pre_ok_reg = 1'b0, pre_ok_next;
 logic [3:0] hdr_ptr_reg = '0, hdr_ptr_next;
@@ -145,6 +161,13 @@ logic [DATA_W-1:0] m_axis_rx_tdata_reg = '0, m_axis_rx_tdata_next;
 logic m_axis_rx_tvalid_reg = 1'b0, m_axis_rx_tvalid_next;
 logic m_axis_rx_tlast_reg = 1'b0, m_axis_rx_tlast_next;
 logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
+
+logic [15:0] rx_an_cfg_reg = '0;
+logic rx_an_cfg_valid_reg = 1'b0;
+logic an_cfg_match_reg = 1'b0;
+logic [1:0] an_ability_match_cnt_reg = '0;
+logic [1:0] an_ack_match_cnt_reg = '0;
+logic [1:0] an_idle_match_cnt_reg = '0;
 
 logic start_packet_int_reg = 1'b0;
 logic start_packet_reg = 1'b0;
@@ -181,6 +204,12 @@ assign m_axis_rx.tuser[0] = m_axis_rx_tuser_reg;
 if (PTP_TS_EN) begin
     assign m_axis_rx.tuser[1 +: PTP_TS_W] = ptp_ts_out_reg;
 end
+
+assign rx_an_cfg = AN_EN ? rx_an_cfg_reg : '0;
+assign rx_an_cfg_valid = AN_EN ? rx_an_cfg_valid_reg : 1'b0;
+assign rx_an_ability_match = AN_EN ? &an_ability_match_cnt_reg : 1'b0;
+assign rx_an_ack_match = AN_EN ? &an_ack_match_cnt_reg : 1'b0;
+assign rx_an_idle_match = AN_EN ? &an_idle_match_cnt_reg : 1'b0;
 
 assign rx_start_packet = start_packet_reg;
 
@@ -458,6 +487,8 @@ always_ff @(posedge clk) begin
     m_axis_rx_tlast_reg <= m_axis_rx_tlast_next;
     m_axis_rx_tuser_reg <= m_axis_rx_tuser_next;
 
+    rx_an_cfg_valid_reg <= 1'b0;
+
     start_packet_int_reg <= 1'b0;
     start_packet_reg <= 1'b0;
 
@@ -481,6 +512,73 @@ always_ff @(posedge clk) begin
         encoded_rx_data_d4_reg <= encoded_rx_data_d3_reg;
 
         encoded_rx_data_k_d0_reg <= encoded_rx_data_k;
+
+        input_k28p5_d0_reg <= 1'b0;
+        input_i_d0_reg <= 1'b0;
+        input_c_d0_reg <= 1'b0;
+        input_c_d1_reg <= input_c_d0_reg;
+        input_start_d0_reg <= 1'b0;
+
+        // /K28.5/ control character detection
+        if (encoded_rx_data_k && encoded_rx_data == K(28, 5)) begin
+            input_k28p5_d0_reg <= 1'b1;
+        end
+
+        // idle symbol detection
+        if (input_k28p5_d0_reg && (encoded_rx_data == D(5,6) || encoded_rx_data == D(16,2))) begin
+            input_i_d0_reg <= 1'b1;
+        end
+
+        if (AN_EN && input_i_d0_reg) begin
+            an_ability_match_cnt_reg <= '0;
+            an_ack_match_cnt_reg <= '0;
+            if (!(&an_idle_match_cnt_reg)) begin
+                an_idle_match_cnt_reg <= an_idle_match_cnt_reg + 1;
+            end
+        end
+
+        // config symbol detection
+        if (input_k28p5_d0_reg && (encoded_rx_data == D(21,5) || encoded_rx_data == D(2,2))) begin
+            input_c_d0_reg <= 1'b1;
+        end
+
+        if (AN_EN && input_c_d0_reg) begin
+            rx_an_cfg_reg[7:0] <= encoded_rx_data;
+            an_cfg_match_reg <= rx_an_cfg_reg[7:0] == encoded_rx_data;
+            input_c_d1_reg <= encoded_rx_data_k == 1'b0;
+            an_idle_match_cnt_reg <= '0;
+        end
+
+        if (AN_EN && input_c_d1_reg) begin
+            rx_an_cfg_reg[15:8] <= encoded_rx_data;
+            rx_an_cfg_valid_reg <= encoded_rx_data_k == 1'b0;
+            if (an_cfg_match_reg && ((rx_an_cfg_reg[15:8] ^ encoded_rx_data) & 8'h40) == 0) begin
+                if (!(&an_ability_match_cnt_reg)) begin
+                    an_ability_match_cnt_reg <= an_ability_match_cnt_reg + 1;
+                end
+            end else begin
+                an_ability_match_cnt_reg <= '0;
+            end
+            if (an_cfg_match_reg && rx_an_cfg_reg[14] && rx_an_cfg_reg[15:8] == encoded_rx_data) begin
+                if (!(&an_ack_match_cnt_reg)) begin
+                    an_ack_match_cnt_reg <= an_ack_match_cnt_reg + 1;
+                end
+            end else begin
+                an_ack_match_cnt_reg <= '0;
+            end
+            an_idle_match_cnt_reg <= '0;
+        end
+
+        // start control character detection
+        if (encoded_rx_data_k && encoded_rx_data == CTRL_S) begin
+            input_start_d0_reg <= 1'b1;
+        end
+
+        if (AN_EN && input_start_d0_reg) begin
+            an_ability_match_cnt_reg <= '0;
+            an_ack_match_cnt_reg <= '0;
+            an_idle_match_cnt_reg <= '0;
+        end
 
         if (reset_crc) begin
             crc_state_reg <= '1;
@@ -508,7 +606,18 @@ always_ff @(posedge clk) begin
     if (rst) begin
         state_reg <= STATE_IDLE;
 
+        input_k28p5_d0_reg <= 1'b0;
+        input_i_d0_reg <= 1'b0;
+        input_c_d0_reg <= 1'b0;
+        input_c_d1_reg <= 1'b0;
+        input_start_d0_reg <= 1'b0;
+
         m_axis_rx_tvalid_reg <= 1'b0;
+
+        rx_an_cfg_valid_reg <= 1'b0;
+        an_ability_match_cnt_reg <= '0;
+        an_ack_match_cnt_reg <= '0;
+        an_idle_match_cnt_reg <= '0;
 
         start_packet_int_reg <= 1'b0;
         start_packet_reg <= 1'b0;

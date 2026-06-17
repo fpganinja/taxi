@@ -136,6 +136,7 @@ if (DATA_W == 16) begin
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .AN_EN(1'b0),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W)
@@ -155,6 +156,15 @@ if (DATA_W == 16) begin
          * Receive interface (AXI stream)
          */
         .m_axis_rx(m_axis_rx),
+
+        /*
+         * AN config register
+         */
+        .rx_an_cfg(),
+        .rx_an_cfg_valid(),
+        .rx_an_ability_match(),
+        .rx_an_ack_match(),
+        .rx_an_idle_match(),
 
         /*
          * PTP
@@ -194,6 +204,7 @@ end else begin
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .AN_EN(1'b0),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W)
     )
@@ -212,6 +223,15 @@ end else begin
          * Receive interface (AXI stream)
          */
         .m_axis_rx(m_axis_rx),
+
+        /*
+         * AN config register
+         */
+        .rx_an_cfg(),
+        .rx_an_cfg_valid(),
+        .rx_an_ability_match(),
+        .rx_an_ack_match(),
+        .rx_an_idle_match(),
 
         /*
          * PTP

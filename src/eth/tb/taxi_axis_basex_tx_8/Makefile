@@ -39,6 +39,7 @@ export PARAM_PADDING_EN := 1
 export PARAM_MIN_FRAME_LEN := 64
 export PARAM_GBX_IF_EN := 0
 export PARAM_GBX_CNT := 1
+export PARAM_AN_EN := 1
 export PARAM_DIC_EN := 1
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TS_FMT_TOD := 1

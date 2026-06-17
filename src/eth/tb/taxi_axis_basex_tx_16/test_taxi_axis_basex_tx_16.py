@@ -67,6 +67,9 @@ class TB:
         self.ptp_clock = PtpClockSimTime(ts_tod=dut.ptp_ts, clock=dut.clk)
         self.tx_cpl_sink = AxiStreamSink(AxiStreamBus.from_entity(dut.m_axis_tx_cpl), dut.clk, dut.rst)
 
+        dut.tx_an_cfg.setimmediatevalue(0)
+        dut.tx_an_cfg_valid.setimmediatevalue(0)
+
         dut.cfg_tx_max_pkt_len.setimmediatevalue(0)
         dut.cfg_tx_ifg.setimmediatevalue(0)
         dut.cfg_tx_enable.setimmediatevalue(0)
@@ -378,6 +381,39 @@ async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
+async def run_test_an(dut, gbx_cfg=None):
+
+    tb = TB(dut, gbx_cfg)
+
+    await tb.reset()
+
+    for k in range(16):
+        an_cfg = 1 << k
+
+        dut.tx_an_cfg.value = an_cfg
+        dut.tx_an_cfg_valid.value = 1
+
+        for k in range(20):
+            await RisingEdge(dut.clk)
+
+        assert tb.sink.get_an_cfg() == an_cfg
+        assert tb.sink.get_an_ability_match()
+        assert tb.sink.get_an_ack_match() == bool(an_cfg & 0x4000)
+        assert not tb.sink.get_an_idle_match()
+
+        dut.tx_an_cfg_valid.value = 0
+
+        for k in range(20):
+            await RisingEdge(dut.clk)
+
+        assert not tb.sink.get_an_ability_match()
+        assert not tb.sink.get_an_ack_match()
+        assert tb.sink.get_an_idle_match()
+
+    for k in range(10):
+        await RisingEdge(dut.clk)
+
+
 def size_list():
     return list(range(16, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
 
@@ -414,6 +450,10 @@ if getattr(cocotb, 'top', None) is not None:
         factory.add_option("ifg", [12])
         factory.add_option("gbx_cfg", gbx_cfgs)
         factory.generate_tests()
+
+    factory = TestFactory(run_test_an)
+    factory.add_option("gbx_cfg", gbx_cfgs)
+    factory.generate_tests()
 
 
 # cocotb-test
@@ -459,6 +499,7 @@ def test_taxi_axis_basex_tx_16(request, gbx_en, dic_en):
     parameters['CTRL_W'] = parameters['DATA_W'] // 8
     parameters['GBX_IF_EN'] = gbx_en
     parameters['GBX_CNT'] = 1
+    parameters['AN_EN'] = 1
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TS_W'] = 96

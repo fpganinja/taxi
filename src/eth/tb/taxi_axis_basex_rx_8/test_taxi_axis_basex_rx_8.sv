@@ -21,6 +21,7 @@ module test_taxi_axis_basex_rx_8 #
     parameter DATA_W = 8,
     parameter CTRL_W = DATA_W / 8,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64
@@ -38,6 +39,12 @@ logic [CTRL_W-1:0] encoded_rx_data_k;
 logic encoded_rx_data_valid;
 
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(USER_W)) m_axis_rx();
+
+logic [15:0] rx_an_cfg;
+logic rx_an_cfg_valid;
+logic rx_an_ability_match;
+logic rx_an_ack_match;
+logic rx_an_idle_match;
 
 logic [PTP_TS_W-1:0] ptp_ts;
 
@@ -65,6 +72,7 @@ taxi_axis_basex_rx_8 #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(GBX_IF_EN),
+    .AN_EN(AN_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_W(PTP_TS_W)
 )
@@ -83,6 +91,15 @@ uut (
      * AXI4-Stream output (source)
      */
     .m_axis_rx(m_axis_rx),
+
+    /*
+     * AN config register
+     */
+    .rx_an_cfg(rx_an_cfg),
+    .rx_an_cfg_valid(rx_an_cfg_valid),
+    .rx_an_ability_match(rx_an_ability_match),
+    .rx_an_ack_match(rx_an_ack_match),
+    .rx_an_idle_match(rx_an_idle_match),
 
     /*
      * PTP

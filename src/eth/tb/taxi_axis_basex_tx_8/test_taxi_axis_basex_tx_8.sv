@@ -24,6 +24,7 @@ module test_taxi_axis_basex_tx_8 #
     parameter MIN_FRAME_LEN = 64,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
@@ -51,6 +52,10 @@ logic [GBX_CNT-1:0] tx_gbx_req_sync;
 logic tx_gbx_req_stall;
 logic [GBX_CNT-1:0] tx_gbx_sync;
 
+logic [15:0] tx_an_cfg;
+logic tx_an_cfg_valid;
+logic tx_an_cfg_ready;
+
 logic [PTP_TS_W-1:0] ptp_ts;
 
 logic [15:0] cfg_tx_max_pkt_len;
@@ -77,7 +82,8 @@ taxi_axis_basex_tx_8 #(
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .GBX_IF_EN(GBX_IF_EN),
     .GBX_CNT(GBX_CNT),
-    // .DIC_EN(DIC_EN),
+    .AN_EN(AN_EN),
+    .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_W(PTP_TS_W),
     .TX_CPL_CTRL_IN_TUSER(TX_CPL_CTRL_IN_TUSER)
@@ -103,6 +109,13 @@ uut (
     .tx_gbx_req_sync(tx_gbx_req_sync),
     .tx_gbx_req_stall(tx_gbx_req_stall),
     .tx_gbx_sync(tx_gbx_sync),
+
+    /*
+     * AN config register
+     */
+    .tx_an_cfg(tx_an_cfg),
+    .tx_an_cfg_valid(tx_an_cfg_valid),
+    .tx_an_cfg_ready(tx_an_cfg_ready),
 
     /*
      * PTP

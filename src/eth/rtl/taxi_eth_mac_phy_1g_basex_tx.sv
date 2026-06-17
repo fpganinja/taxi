@@ -142,6 +142,7 @@ if (DATA_W == 16) begin
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
         .GBX_CNT(1),
+        .AN_EN(1'b0),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W),
@@ -168,6 +169,13 @@ if (DATA_W == 16) begin
         .tx_gbx_req_sync(tx_gbx_req_sync),
         .tx_gbx_req_stall(tx_gbx_req_stall),
         .tx_gbx_sync(tx_gbx_sync),
+
+        /*
+         * AN config register
+         */
+        .tx_an_cfg('0),
+        .tx_an_cfg_valid(1'b0),
+        .tx_an_cfg_ready(),
 
         /*
          * PTP
@@ -205,6 +213,7 @@ end else begin
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
         .GBX_CNT(1),
+        .AN_EN(1'b0),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W),
@@ -231,6 +240,13 @@ end else begin
         .tx_gbx_req_sync(tx_gbx_req_sync),
         .tx_gbx_req_stall(tx_gbx_req_stall),
         .tx_gbx_sync(tx_gbx_sync),
+
+        /*
+         * AN config register
+         */
+        .tx_an_cfg('0),
+        .tx_an_cfg_valid(1'b0),
+        .tx_an_cfg_ready(),
 
         /*
          * PTP

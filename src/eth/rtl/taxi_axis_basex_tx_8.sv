@@ -23,6 +23,7 @@ module taxi_axis_basex_tx_8 #
     parameter MIN_FRAME_LEN = 64,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96,
@@ -49,6 +50,13 @@ module taxi_axis_basex_tx_8 #
     input  wire logic [GBX_CNT-1:0]   tx_gbx_req_sync = '0,
     input  wire logic                 tx_gbx_req_stall = '0,
     output wire logic [GBX_CNT-1:0]   tx_gbx_sync,
+
+    /*
+     * AN config register
+     */
+    input  wire logic [15:0]          tx_an_cfg = '0,
+    input  wire logic                 tx_an_cfg_valid = 1'b0,
+    output wire logic                 tx_an_cfg_ready,
 
     /*
      * PTP
@@ -181,7 +189,8 @@ typedef enum logic [3:0] {
     STATE_FCS,
     STATE_T,
     STATE_R,
-    STATE_IFG
+    STATE_IFG,
+    STATE_AN
 } state_t;
 
 state_t state_reg = STATE_IDLE, state_next;
@@ -206,6 +215,7 @@ logic [2:0] pre_cnt_reg = '0, pre_cnt_next;
 logic [7:0] ifg_cnt_reg = '0, ifg_cnt_next;
 logic deficit_idle_cnt_reg = 1'd0, deficit_idle_cnt_next;
 logic odd_reg = 1'b0, odd_next;
+logic an_phase_reg = 1'b0, an_phase_next;
 logic rd_reg = 1'b0, rd_next;
 
 logic [DATA_W-1:0] encoded_tx_data_reg = '0, encoded_tx_data_next;
@@ -220,6 +230,8 @@ logic s_axis_tx_tready_reg = 1'b0, s_axis_tx_tready_next;
 logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_reg = '0, m_axis_tx_cpl_ts_next;
 logic [TX_TAG_W-1:0] m_axis_tx_cpl_tag_reg = '0, m_axis_tx_cpl_tag_next;
 logic m_axis_tx_cpl_valid_reg = 1'b0, m_axis_tx_cpl_valid_next;
+
+logic tx_an_cfg_ready_reg = 1'b0, tx_an_cfg_ready_next;
 
 logic start_packet_int_reg = 1'b0, start_packet_int_next;
 logic start_packet_reg = 1'b0, start_packet_next;
@@ -256,6 +268,8 @@ assign m_axis_tx_cpl.tlast = 1'b1;
 assign m_axis_tx_cpl.tid = m_axis_tx_cpl_tag_reg;
 assign m_axis_tx_cpl.tdest = '0;
 assign m_axis_tx_cpl.tuser = '0;
+
+assign tx_an_cfg_ready = AN_EN ? tx_an_cfg_ready_reg : 1'b0;
 
 assign tx_start_packet = start_packet_reg;
 assign stat_tx_byte = stat_tx_byte_reg;
@@ -307,9 +321,12 @@ always_comb begin
     ifg_cnt_next = ifg_cnt_reg;
     deficit_idle_cnt_next = deficit_idle_cnt_reg;
     odd_next = odd_reg;
+    an_phase_next = an_phase_reg;
     rd_next = rd_reg;
 
     s_axis_tx_tready_next = 1'b0;
+
+    tx_an_cfg_ready_next = 1'b0;
 
     s_tdata_next = s_tdata_reg;
 
@@ -438,6 +455,10 @@ always_comb begin
                     encoded_tx_data_next = CTRL_S;
                     encoded_tx_data_k_next = 1'b1;
                     state_next = STATE_PREAMBLE;
+                end else if (AN_EN && odd_reg && tx_an_cfg_valid) begin
+                    encoded_tx_data_next = an_phase_reg ? D(2,2) : D(21,5);
+                    encoded_tx_data_k_next = 1'b0;
+                    state_next = STATE_AN;
                 end else begin
                     state_next = STATE_IDLE;
                 end
@@ -643,6 +664,22 @@ always_comb begin
                     end
                 end
             end
+            STATE_AN: begin
+                if (AN_EN) begin
+                    // send config register
+                    if (!odd_reg) begin
+                        encoded_tx_data_next = tx_an_cfg[7:0];
+                        encoded_tx_data_k_next = 1'b0;
+                        state_next = STATE_AN;
+                    end else begin
+                        encoded_tx_data_next = tx_an_cfg[15:8];
+                        encoded_tx_data_k_next = 1'b0;
+                        tx_an_cfg_ready_next = 1'b1;
+                        an_phase_next = !an_phase_reg;
+                        state_next = STATE_IDLE;
+                    end
+                end
+            end
             default: begin
                 // invalid state, return to idle
                 state_next = STATE_IDLE;
@@ -674,15 +711,18 @@ always_ff @(posedge clk) begin
     ifg_cnt_reg <= ifg_cnt_next;
     deficit_idle_cnt_reg <= deficit_idle_cnt_next;
     odd_reg <= odd_next;
+    an_phase_reg <= an_phase_next;
     rd_reg <= rd_next;
+
+    s_tdata_reg <= s_tdata_next;
+
+    s_axis_tx_tready_reg <= s_axis_tx_tready_next;
 
     m_axis_tx_cpl_ts_reg <= m_axis_tx_cpl_ts_next;
     m_axis_tx_cpl_tag_reg <= m_axis_tx_cpl_tag_next;
     m_axis_tx_cpl_valid_reg <= m_axis_tx_cpl_valid_next;
 
-    s_tdata_reg <= s_tdata_next;
-
-    s_axis_tx_tready_reg <= s_axis_tx_tready_next;
+    tx_an_cfg_ready_reg <= tx_an_cfg_ready_next;
 
     start_packet_int_reg <= start_packet_int_next;
     start_packet_reg <= start_packet_next;
@@ -722,11 +762,14 @@ always_ff @(posedge clk) begin
 
         frame_reg <= 1'b0;
         odd_reg <= 1'b0;
+        an_phase_reg <= 1'b0;
         rd_reg <= 1'b0;
 
         s_axis_tx_tready_reg <= 1'b0;
 
         m_axis_tx_cpl_valid_reg <= 1'b0;
+
+        tx_an_cfg_ready_reg <= 1'b0;
 
         encoded_tx_data_valid_reg <= 1'b0;
         encoded_tx_data_k_reg <= 1'b0;

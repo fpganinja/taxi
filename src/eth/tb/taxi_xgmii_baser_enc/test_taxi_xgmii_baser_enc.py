@@ -62,6 +62,10 @@ class TB:
         dut.xgmii_tx_valid.setimmediatevalue(1)
         dut.tx_gbx_sync_in.setimmediatevalue(0)
 
+        dut.tx_os.setimmediatevalue(0)
+        dut.tx_os_sig.setimmediatevalue(0)
+        dut.tx_os_valid.setimmediatevalue(0)
+
     async def reset(self):
         self.dut.rst.setimmediatevalue(0)
         await RisingEdge(self.dut.clk)
@@ -196,6 +200,19 @@ async def run_test_os(dut):
             assert tb.sink.get_os() == (os, sig)
 
             dut.tx_os_valid.value = 0
+
+            for k in range(20):
+                await RisingEdge(dut.clk)
+
+            tb.sink.get_os()
+            tb.source.set_os(os, sig)
+
+            for k in range(20):
+                await RisingEdge(dut.clk)
+
+            assert tb.sink.get_os() == (os, sig)
+
+            tb.source.set_os(None)
 
             for k in range(20):
                 await RisingEdge(dut.clk)

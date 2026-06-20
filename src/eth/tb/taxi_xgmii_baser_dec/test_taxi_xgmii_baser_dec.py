@@ -193,6 +193,7 @@ async def run_test_os(dut):
 
             assert int(dut.rx_os.value) == os
             assert int(dut.rx_os_sig.value) == sig
+            assert tb.sink.get_os() == (os, sig)
 
             tb.source.set_os(None)
 

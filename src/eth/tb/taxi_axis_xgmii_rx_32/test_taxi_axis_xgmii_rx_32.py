@@ -244,6 +244,33 @@ async def run_test_oversize(dut, ifg=12):
     await RisingEdge(dut.clk)
 
 
+async def run_test_os(dut):
+
+    tb = TB(dut)
+
+    await tb.reset()
+
+    for sig in [False, True]:
+        for k in range(24):
+            os = 1 << k
+
+            tb.source.set_os(os, sig)
+
+            for k in range(20):
+                await RisingEdge(dut.clk)
+
+            assert int(dut.rx_os.value) == os
+            assert int(dut.rx_os_sig.value) == sig
+
+            tb.source.set_os(None)
+
+            for k in range(20):
+                await RisingEdge(dut.clk)
+
+    for k in range(10):
+        await RisingEdge(dut.clk)
+
+
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
 
@@ -266,6 +293,9 @@ if getattr(cocotb, 'top', None) is not None:
 
     factory = TestFactory(run_test_oversize)
     factory.add_option("ifg", list(range(0, 13)))
+    factory.generate_tests()
+
+    factory = TestFactory(run_test_os)
     factory.generate_tests()
 
 

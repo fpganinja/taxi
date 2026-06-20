@@ -47,6 +47,14 @@ module taxi_axis_xgmii_tx_32 #
     output wire logic [GBX_CNT-1:0]   tx_gbx_sync,
 
     /*
+     * Ordered sets
+     */
+    input  wire logic [23:0]          tx_os = '0,
+    input  wire logic                 tx_os_sig = 1'b0,
+    input  wire logic                 tx_os_valid = 1'b0,
+    output wire logic                 tx_os_ready,
+
+    /*
      * PTP
      */
     input  wire logic [PTP_TS_W-1:0]  ptp_ts,
@@ -160,6 +168,8 @@ logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_reg = '0, m_axis_tx_cpl_ts_next;
 logic [TX_TAG_W-1:0] m_axis_tx_cpl_tag_reg = '0, m_axis_tx_cpl_tag_next;
 logic m_axis_tx_cpl_valid_reg = 1'b0, m_axis_tx_cpl_valid_next;
 
+logic tx_os_ready_reg = 1'b0, tx_os_ready_next;
+
 logic [DATA_W-1:0] xgmii_txd_reg = {CTRL_W{XGMII_IDLE}}, xgmii_txd_next;
 logic [CTRL_W-1:0] xgmii_txc_reg = {CTRL_W{1'b1}}, xgmii_txc_next;
 logic xgmii_tx_valid_reg = 1'b0;
@@ -194,6 +204,8 @@ assign m_axis_tx_cpl.tlast = 1'b1;
 assign m_axis_tx_cpl.tid = m_axis_tx_cpl_tag_reg;
 assign m_axis_tx_cpl.tdest = '0;
 assign m_axis_tx_cpl.tuser = '0;
+
+assign tx_os_ready = tx_os_ready_reg;
 
 assign tx_start_packet = start_packet_reg;
 
@@ -319,9 +331,21 @@ always_comb begin
         end
     end
 
-    // XGMII idle
-    xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-    xgmii_txc_next = {CTRL_W{1'b1}};
+    tx_os_ready_next = 1'b0;
+
+    if (tx_os_valid) begin
+        // Ordered sets
+        xgmii_txd_next[7:0] = tx_os_sig ? XGMII_SIG_OS : XGMII_SEQ_OS;
+        xgmii_txd_next[15:8] = tx_os[23:16];
+        xgmii_txd_next[23:16] = tx_os[15:8];
+        xgmii_txd_next[31:24] = tx_os[7:0];
+        xgmii_txc_next = 4'b0001;
+        tx_os_ready_next = 1'b1;
+    end else begin
+        // XGMII idle
+        xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
+        xgmii_txc_next = {CTRL_W{1'b1}};
+    end
 
     start_packet_next = 1'b0;
 
@@ -406,9 +430,7 @@ always_comb begin
                 {frame_len_lim_cyc_next, frame_len_lim_last_next} = cfg_tx_max_pkt_len;
                 frame_len_lim_check_next = 1'b0;
 
-                // XGMII idle
-                xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-                xgmii_txc_next = {CTRL_W{1'b1}};
+                // XGMII idle or ordered set
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -582,9 +604,7 @@ always_comb begin
                 // send IFG
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                // XGMII idle
-                xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-                xgmii_txc_next = {CTRL_W{1'b1}};
+                // XGMII idle or ordered set
 
                 if (DIC_EN) begin
                     if (ifg_cnt_next > 8'd3 || frame_reg) begin
@@ -638,6 +658,8 @@ always_ff @(posedge clk) begin
     m_axis_tx_cpl_tag_reg <= m_axis_tx_cpl_tag_next;
     m_axis_tx_cpl_valid_reg <= m_axis_tx_cpl_valid_next;
 
+    tx_os_ready_reg <= tx_os_ready_next;
+
     if (GBX_IF_EN && tx_gbx_req_stall) begin
         // gearbox stall
     end else begin
@@ -673,6 +695,8 @@ always_ff @(posedge clk) begin
         s_axis_tx_tready_reg <= 1'b0;
 
         m_axis_tx_cpl_valid_reg <= 1'b0;
+
+        tx_os_ready_reg <= 1'b0;
 
         xgmii_txd_reg <= {CTRL_W{XGMII_IDLE}};
         xgmii_txc_reg <= {CTRL_W{1'b1}};

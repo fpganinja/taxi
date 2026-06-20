@@ -39,6 +39,10 @@ logic xgmii_rx_valid;
 
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(USER_W)) m_axis_rx();
 
+logic [23:0] rx_os;
+logic rx_os_sig;
+logic rx_os_valid;
+
 logic [PTP_TS_W-1:0] ptp_ts;
 
 logic [15:0] cfg_rx_max_pkt_len;
@@ -84,6 +88,13 @@ uut (
      * AXI4-Stream output (source)
      */
     .m_axis_rx(m_axis_rx),
+
+    /*
+     * Ordered sets
+     */
+    .rx_os(rx_os),
+    .rx_os_sig(rx_os_sig),
+    .rx_os_valid(rx_os_valid),
 
     /*
      * PTP

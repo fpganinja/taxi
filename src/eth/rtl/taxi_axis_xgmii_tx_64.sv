@@ -48,6 +48,14 @@ module taxi_axis_xgmii_tx_64 #
     output wire logic [GBX_CNT-1:0]   tx_gbx_sync,
 
     /*
+     * Ordered sets
+     */
+    input  wire logic [23:0]          tx_os = '0,
+    input  wire logic                 tx_os_sig = 1'b0,
+    input  wire logic                 tx_os_valid = 1'b0,
+    output wire logic                 tx_os_ready,
+
+    /*
      * PTP
      */
     input  wire logic [PTP_TS_W-1:0]  ptp_ts,
@@ -167,6 +175,8 @@ logic m_axis_tx_cpl_valid_reg = 1'b0;
 logic m_axis_tx_cpl_valid_int_reg = 1'b0;
 logic m_axis_tx_cpl_ts_borrow_reg = 1'b0;
 
+logic tx_os_ready_reg = 1'b0, tx_os_ready_next;
+
 logic [4+16-1:0] last_ts_reg = '0;
 logic [4+16-1:0] ts_inc_reg = '0;
 
@@ -204,6 +214,8 @@ assign m_axis_tx_cpl.tlast = 1'b1;
 assign m_axis_tx_cpl.tid = m_axis_tx_cpl_tag_reg;
 assign m_axis_tx_cpl.tdest = '0;
 assign m_axis_tx_cpl.tuser = '0;
+
+assign tx_os_ready = tx_os_ready_reg;
 
 assign tx_start_packet = start_packet_reg;
 
@@ -355,9 +367,25 @@ always_comb begin
 
     m_axis_tx_cpl_tag_next = m_axis_tx_cpl_tag_reg;
 
-    // XGMII idle
-    xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-    xgmii_txc_next = {CTRL_W{1'b1}};
+    tx_os_ready_next = 1'b0;
+
+    if (tx_os_valid) begin
+        // Ordered sets
+        xgmii_txd_next[7:0] = tx_os_sig ? XGMII_SIG_OS : XGMII_SEQ_OS;
+        xgmii_txd_next[15:8] = tx_os[23:16];
+        xgmii_txd_next[23:16] = tx_os[15:8];
+        xgmii_txd_next[31:24] = tx_os[7:0];
+        xgmii_txd_next[39:32] = tx_os_sig ? XGMII_SIG_OS : XGMII_SEQ_OS;
+        xgmii_txd_next[47:40] = tx_os[23:16];
+        xgmii_txd_next[55:48] = tx_os[15:8];
+        xgmii_txd_next[63:56] = tx_os[7:0];
+        xgmii_txc_next = 8'b00010001;
+        tx_os_ready_next = 1'b1;
+    end else begin
+        // XGMII idle
+        xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
+        xgmii_txc_next = {CTRL_W{1'b1}};
+    end
 
     stat_tx_byte_next = '0;
     stat_tx_pkt_len_next = '0;
@@ -450,9 +478,7 @@ always_comb begin
                 frame_len_lim_check_next = 1'b0;
                 s_axis_tx_tready_next = cfg_tx_enable;
 
-                // XGMII idle
-                xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-                xgmii_txc_next = {CTRL_W{1'b1}};
+                // XGMII idle or ordered set
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -615,9 +641,7 @@ always_comb begin
                 // send IFG
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                // XGMII idle
-                xgmii_txd_next = {CTRL_W{XGMII_IDLE}};
-                xgmii_txc_next = {CTRL_W{1'b1}};
+                // XGMII idle or ordered set
 
                 crc_data_next = {24'd0, s_axis_tx.tdata} ^ {56'd0, 32'hffffffff};
 
@@ -684,6 +708,8 @@ always_ff @(posedge clk) begin
     m_axis_tx_cpl_tag_reg <= m_axis_tx_cpl_tag_next;
     m_axis_tx_cpl_valid_reg <= 1'b0;
     m_axis_tx_cpl_valid_int_reg <= 1'b0;
+
+    tx_os_ready_reg <= tx_os_ready_next;
 
     start_packet_reg <= 2'b00;
 
@@ -777,6 +803,8 @@ always_ff @(posedge clk) begin
 
         m_axis_tx_cpl_valid_reg <= 1'b0;
         m_axis_tx_cpl_valid_int_reg <= 1'b0;
+
+        tx_os_ready_reg <= 1'b0;
 
         xgmii_txd_reg <= {CTRL_W{XGMII_IDLE}};
         xgmii_txc_reg <= {CTRL_W{1'b1}};

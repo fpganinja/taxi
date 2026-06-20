@@ -46,6 +46,11 @@ logic [GBX_CNT-1:0] tx_gbx_req_sync;
 logic tx_gbx_req_stall;
 logic [GBX_CNT-1:0] tx_gbx_sync;
 
+logic [23:0] tx_os;
+logic tx_os_sig;
+logic tx_os_valid;
+logic tx_os_ready;
+
 logic [PTP_TS_W-1:0] ptp_ts;
 
 logic [15:0] cfg_tx_max_pkt_len;
@@ -94,6 +99,14 @@ uut (
     .tx_gbx_req_sync(tx_gbx_req_sync),
     .tx_gbx_req_stall(tx_gbx_req_stall),
     .tx_gbx_sync(tx_gbx_sync),
+
+    /*
+     * Ordered sets
+     */
+    .tx_os(tx_os),
+    .tx_os_sig(tx_os_sig),
+    .tx_os_valid(tx_os_valid),
+    .tx_os_ready(tx_os_ready),
 
     /*
      * PTP

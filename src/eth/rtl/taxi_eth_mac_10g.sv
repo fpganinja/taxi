@@ -409,6 +409,13 @@ if (DATA_W == 64) begin
         .m_axis_rx(axis_rx_int),
 
         /*
+         * Ordered sets
+         */
+        .rx_os(),
+        .rx_os_sig(),
+        .rx_os_valid(),
+
+        /*
          * PTP
          */
         .ptp_ts(rx_ptp_ts_out),
@@ -472,6 +479,14 @@ if (DATA_W == 64) begin
         .tx_gbx_sync(tx_gbx_sync),
 
         /*
+         * Ordered sets
+         */
+        .tx_os('0),
+        .tx_os_sig(1'b0),
+        .tx_os_valid(1'b0),
+        .tx_os_ready(),
+
+        /*
          * PTP
          */
         .ptp_ts(tx_ptp_ts_out),
@@ -524,6 +539,13 @@ end else if (DATA_W == 32) begin
          * Receive interface (AXI stream)
          */
         .m_axis_rx(axis_rx_int),
+
+        /*
+         * Ordered sets
+         */
+        .rx_os(),
+        .rx_os_sig(),
+        .rx_os_valid(),
 
         /*
          * PTP
@@ -589,6 +611,14 @@ end else if (DATA_W == 32) begin
         .tx_gbx_req_sync(tx_gbx_req_sync),
         .tx_gbx_req_stall(tx_gbx_req_stall),
         .tx_gbx_sync(tx_gbx_sync),
+
+        /*
+         * Ordered sets
+         */
+        .tx_os('0),
+        .tx_os_sig(1'b0),
+        .tx_os_valid(1'b0),
+        .tx_os_ready(),
 
         /*
          * PTP

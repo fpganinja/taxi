@@ -40,6 +40,13 @@ module taxi_axis_xgmii_rx_32 #
     taxi_axis_if.src                  m_axis_rx,
 
     /*
+     * Ordered sets
+     */
+    output wire logic [23:0]          rx_os = '0,
+    output wire logic                 rx_os_sig = 1'b0,
+    output wire logic                 rx_os_valid = 1'b0,
+
+    /*
      * PTP
      */
     input  wire logic [PTP_TS_W-1:0]  ptp_ts,
@@ -148,6 +155,10 @@ logic m_axis_rx_tvalid_reg = 1'b0, m_axis_rx_tvalid_next;
 logic m_axis_rx_tlast_reg = 1'b0, m_axis_rx_tlast_next;
 logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
 
+logic [23:0] rx_os_reg = '0;
+logic rx_os_sig_reg = 1'b0;
+logic rx_os_valid_reg = 1'b0;
+
 logic start_packet_reg = 1'b0, start_packet_next;
 
 logic [2:0] stat_rx_byte_reg = '0, stat_rx_byte_next;
@@ -191,6 +202,10 @@ assign m_axis_rx.tuser[0] = m_axis_rx_tuser_reg;
 if (PTP_TS_EN) begin
     assign m_axis_rx.tuser[1 +: PTP_TS_W] = ptp_ts_out_reg;
 end
+
+assign rx_os = rx_os_reg;
+assign rx_os_sig = rx_os_sig_reg;
+assign rx_os_valid = rx_os_valid_reg;
 
 assign rx_start_packet = start_packet_reg;
 
@@ -520,6 +535,8 @@ always_ff @(posedge clk) begin
     m_axis_rx_tlast_reg <= m_axis_rx_tlast_next;
     m_axis_rx_tuser_reg <= m_axis_rx_tuser_next;
 
+    rx_os_valid_reg <= 1'b0;
+
     ptp_ts_out_reg <= ptp_ts_out_next;
 
     start_packet_reg <= start_packet_next;
@@ -567,6 +584,15 @@ always_ff @(posedge clk) begin
             crc_state_reg <= 32'hffffffff;
         end
 
+        // ordered sets
+        if (xgmii_rxc == 4'b0001 && (xgmii_rxd[7:0] == XGMII_SEQ_OS || xgmii_rxd[7:0] == XGMII_SIG_OS)) begin
+            rx_os_reg[7:0] <= xgmii_rxd[31:24];
+            rx_os_reg[15:8] <= xgmii_rxd[23:16];
+            rx_os_reg[23:16] <= xgmii_rxd[15:8];
+            rx_os_sig_reg <= xgmii_rxd[7:0] == XGMII_SIG_OS;
+            rx_os_valid_reg <= 1'b1;
+        end
+
         term_lane_d0_reg <= term_lane_reg;
 
         crc_valid_reg <= crc_valid;
@@ -583,6 +609,8 @@ always_ff @(posedge clk) begin
         state_reg <= STATE_IDLE;
 
         m_axis_rx_tvalid_reg <= 1'b0;
+
+        rx_os_valid_reg <= 1'b0;
 
         start_packet_reg <= 1'b0;
 

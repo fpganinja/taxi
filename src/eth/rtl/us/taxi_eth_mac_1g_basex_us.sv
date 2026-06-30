@@ -53,6 +53,7 @@ module taxi_eth_mac_1g_basex_us #
 
     // MAC/PHY parameters
     parameter logic COMBINED_MAC_PCS = 1'b1,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -129,6 +130,17 @@ module taxi_eth_mac_1g_basex_us #
      * Receive interface (AXI stream)
      */
     taxi_axis_if.src                  m_axis_rx[CNT],
+
+    /*
+     * Autonegotiation
+     */
+    input  wire logic                 an_en[CNT] = '{CNT{1'b1}},
+    input  wire logic                 an_restart[CNT] = '{CNT{1'b0}},
+    input  wire logic                 an_speedup[CNT] = '{CNT{1'b0}},
+    output wire logic                 an_intr[CNT],
+    output wire logic                 an_complete[CNT],
+    input  wire logic [15:0]          an_adv_ability[CNT] = '{CNT{16'h0020}},
+    output wire logic [15:0]          an_lp_adv_ability[CNT],
 
     /*
      * PTP clock
@@ -422,6 +434,7 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
 
         // MAC/PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
+        .AN_EN(AN_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TD_EN(PTP_TD_EN),
@@ -512,6 +525,17 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
          * Receive interface (AXI stream)
          */
         .m_axis_rx(m_axis_rx[n]),
+
+        /*
+         * Autonegotiation
+         */
+        .an_en(an_en[n]),
+        .an_restart(an_restart[n]),
+        .an_speedup(an_speedup[n]),
+        .an_intr(an_intr[n]),
+        .an_complete(an_complete[n]),
+        .an_adv_ability(an_adv_ability[n]),
+        .an_lp_adv_ability(an_lp_adv_ability[n]),
 
         /*
          * PTP clock

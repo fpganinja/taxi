@@ -52,6 +52,7 @@ module taxi_eth_mac_1g_basex_us_ch #
 
     // MAC/PHY parameters
     parameter logic COMBINED_MAC_PCS = 1'b1,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -142,6 +143,17 @@ module taxi_eth_mac_1g_basex_us_ch #
      * Receive interface (AXI stream)
      */
     taxi_axis_if.src                  m_axis_rx,
+
+    /*
+     * Autonegotiation
+     */
+    input  wire logic                 an_en = 1'b1,
+    input  wire logic                 an_restart = 1'b0,
+    input  wire logic                 an_speedup = 1'b0,
+    output wire logic                 an_intr,
+    output wire logic                 an_complete,
+    input  wire logic [15:0]          an_adv_ability = 16'h0020,
+    output wire logic [15:0]          an_lp_adv_ability,
 
     /*
      * PTP clock
@@ -555,6 +567,7 @@ if (COMBINED_MAC_PCS) begin : mac
         .CTRL_W(CTRL_W),
         .TX_GBX_IF_EN(GBX_EN),
         .RX_GBX_IF_EN(GBX_EN),
+        .AN_EN(AN_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TD_EN(PTP_TD_EN),
@@ -607,6 +620,17 @@ if (COMBINED_MAC_PCS) begin : mac
         .serdes_rx_data_k(serdes_rx_data_k),
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_reset_req(rx_reset_req),
+
+        /*
+         * Autonegotiation
+         */
+        .an_en(an_en),
+        .an_restart(an_restart),
+        .an_speedup(an_speedup),
+        .an_intr(an_intr),
+        .an_complete(an_complete),
+        .an_adv_ability(an_adv_ability),
+        .an_lp_adv_ability(an_lp_adv_ability),
 
         /*
          * PTP

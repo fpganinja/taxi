@@ -22,6 +22,7 @@ module test_taxi_eth_mac_phy_1g_basex #
     parameter CTRL_W = DATA_W/8,
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -72,6 +73,14 @@ logic [DATA_W-1:0] serdes_rx_data;
 logic [CTRL_W-1:0] serdes_rx_data_k;
 logic serdes_rx_data_valid;
 logic serdes_rx_reset_req;
+
+logic an_en;
+logic an_restart;
+logic an_speedup;
+logic an_intr;
+logic an_complete;
+logic [15:0] an_adv_ability;
+logic [15:0] an_lp_adv_ability;
 
 logic ptp_clk;
 logic ptp_rst;
@@ -205,6 +214,7 @@ taxi_eth_mac_phy_1g_basex #(
     .CTRL_W(CTRL_W),
     .TX_GBX_IF_EN(TX_GBX_IF_EN),
     .RX_GBX_IF_EN(RX_GBX_IF_EN),
+    .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TD_EN(PTP_TD_EN),
@@ -259,6 +269,17 @@ uut (
     .serdes_rx_data_k(serdes_rx_data_k),
     .serdes_rx_data_valid(serdes_rx_data_valid),
     .serdes_rx_reset_req(serdes_rx_reset_req),
+
+    /*
+     * Autonegotiation
+     */
+    .an_en(an_en),
+    .an_restart(an_restart),
+    .an_speedup(an_speedup),
+    .an_intr(an_intr),
+    .an_complete(an_complete),
+    .an_adv_ability(an_adv_ability),
+    .an_lp_adv_ability(an_lp_adv_ability),
 
     /*
      * PTP

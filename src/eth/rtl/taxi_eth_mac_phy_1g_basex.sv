@@ -21,6 +21,7 @@ module taxi_eth_mac_phy_1g_basex #
     parameter CTRL_W = (DATA_W/8),
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -75,6 +76,17 @@ module taxi_eth_mac_phy_1g_basex #
     input  wire logic [CTRL_W-1:0]    serdes_rx_data_k,
     input  wire logic                 serdes_rx_data_valid = 1'b1,
     output wire logic                 serdes_rx_reset_req,
+
+    /*
+     * Autonegotiation
+     */
+    input  wire logic                 an_en = 1'b1,
+    input  wire logic                 an_restart = 1'b0,
+    input  wire logic                 an_speedup = 1'b0,
+    output wire logic                 an_intr,
+    output wire logic                 an_complete,
+    input  wire logic [15:0]          an_adv_ability = 16'h0020,
+    output wire logic [15:0]          an_lp_adv_ability,
 
     /*
      * PTP
@@ -353,10 +365,97 @@ end else begin
 
 end
 
+// Autonegotiation
+wire logic [15:0]  rx_an_cfg;
+wire logic         rx_an_cfg_valid;
+wire logic         rx_an_ability_match;
+wire logic         rx_an_ack_match;
+wire logic         rx_an_idle_match;
+
+wire logic [15:0]  tx_an_cfg;
+wire logic         tx_an_cfg_valid;
+wire logic         tx_an_cfg_ready;
+
+if (AN_EN) begin : an
+
+    // synchronize RX signals to TX
+    wire [15:0]  sync_rx_an_cfg;
+    wire         sync_rx_an_cfg_valid;
+    wire         sync_rx_an_ability_match;
+    wire         sync_rx_an_ack_match;
+    wire         sync_rx_an_idle_match;
+
+    taxi_sync_signal #(
+        .WIDTH(16+4),
+        .N(2)
+    )
+    sync_inst (
+        .clk(tx_clk),
+
+        .in({
+            rx_an_cfg,
+            rx_an_cfg_valid,
+            rx_an_ability_match,
+            rx_an_ack_match,
+            rx_an_idle_match
+        }),
+        .out({
+            sync_rx_an_cfg,
+            sync_rx_an_cfg_valid,
+            sync_rx_an_ability_match,
+            sync_rx_an_ack_match,
+            sync_rx_an_idle_match
+        })
+    );
+
+    taxi_eth_phy_1g_basex_an #(
+        .DATA_W(DATA_W)
+    )
+    an_inst (
+        .clk(tx_clk),
+        .rst(tx_rst),
+
+        /*
+        * AN config register
+        */
+        .rx_an_cfg(sync_rx_an_cfg),
+        .rx_an_cfg_valid(sync_rx_an_cfg_valid),
+        .rx_an_ability_match(sync_rx_an_ability_match),
+        .rx_an_ack_match(sync_rx_an_ack_match),
+        .rx_an_idle_match(sync_rx_an_idle_match),
+
+        .tx_an_cfg(tx_an_cfg),
+        .tx_an_cfg_valid(tx_an_cfg_valid),
+        .tx_an_cfg_ready(tx_an_cfg_ready),
+
+        /*
+         * Autonegotiation
+         */
+        .an_en(an_en),
+        .an_restart(an_restart),
+        .an_speedup(an_speedup),
+        .an_intr(an_intr),
+        .an_complete(an_complete),
+        .an_adv_ability(an_adv_ability),
+        .an_lp_adv_ability(an_lp_adv_ability)
+    );
+
+end else begin : an
+
+    assign tx_an_cfg = '0;
+    assign tx_an_cfg_valid = 1'b0;
+
+    assign an_intr = 1'b0;
+    assign an_complete = 1'b0;
+    assign an_lp_adv_ability = '0;
+
+end
+
 taxi_eth_mac_phy_1g_basex_rx #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(RX_GBX_IF_EN),
+    .AN_EN(AN_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
@@ -381,6 +480,15 @@ rx_inst (
     .serdes_rx_data_k(serdes_rx_data_k),
     .serdes_rx_data_valid(serdes_rx_data_valid),
     .serdes_rx_reset_req(serdes_rx_reset_req),
+
+    /*
+     * AN config register
+     */
+    .rx_an_cfg(rx_an_cfg),
+    .rx_an_cfg_valid(rx_an_cfg_valid),
+    .rx_an_ability_match(rx_an_ability_match),
+    .rx_an_ack_match(rx_an_ack_match),
+    .rx_an_idle_match(rx_an_idle_match),
 
     /*
      * PTP
@@ -423,6 +531,7 @@ taxi_eth_mac_phy_1g_basex_tx #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(TX_GBX_IF_EN),
+    .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
@@ -454,6 +563,13 @@ tx_inst (
     .serdes_tx_gbx_req_sync(serdes_tx_gbx_req_sync),
     .serdes_tx_gbx_req_stall(serdes_tx_gbx_req_stall),
     .serdes_tx_gbx_sync(serdes_tx_gbx_sync),
+
+    /*
+     * AN config register
+     */
+    .tx_an_cfg(tx_an_cfg),
+    .tx_an_cfg_valid(tx_an_cfg_valid),
+    .tx_an_cfg_ready(tx_an_cfg_ready),
 
     /*
      * PTP

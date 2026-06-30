@@ -36,6 +36,7 @@ export PARAM_DATA_W := 16
 export PARAM_TX_GBX_IF_EN := 1
 export PARAM_RX_GBX_IF_EN := $(PARAM_TX_GBX_IF_EN)
 export PARAM_AXIS_DATA_W := $(PARAM_DATA_W)
+export PARAM_AN_EN := 1
 export PARAM_DIC_EN := 1
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TD_EN := $(PARAM_PTP_TS_EN)

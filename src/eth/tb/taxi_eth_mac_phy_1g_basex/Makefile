@@ -35,6 +35,7 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 export PARAM_DATA_W := 16
 export PARAM_TX_GBX_IF_EN := 1
 export PARAM_RX_GBX_IF_EN := $(PARAM_TX_GBX_IF_EN)
+export PARAM_AN_EN := 1
 export PARAM_DIC_EN := 1
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TD_EN := $(PARAM_PTP_TS_EN)

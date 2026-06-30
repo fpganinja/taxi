@@ -127,6 +127,11 @@ class TB:
         dut.rx_rst_in.setimmediatevalue([0]*4)
         dut.tx_rst_in.setimmediatevalue([0]*4)
 
+        dut.an_en.setimmediatevalue([0]*4)
+        dut.an_restart.setimmediatevalue([0]*4)
+        dut.an_speedup.setimmediatevalue([1]*4)
+        dut.an_adv_ability.setimmediatevalue([0x0020]*4)
+
         dut.stat_rx_fifo_drop.setimmediatevalue([0]*4)
 
         dut.cfg_tx_pad_en.setimmediatevalue([0]*4)
@@ -774,6 +779,81 @@ async def run_test_pfc(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+async def run_test_an(dut, port=0):
+
+    tb = TB(dut)
+
+    tb.dut.an_en[port].value = 1
+    tb.dut.an_restart[port].value = 0
+    tb.dut.an_speedup[port].value = 1
+    tb.dut.an_adv_ability[port].value = 0x0020
+
+    await tb.reset()
+
+    tb.log.info("Wait for reset")
+    while int(dut.rx_rst_out[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    tb.log.info("Wait for block lock")
+    while not int(dut.rx_block_lock[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    for k in range(100):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    tb.log.info("AN_RESTART")
+    tb.serdes_sources[port].set_an_cfg(0x0000)
+
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk[port])
+
+    tb.log.info("ABILITY_DETECT")
+    tb.serdes_sources[port].set_an_cfg(0x002A)
+
+    lp_cfg = None
+    while True:
+        await RisingEdge(dut.tx_clk[port])
+        lp_cfg = tb.serdes_sinks[port].get_an_cfg()
+        if tb.serdes_sinks[port].get_an_ability_match() and lp_cfg is not None and lp_cfg != 0:
+            break
+
+    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability[port].value) & 0xbfff
+
+    tb.log.info("ACKNOWLEDGE_DETECT")
+    tb.serdes_sources[port].set_an_cfg(0x402A)
+
+    while True:
+        await RisingEdge(dut.tx_clk[port])
+        cfg = tb.serdes_sinks[port].get_an_cfg()
+        if tb.serdes_sinks[port].get_an_ack_match():
+            if lp_cfg | 0x4000 == cfg:
+                break
+
+    tb.log.info("COMPLETE_ACKNOWLEDGE")
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk[port])
+
+    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability[port].value) & 0xbfff
+    assert int(tb.dut.an_lp_adv_ability[port].value) & 0xbfff == 0x002A
+
+    tb.log.info("IDLE_DETECT")
+    tb.serdes_sources[port].set_an_cfg(None)
+
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk[port])
+
+    while True:
+        await RisingEdge(dut.tx_clk[port])
+        if tb.serdes_sinks[port].get_an_idle_match():
+            break
+
+    for k in range(10):
+        await RisingEdge(dut.tx_clk[port])
+
+
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
 
@@ -809,6 +889,11 @@ if getattr(cocotb, 'top', None) is not None:
         for test in [run_test_lfc, run_test_pfc]:
             factory = TestFactory(test)
             factory.add_option("ifg", [12])
+            factory.generate_tests()
+
+    if cocotb.top.AN_EN.value:
+        for test in [run_test_an]:
+            factory = TestFactory(test)
             factory.generate_tests()
 
 

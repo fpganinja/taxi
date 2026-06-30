@@ -1,6 +1,7 @@
 taxi_eth_mac_phy_1g_basex.sv
 taxi_eth_mac_phy_1g_basex_rx.f
 taxi_eth_mac_phy_1g_basex_tx.f
+taxi_eth_phy_1g_basex_an.sv
 taxi_eth_mac_stats.f
 taxi_mac_ctrl_tx.sv
 taxi_mac_ctrl_rx.sv

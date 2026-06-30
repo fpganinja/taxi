@@ -20,6 +20,7 @@ module taxi_eth_mac_phy_1g_basex_tx #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
@@ -51,6 +52,13 @@ module taxi_eth_mac_phy_1g_basex_tx #
     input  wire logic                 serdes_tx_gbx_req_sync = 1'b0,
     input  wire logic                 serdes_tx_gbx_req_stall = 1'b0,
     output wire logic                 serdes_tx_gbx_sync,
+
+    /*
+     * AN config register
+     */
+    input  wire logic [15:0]          tx_an_cfg = '0,
+    input  wire logic                 tx_an_cfg_valid = 1'b0,
+    output wire logic                 tx_an_cfg_ready,
 
     /*
      * PTP
@@ -142,7 +150,7 @@ if (DATA_W == 16) begin
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
         .GBX_CNT(1),
-        .AN_EN(1'b0),
+        .AN_EN(AN_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W),
@@ -173,9 +181,9 @@ if (DATA_W == 16) begin
         /*
          * AN config register
          */
-        .tx_an_cfg('0),
-        .tx_an_cfg_valid(1'b0),
-        .tx_an_cfg_ready(),
+        .tx_an_cfg(tx_an_cfg),
+        .tx_an_cfg_valid(tx_an_cfg_valid),
+        .tx_an_cfg_ready(tx_an_cfg_ready),
 
         /*
          * PTP
@@ -213,7 +221,7 @@ end else begin
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
         .GBX_CNT(1),
-        .AN_EN(1'b0),
+        .AN_EN(AN_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W),
@@ -244,9 +252,9 @@ end else begin
         /*
          * AN config register
          */
-        .tx_an_cfg('0),
-        .tx_an_cfg_valid(1'b0),
-        .tx_an_cfg_ready(),
+        .tx_an_cfg(tx_an_cfg),
+        .tx_an_cfg_valid(tx_an_cfg_valid),
+        .tx_an_cfg_ready(tx_an_cfg_ready),
 
         /*
          * PTP

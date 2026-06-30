@@ -43,6 +43,7 @@ export PARAM_QPLL1_PD := 1
 export PARAM_QPLL0_EXT_CTRL := 0
 export PARAM_QPLL1_EXT_CTRL := 0
 export PARAM_COMBINED_MAC_PCS := 1
+export PARAM_AN_EN := 1
 export PARAM_DIC_EN := 1
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TD_EN := $(PARAM_PTP_TS_EN)

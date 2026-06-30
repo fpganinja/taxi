@@ -42,6 +42,7 @@ module test_taxi_eth_mac_1g_basex_us #
     parameter logic [CNT-1:0] GT_RX_LPM_EN = '0,
     parameter logic [CNT-1:0] GT_RX_POLARITY = '0,
     parameter logic COMBINED_MAC_PCS = 1'b1,
+    parameter logic AN_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -110,6 +111,14 @@ logic tx_rst_out[CNT];
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) s_axis_tx[CNT]();
 taxi_axis_if #(.DATA_W(PTP_TS_W), .KEEP_W(1), .ID_EN(1), .ID_W(TX_TAG_W)) m_axis_tx_cpl[CNT]();
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(RX_USER_W)) m_axis_rx[CNT]();
+
+logic an_en[CNT];
+logic an_restart[CNT];
+logic an_speedup[CNT];
+logic an_intr[CNT];
+logic an_complete[CNT];
+logic [15:0] an_adv_ability[CNT];
+logic [15:0] an_lp_adv_ability[CNT];
 
 logic ptp_clk;
 logic ptp_rst;
@@ -263,6 +272,7 @@ taxi_eth_mac_1g_basex_us #(
     .GT_RX_LPM_EN(GT_RX_LPM_EN),
     .GT_RX_POLARITY(GT_RX_POLARITY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
+    .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TD_EN(PTP_TD_EN),
@@ -339,6 +349,17 @@ uut (
      * Receive interface (AXI stream)
      */
     .m_axis_rx(m_axis_rx),
+
+    /*
+     * Autonegotiation
+     */
+    .an_en(an_en),
+    .an_restart(an_restart),
+    .an_speedup(an_speedup),
+    .an_intr(an_intr),
+    .an_complete(an_complete),
+    .an_adv_ability(an_adv_ability),
+    .an_lp_adv_ability(an_lp_adv_ability),
 
     /*
      * PTP

@@ -279,6 +279,7 @@ if (SFP_RATE == 0) begin : sfp_mac
 
         // PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
+        .AN_EN(1'b1),
         .DIC_EN(1'b1),
         .PTP_TS_EN(1'b0),
         .PTP_TD_EN(1'b0),
@@ -354,6 +355,17 @@ if (SFP_RATE == 0) begin : sfp_mac
          * Receive interface (AXI stream)
          */
         .m_axis_rx(axis_sfp_rx),
+
+        /*
+         * Autonegotiation
+         */
+        .an_en('{2{1'b1}}),
+        .an_restart('{2{1'b0}}),
+        .an_speedup('{2{1'b0}}),
+        .an_intr(),
+        .an_complete(),
+        .an_adv_ability('{2{16'h0020}}),
+        .an_lp_adv_ability(),
 
         /*
          * PTP clock

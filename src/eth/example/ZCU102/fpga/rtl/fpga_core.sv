@@ -361,8 +361,11 @@ if (SFP_RATE == 0) begin : sfp_mac
         .an_en('{4{1'b1}}),
         .an_restart('{4{1'b0}}),
         .an_speedup('{4{1'b0}}),
+        .an_timeout_en('{4{1'b1}}),
         .an_intr(),
+        .an_running(),
         .an_complete(),
+        .an_timeout(),
         .an_adv_ability('{4{16'h0020}}),
         .an_lp_adv_ability(),
 

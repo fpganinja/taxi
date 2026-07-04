@@ -98,6 +98,10 @@ logic an_complete;
 logic an_timeout;
 logic [15:0] an_adv_ability;
 logic [15:0] an_lp_adv_ability;
+logic [1:0] an_lp_remote_fault;
+logic an_res_full_duplex;
+logic an_res_tx_pause;
+logic an_res_rx_pause;
 
 logic ptp_clk;
 logic ptp_rst;
@@ -228,6 +232,10 @@ uut (
     .an_timeout(an_timeout),
     .an_adv_ability(an_adv_ability),
     .an_lp_adv_ability(an_lp_adv_ability),
+    .an_lp_remote_fault(an_lp_remote_fault),
+    .an_res_full_duplex(an_res_full_duplex),
+    .an_res_tx_pause(an_res_tx_pause),
+    .an_res_rx_pause(an_res_rx_pause),
 
     /*
      * PTP clock

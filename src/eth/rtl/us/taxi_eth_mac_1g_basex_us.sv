@@ -144,6 +144,10 @@ module taxi_eth_mac_1g_basex_us #
     output wire logic                 an_timeout[CNT],
     input  wire logic [15:0]          an_adv_ability[CNT] = '{CNT{16'h0020}},
     output wire logic [15:0]          an_lp_adv_ability[CNT],
+    output wire logic [1:0]           an_lp_remote_fault[CNT],
+    output wire logic                 an_res_full_duplex[CNT],
+    output wire logic                 an_res_tx_pause[CNT],
+    output wire logic                 an_res_rx_pause[CNT],
 
     /*
      * PTP clock
@@ -542,6 +546,10 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         .an_timeout(an_timeout[n]),
         .an_adv_ability(an_adv_ability[n]),
         .an_lp_adv_ability(an_lp_adv_ability[n]),
+        .an_lp_remote_fault(an_lp_remote_fault[n]),
+        .an_res_full_duplex(an_res_full_duplex[n]),
+        .an_res_tx_pause(an_res_tx_pause[n]),
+        .an_res_rx_pause(an_res_rx_pause[n]),
 
         /*
          * PTP clock

@@ -90,6 +90,10 @@ module taxi_eth_mac_phy_1g_basex #
     output wire logic                 an_timeout,
     input  wire logic [15:0]          an_adv_ability = 16'h0020,
     output wire logic [15:0]          an_lp_adv_ability,
+    output wire logic [1:0]           an_lp_remote_fault,
+    output wire logic                 an_res_full_duplex,
+    output wire logic                 an_res_tx_pause,
+    output wire logic                 an_res_rx_pause,
 
     /*
      * PTP
@@ -443,7 +447,11 @@ if (AN_EN) begin : an
         .an_complete(an_complete),
         .an_timeout(an_timeout),
         .an_adv_ability(an_adv_ability),
-        .an_lp_adv_ability(an_lp_adv_ability)
+        .an_lp_adv_ability(an_lp_adv_ability),
+        .an_lp_remote_fault(an_lp_remote_fault),
+        .an_res_full_duplex(an_res_full_duplex),
+        .an_res_tx_pause(an_res_tx_pause),
+        .an_res_rx_pause(an_res_rx_pause)
     );
 
 end else begin : an

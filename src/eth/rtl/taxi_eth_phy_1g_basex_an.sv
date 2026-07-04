@@ -48,7 +48,11 @@ module taxi_eth_phy_1g_basex_an #
     output wire logic         an_complete,
     output wire logic         an_timeout,
     input  wire logic [15:0]  an_adv_ability = 16'h0020,
-    output wire logic [15:0]  an_lp_adv_ability
+    output wire logic [15:0]  an_lp_adv_ability,
+    output wire logic [1:0]   an_lp_remote_fault,
+    output wire logic         an_res_full_duplex,
+    output wire logic         an_res_tx_pause,
+    output wire logic         an_res_rx_pause
 );
 
 localparam logic [15:0] AN_ACK = 16'h4000;
@@ -94,6 +98,15 @@ assign an_running = an_running_reg;
 assign an_complete = an_complete_reg;
 assign an_timeout = an_timeout_reg;
 assign an_lp_adv_ability = an_lp_adv_ability_reg;
+
+// extract remote fault bits from link partner ability value
+assign an_lp_remote_fault = an_lp_adv_ability_reg[13:12];
+// fall back to half duplex only if both ends support it and at least one end does not support full duplex
+assign an_res_full_duplex = !((an_adv_ability[6] && an_lp_adv_ability_reg[6]) && (!an_adv_ability[5] || !an_lp_adv_ability_reg[5]));
+// both sides support symmetric pause, or asymmetric pause towards link partner
+assign an_res_tx_pause = (an_adv_ability[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability[8:7] == 2'b10 && an_lp_adv_ability_reg[8:7] == 2'b11);
+// both sides support symmetric pause, or asymmetric pause towards local device
+assign an_res_rx_pause = (an_adv_ability[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability[8:7] == 2'b11 && an_lp_adv_ability_reg[8:7] == 2'b10);
 
 always_comb begin
     state_next = STATE_START;

@@ -368,6 +368,10 @@ if (SFP_RATE == 0) begin : sfp_mac
         .an_timeout(),
         .an_adv_ability('{4{16'h0020}}),
         .an_lp_adv_ability(),
+        .an_lp_remote_fault(),
+        .an_res_full_duplex(),
+        .an_res_tx_pause(),
+        .an_res_rx_pause(),
 
         /*
          * PTP clock

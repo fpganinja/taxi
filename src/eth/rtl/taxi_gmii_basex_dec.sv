@@ -210,13 +210,13 @@ always_comb begin
                     c_cyc = 1'b1;
                 end else if (AN_EN && c_cyc) begin
                     if (!odd_cyc) begin
-                        rx_an_cfg_next[7:0] = encoded_rx_data[seg*8 +: 8];
                         an_cfg_match_next = rx_an_cfg_next[7:0] == encoded_rx_data[seg*8 +: 8];
+                        rx_an_cfg_next[7:0] = encoded_rx_data[seg*8 +: 8];
                         an_idle_match_next = '0;
                     end else begin
                         rx_an_cfg_next[15:8] = encoded_rx_data[seg*8 +: 8];
                         rx_an_cfg_valid_next = 1'b1;
-                        if (an_cfg_match_next && ((rx_an_cfg_next[15:8] ^ encoded_rx_data[seg*8 +: 8]) & 8'h40) == 0) begin
+                        if (an_cfg_match_next && ((rx_an_cfg_next[15:8] ^ encoded_rx_data[seg*8 +: 8]) & ~8'h40) == 0) begin
                             an_ability_match_next = {an_ability_match_next[0], 1'b1};
                         end else begin
                             an_ability_match_next = '0;

@@ -550,7 +550,7 @@ always_ff @(posedge clk) begin
         if (AN_EN && input_c_d1_reg) begin
             rx_an_cfg_reg[15:8] <= encoded_rx_data;
             rx_an_cfg_valid_reg <= encoded_rx_data_k == 1'b0;
-            if (an_cfg_match_reg && ((rx_an_cfg_reg[15:8] ^ encoded_rx_data) & 8'h40) == 0) begin
+            if (an_cfg_match_reg && ((rx_an_cfg_reg[15:8] ^ encoded_rx_data) & ~8'h40) == 0) begin
                 an_ability_match_reg <= {an_ability_match_reg[0], 1'b1};
             end else begin
                 an_ability_match_reg <= '0;

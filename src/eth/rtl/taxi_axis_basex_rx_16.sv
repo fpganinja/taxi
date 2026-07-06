@@ -683,7 +683,7 @@ always_ff @(posedge clk) begin
         if (AN_EN && input_c_d0_reg) begin
             rx_an_cfg_reg <= encoded_rx_data;
             rx_an_cfg_valid_reg <= encoded_rx_data_k == 2'b00;
-            if (((rx_an_cfg_reg ^ encoded_rx_data) & 16'h4000) == 0) begin
+            if (((rx_an_cfg_reg ^ encoded_rx_data) & ~16'h4000) == 0) begin
                 an_ability_match_reg <= {an_ability_match_reg[0], 1'b1};
             end else begin
                 an_ability_match_reg <= '0;

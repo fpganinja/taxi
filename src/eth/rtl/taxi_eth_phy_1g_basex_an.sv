@@ -222,22 +222,7 @@ always_comb begin
             if (rx_an_ability_match && rx_an_cfg != 0) begin
                 // got ability advertisement from link partner
                 an_lp_adv_ability_next = rx_an_cfg;
-                if (rx_an_cfg[0] == an_sgmii_mode_reg) begin
-                    // mode matches
-                    state_next = STATE_ACK_DET;
-                end else begin
-                    // mode mismatch, restart
-                    if (an_sgmii_auto) begin
-                        // in SGMII auto mode, switch modes after a few mismatches
-                        if (&mode_mismatch_cnt_reg) begin
-                            mode_mismatch_cnt_next = '0;
-                            an_sgmii_mode_next = rx_an_cfg[0];
-                        end else begin
-                            mode_mismatch_cnt_next = mode_mismatch_cnt_reg + 1;
-                        end
-                    end
-                    state_next = STATE_START;
-                end
+                state_next = STATE_ACK_DET;
             end else if (!timeout_run_reg && an_timeout_en) begin
                 // timed out, no AN response from link partner
                 an_timeout_next = 1'b1;
@@ -283,8 +268,23 @@ always_comb begin
                 state_next = STATE_START;
             end else if (!delay_run_reg) begin
                 // link timer expired
-                delay_run_next = 1'b1;
-                state_next = STATE_IDLE_DET;
+                if (an_lp_adv_ability_reg[0] == an_sgmii_mode_reg) begin
+                    // mode matches
+                    delay_run_next = 1'b1;
+                    state_next = STATE_IDLE_DET;
+                end else begin
+                    // mode mismatch, restart
+                    if (an_sgmii_auto) begin
+                        // in SGMII auto mode, switch modes after a few mismatches
+                        if (&mode_mismatch_cnt_reg) begin
+                            mode_mismatch_cnt_next = '0;
+                            an_sgmii_mode_next = rx_an_cfg[0];
+                        end else begin
+                            mode_mismatch_cnt_next = mode_mismatch_cnt_reg + 1;
+                        end
+                    end
+                    state_next = STATE_START;
+                end
             end else begin
                 state_next = STATE_ACK_CPL;
             end

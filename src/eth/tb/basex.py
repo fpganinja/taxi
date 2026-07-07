@@ -807,7 +807,7 @@ class BaseXSerdesSink:
                         if len(an_cfg) == 2:
                             an_cfg = an_cfg[0] | (an_cfg[1] << 8)
                             self.log.info("RX config reg: 0x%04x", an_cfg)
-                            if (last_an_cfg ^ an_cfg) & 0x4000 == 0:
+                            if (last_an_cfg ^ an_cfg) & ~0x4000 == 0:
                                 self.an_ability_match_cnt += 1
                             else:
                                 self.an_ability_match_cnt = 0

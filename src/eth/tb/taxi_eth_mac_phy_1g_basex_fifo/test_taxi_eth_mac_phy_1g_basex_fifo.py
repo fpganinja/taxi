@@ -305,14 +305,13 @@ async def run_basex_an(tb, cfg, sgmii=False):
         while True:
             await RisingEdge(dut.tx_clk)
             lp_cfg_ack = tb.serdes_sink.get_an_cfg()
-            if tb.serdes_sink.get_an_ack_match():
-                if lp_cfg | 0x4000 == lp_cfg_ack:
-                    break
+            if tb.serdes_sink.get_an_ack_match() and lp_cfg_ack is not None:
+                break
             elif tb.serdes_sink.get_an_ability_match() and lp_cfg_ack is not None and lp_cfg_ack == 0:
                 break
 
         if lp_cfg | 0x4000 != lp_cfg_ack:
-            tb.log.warning("AN inconsistent, restarting")
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg | 0x4000, lp_cfg_ack)
             continue
 
         if lp_cfg_ack == 0:
@@ -329,9 +328,21 @@ async def run_basex_an(tb, cfg, sgmii=False):
 
         while True:
             await RisingEdge(dut.tx_clk)
+            lp_cfg_ack2 = tb.serdes_sink.get_an_cfg()
             if tb.serdes_sink.get_an_idle_match():
                 break
+            elif tb.serdes_sink.get_an_ability_match() and lp_cfg_ack2 is not None and (lp_cfg_ack2 == 0 or lp_cfg_ack != lp_cfg_ack2):
+                break
 
+        if lp_cfg_ack2 is not None and lp_cfg_ack != lp_cfg_ack2:
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg_ack, lp_cfg_ack2)
+            continue
+
+        if lp_cfg_ack2 == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("AN done")
         return lp_cfg_ack
 
     tb.log.warning("AN timed out")
@@ -363,8 +374,6 @@ async def run_test_an(dut, gbx_cfg=None, sgmii_en=False, sgmii_auto=False):
         for x in range(16):
             cfg1 = 0x000A | ((x & 3) << 5) | ((x & 3) << 7) | ((x & 3) << 12)
             cfg2 = 0x000C | (((x >> 2) & 3) << 5) | (((x >> 2) & 3) << 7) | (((x >> 2) & 3) << 12)
-            cfg1 = 0x002A
-            cfg2 = 0x0020
             dut.an_adv_ability_basex.value = cfg2
 
             lp_cfg = await run_basex_an(tb, cfg1, False)
@@ -386,11 +395,11 @@ async def run_test_an(dut, gbx_cfg=None, sgmii_en=False, sgmii_auto=False):
                 # both ends support symmetric pause
                 assert bool(dut.an_res_tx_pause.value)
                 assert bool(dut.an_res_rx_pause.value)
-            elif ((cfg1 >> 7) & 3) & 2 == 3 and ((cfg2 >> 7) & 3) & 2 == 2:
+            elif ((cfg1 >> 7) & 3) == 2 and ((cfg2 >> 7) & 3) == 3:
                 # asymmetric towards local
                 assert not bool(dut.an_res_tx_pause.value)
                 assert bool(dut.an_res_rx_pause.value)
-            elif ((cfg1 >> 7) & 3) & 2 == 2 and ((cfg2 >> 7) & 3) & 2 == 3:
+            elif ((cfg1 >> 7) & 3) == 3 and ((cfg2 >> 7) & 3) == 2:
                 # asymmetric towards partner
                 assert bool(dut.an_res_tx_pause.value)
                 assert not bool(dut.an_res_rx_pause.value)

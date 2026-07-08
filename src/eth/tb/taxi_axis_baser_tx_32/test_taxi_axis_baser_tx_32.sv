@@ -22,6 +22,7 @@ module test_taxi_axis_baser_tx_32 #
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
+    parameter logic USXGMII_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
@@ -58,6 +59,9 @@ logic [PTP_TS_W-1:0] ptp_ts;
 logic [15:0] cfg_tx_max_pkt_len;
 logic [7:0] cfg_tx_ifg;
 logic cfg_tx_enable;
+logic cfg_tx_usxgmii_en;
+logic cfg_tx_usxgmii_5g;
+logic [2:0] cfg_tx_usxgmii_speed;
 
 logic tx_start_packet;
 logic [2:0] stat_tx_byte;
@@ -77,6 +81,7 @@ taxi_axis_baser_tx_32 #(
     .HDR_W(HDR_W),
     .GBX_IF_EN(GBX_IF_EN),
     .GBX_CNT(GBX_CNT),
+    .USXGMII_EN(USXGMII_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_W(PTP_TS_W),
@@ -122,6 +127,9 @@ uut (
     .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
     .cfg_tx_ifg(cfg_tx_ifg),
     .cfg_tx_enable(cfg_tx_enable),
+    .cfg_tx_usxgmii_en(cfg_tx_usxgmii_en),
+    .cfg_tx_usxgmii_5g(cfg_tx_usxgmii_5g),
+    .cfg_tx_usxgmii_speed(cfg_tx_usxgmii_speed),
 
     /*
      * Status

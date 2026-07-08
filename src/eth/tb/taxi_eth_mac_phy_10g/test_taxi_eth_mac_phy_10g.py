@@ -246,7 +246,7 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
     if len(dut.serdes_tx_data) == 64:
         pipe_delay = 5
     else:
-        pipe_delay = 6
+        pipe_delay = 5
 
     tb = TB(dut, gbx_cfg)
 

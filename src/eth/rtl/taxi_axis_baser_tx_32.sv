@@ -21,6 +21,7 @@ module taxi_axis_baser_tx_32 #
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96,
@@ -66,6 +67,9 @@ module taxi_axis_baser_tx_32 #
     input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
     input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
     input  wire logic                 cfg_tx_enable,
+    input  wire logic                 cfg_tx_usxgmii_en = 1'b1,
+    input  wire logic                 cfg_tx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]           cfg_tx_usxgmii_speed = 3'b011,
 
     /*
      * Status
@@ -201,6 +205,9 @@ logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
 logic [7:0] ifg_cnt_reg = '0, ifg_cnt_next;
 logic [1:0] deficit_idle_cnt_reg = 2'd0, deficit_idle_cnt_next;
 
+logic [9:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
+
 logic s_axis_tx_tready_reg = 1'b0, s_axis_tx_tready_next;
 
 logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_reg = '0, m_axis_tx_cpl_ts_next;
@@ -220,6 +227,7 @@ logic [DATA_W-1:0] output_data_reg = '0, output_data_next;
 logic [DATA_W-1:0] output_data_d1_reg = '0;
 out_type_t output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
 
+logic start_packet_int_reg = 1'b0, start_packet_int_next;
 logic start_packet_reg = 1'b0, start_packet_next;
 
 logic [2:0] stat_tx_byte_reg = '0, stat_tx_byte_next;
@@ -234,7 +242,7 @@ logic stat_tx_err_oversize_reg = 1'b0, stat_tx_err_oversize_next;
 logic stat_tx_err_user_reg = 1'b0, stat_tx_err_user_next;
 logic stat_tx_err_underflow_reg = 1'b0, stat_tx_err_underflow_next;
 
-assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall);
+assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall) && (!USXGMII_EN || !rep_stall_reg);
 
 assign encoded_tx_data = encoded_tx_data_reg;
 assign encoded_tx_data_valid = GBX_IF_EN ? encoded_tx_data_valid_reg : 1'b1;
@@ -375,9 +383,10 @@ always_comb begin
         end
     end
 
-    output_data_next = s_tdata_reg;
-    output_type_next = OUTPUT_TYPE_IDLE;
+    output_data_next = output_data_reg;
+    output_type_next = output_type_reg;
 
+    start_packet_int_next = start_packet_int_reg;
     start_packet_next = 1'b0;
 
     stat_tx_byte_next = '0;
@@ -400,6 +409,32 @@ always_comb begin
         // gearbox stall - hold state
         state_next = state_reg;
         s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        output_data_next = output_data_reg;
+        output_type_next = output_type_reg;
+    end else if (USXGMII_EN && rep_stall_reg) begin
+        // USXGMII stall - replicate XGMII symbol
+        state_next = state_reg;
+        s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        output_data_next = output_data_reg;
+        output_type_next = output_type_reg;
+
+        // SOP/EOP are not replicated
+        case (output_type_reg)
+            OUTPUT_TYPE_START: begin
+                // replace start character with 0xAA in replications
+                output_data_next[7:0] = 8'hAA;
+                output_type_next = OUTPUT_TYPE_DATA;
+            end
+            OUTPUT_TYPE_TERM_0, OUTPUT_TYPE_TERM_1, OUTPUT_TYPE_TERM_2, OUTPUT_TYPE_TERM_3: begin
+                // EOP is sent once followed by idles
+                output_type_next = OUTPUT_TYPE_IDLE;
+            end
+            default: begin
+                output_type_next = output_type_reg;
+            end
+        endcase
     end else begin
         // counter to measure frame length
         if (&frame_len_reg[15:2] == 0) begin
@@ -495,7 +530,7 @@ always_comb begin
                 output_type_next = OUTPUT_TYPE_DATA;
 
                 s_axis_tx_tready_next = 1'b1;
-                start_packet_next = 1'b1;
+                start_packet_int_next = 1'b1;
                 state_next = STATE_PAYLOAD;
             end
             STATE_PAYLOAD: begin
@@ -509,6 +544,8 @@ always_comb begin
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
 
                 stat_tx_byte_next = 3'(KEEP_W);
+                start_packet_next = start_packet_int_reg;
+                start_packet_int_next = 1'b0;
 
                 if (s_axis_tx.tvalid && s_axis_tx.tlast) begin
                     if (frame_len_lim_check_reg) begin
@@ -691,6 +728,7 @@ always_ff @(posedge clk) begin
 
     tx_os_ready_reg <= 1'b0;
 
+    start_packet_int_reg <= start_packet_int_next;
     start_packet_reg <= start_packet_next;
 
     stat_tx_byte_reg <= stat_tx_byte_next;
@@ -829,7 +867,42 @@ always_ff @(posedge clk) begin
             phase_reg <= 1'b1;
         end
 
-        crc_state_reg <= crc_state;
+        if (!USXGMII_EN || !rep_stall_reg) begin
+            crc_state_reg <= crc_state;
+        end
+
+        if (USXGMII_EN && cfg_tx_usxgmii_en) begin
+            if (rep_cnt_reg == 0) begin
+                if (cfg_tx_usxgmii_5g) begin
+                    case (cfg_tx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 499; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 49; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 4; // 1 Gbps
+                        3'b100: rep_cnt_reg <= 1; // 2.5 Gbps
+                        3'b101: rep_cnt_reg <= 0; // 5 Gbps
+                        default: rep_cnt_reg <= 0;
+                    endcase
+                end else begin
+                    case (cfg_tx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 999; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 99; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 9; // 1 Gbps
+                        3'b011: rep_cnt_reg <= 0; // 10 Gbps
+                        3'b100: rep_cnt_reg <= 3; // 2.5 Gbps
+                        3'b101: rep_cnt_reg <= 1; // 5 Gbps
+                        default: rep_cnt_reg <= 0;
+                    endcase
+                end
+
+                rep_stall_reg <= 1'b0;
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+            end
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+        end
     end
 
     tx_gbx_sync_reg <= tx_gbx_req_sync;
@@ -839,6 +912,9 @@ always_ff @(posedge clk) begin
 
         frame_reg <= 1'b0;
         deficit_idle_cnt_reg <= 2'd0;
+
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
 
         s_axis_tx_tready_reg <= 1'b0;
 

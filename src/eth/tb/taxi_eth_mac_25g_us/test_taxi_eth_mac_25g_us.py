@@ -308,7 +308,7 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
             pipe_delay = 6
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 7
+            pipe_delay = 6
         else:
             pipe_delay = 8
 

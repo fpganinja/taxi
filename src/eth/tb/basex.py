@@ -428,11 +428,12 @@ class BaseXSerdesSource():
                     d_val = an_cfg.pop(0)
                     k_val = False
                 elif frame is not None:
+                    if rep_cnt == 0 and not sof:
+                        frame_offset += 1
                     if sof:
                         # /S/
                         d_val = XgmiiCtrl.START # /K27.7/
                         k_val = True
-                        sof = False
                     elif frame_offset >= len(frame.data):
                         # /T/
                         d_val = XgmiiCtrl.TERM # /K29.7/
@@ -457,8 +458,7 @@ class BaseXSerdesSource():
                         else:
                             d_val = d # /Dx.y/
                             k_val = False
-                    if rep_cnt == 0:
-                        frame_offset += 1
+                    sof = False
                 elif self.an_cfg is not None and odd:
                     self.log.info("TX config reg: 0x%04x", self.an_cfg)
                     an_cfg = [self.an_cfg & 0xff, (self.an_cfg >> 8) & 0xff]

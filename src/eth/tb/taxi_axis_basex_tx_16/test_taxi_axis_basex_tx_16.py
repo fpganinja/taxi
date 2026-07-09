@@ -38,7 +38,7 @@ except ImportError:
 
 
 class TB:
-    def __init__(self, dut, gbx_cfg=None):
+    def __init__(self, dut, gbx_cfg=None, sgmii_speed=None):
         self.dut = dut
 
         self.log = logging.getLogger("cocotb.tb")
@@ -73,6 +73,21 @@ class TB:
         dut.cfg_tx_max_pkt_len.setimmediatevalue(0)
         dut.cfg_tx_ifg.setimmediatevalue(0)
         dut.cfg_tx_enable.setimmediatevalue(0)
+        if sgmii_speed is not None:
+            dut.cfg_tx_sgmii_en.setimmediatevalue(1)
+            dut.cfg_tx_sgmii_speed.setimmediatevalue(sgmii_speed)
+            if sgmii_speed == 0:
+                self.sink.set_gmii_rep_count(99) # 10 Mbps
+            elif sgmii_speed == 1:
+                self.sink.set_gmii_rep_count(9) # 100 Mbps
+            elif sgmii_speed == 2:
+                self.sink.set_gmii_rep_count(0) # 1 Gbps
+            else:
+                self.sink.set_gmii_rep_count(0)
+        else:
+            dut.cfg_tx_sgmii_en.setimmediatevalue(0)
+            dut.cfg_tx_sgmii_speed.setimmediatevalue(0b10)
+            self.sink.set_gmii_rep_count(0)
 
         self.stats = {}
         self.stats["stat_tx_byte"] = 0
@@ -113,9 +128,9 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
-async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
+async def run_test(dut, gbx_cfg=None, sgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, sgmii_speed)
 
     tb.dut.cfg_tx_max_pkt_len.value = 9218-1
     tb.dut.cfg_tx_ifg.value = ifg
@@ -176,9 +191,9 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         await RisingEdge(dut.clk)
 
 
-async def run_test_underrun(dut, gbx_cfg=None, ifg=12):
+async def run_test_underrun(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, sgmii_speed)
 
     tb.dut.cfg_tx_max_pkt_len.value = 9218-1
     tb.dut.cfg_tx_ifg.value = ifg
@@ -196,12 +211,12 @@ async def run_test_underrun(dut, gbx_cfg=None, ifg=12):
         test_frame = AxiStreamFrame(test_data)
         await tb.source.send(test_frame)
 
-    for k in range(64):
+    for k in range(64*(tb.sink.get_gmii_rep_count()+1)):
         await RisingEdge(dut.clk)
 
     tb.source.pause = True
 
-    for k in range(4):
+    for k in range(4*(tb.sink.get_gmii_rep_count()+1)):
         await RisingEdge(dut.clk)
 
     tb.source.pause = False
@@ -238,9 +253,9 @@ async def run_test_underrun(dut, gbx_cfg=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
-async def run_test_error(dut, gbx_cfg=None, ifg=12):
+async def run_test_error(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, sgmii_speed)
 
     tb.dut.cfg_tx_max_pkt_len.value = 9218-1
     tb.dut.cfg_tx_ifg.value = ifg
@@ -292,9 +307,9 @@ async def run_test_error(dut, gbx_cfg=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
-async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
+async def run_test_oversize(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, sgmii_speed)
 
     tb.dut.cfg_tx_max_pkt_len.value = 1518-1
     tb.dut.cfg_tx_ifg.value = ifg
@@ -381,9 +396,9 @@ async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
-async def run_test_an(dut, gbx_cfg=None):
+async def run_test_an(dut, gbx_cfg=None, sgmii_speed=None):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, sgmii_speed)
 
     await tb.reset()
 
@@ -437,6 +452,7 @@ if getattr(cocotb, 'top', None) is not None:
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
     factory.add_option("ifg", [12])
+    factory.add_option("sgmii_speed", [None, 1, 2])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
@@ -448,10 +464,12 @@ if getattr(cocotb, 'top', None) is not None:
 
         factory = TestFactory(test)
         factory.add_option("ifg", [12])
+        factory.add_option("sgmii_speed", [None, 1, 2])
         factory.add_option("gbx_cfg", gbx_cfgs)
         factory.generate_tests()
 
     factory = TestFactory(run_test_an)
+    factory.add_option("sgmii_speed", [None, 1, 2])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
@@ -499,7 +517,8 @@ def test_taxi_axis_basex_tx_16(request, gbx_en, dic_en):
     parameters['CTRL_W'] = parameters['DATA_W'] // 8
     parameters['GBX_IF_EN'] = gbx_en
     parameters['GBX_CNT'] = 1
-    parameters['AN_EN'] = 1
+    parameters['SGMII_EN'] = 1
+    parameters['AN_EN'] = parameters['SGMII_EN']
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TS_W'] = 96

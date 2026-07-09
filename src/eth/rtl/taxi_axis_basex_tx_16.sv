@@ -21,7 +21,8 @@ module taxi_axis_basex_tx_16 #
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96,
@@ -66,7 +67,9 @@ module taxi_axis_basex_tx_16 #
      */
     input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
     input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
-    input  wire logic                 cfg_tx_enable,
+    input  wire logic                 cfg_tx_enable = 1'b1,
+    input  wire logic                 cfg_tx_sgmii_en = 1'b1,
+    input  wire logic [1:0]           cfg_tx_sgmii_speed = 2'b10,
 
     /*
      * Status
@@ -186,18 +189,14 @@ function logic rd_flip_8b10b(input [7:0] d, input k);
     rd_flip_8b10b = rd_flip_5b6b(d[4:0], k) ^ rd_flip_3b4b(d[7:5]);
 endfunction
 
-typedef enum logic [3:0] {
+typedef enum logic [2:0] {
     STATE_IDLE,
     STATE_PREAMBLE,
     STATE_PAYLOAD,
     STATE_FCS_1,
     STATE_FCS_2,
     STATE_FCS_3,
-    STATE_TR,
-    STATE_RR,
-    STATE_ERR,
-    STATE_IFG,
-    STATE_AN
+    STATE_IFG
 } state_t;
 
 state_t state_reg = STATE_IDLE, state_next;
@@ -223,8 +222,20 @@ logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
 logic [1:0] pre_cnt_reg = '0, pre_cnt_next;
 logic [7:0] ifg_cnt_reg = '0, ifg_cnt_next;
 logic deficit_idle_cnt_reg = 1'd0, deficit_idle_cnt_next;
+logic gmii_frame_reg = 1'b0, gmii_frame_next;
+logic cext_reg = 1'b0, cext_next;
+logic an_cfg_reg = 1'b0, an_cfg_next;
 logic an_phase_reg = 1'b0, an_phase_next;
 logic rd_reg = 1'b0, rd_next;
+
+logic [5:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
+logic rep_en_reg = 1'b0;
+logic rep_sel_reg = 1'b0;
+
+logic [DATA_W-1:0] gmii_txd_reg = '0, gmii_txd_next, gmii_txd_rep;
+logic [CTRL_W-1:0] gmii_tx_en_reg = '0, gmii_tx_en_next, gmii_tx_en_rep;
+logic [CTRL_W-1:0] gmii_tx_er_reg = '0, gmii_tx_er_next, gmii_tx_er_rep;
 
 logic s_axis_tx_tready_reg = 1'b0, s_axis_tx_tready_next;
 
@@ -256,7 +267,7 @@ logic stat_tx_err_oversize_reg = 1'b0, stat_tx_err_oversize_next;
 logic stat_tx_err_user_reg = 1'b0, stat_tx_err_user_next;
 logic stat_tx_err_underflow_reg = 1'b0, stat_tx_err_underflow_next;
 
-assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall);
+assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall) && (!SGMII_EN || !rep_stall_reg);
 
 assign encoded_tx_data = encoded_tx_data_reg;
 assign encoded_tx_data_k = encoded_tx_data_k_reg;
@@ -325,33 +336,30 @@ endfunction
 logic [DATA_W-1:0] fcs_output_data_0;
 logic [DATA_W-1:0] fcs_output_data_1;
 logic [DATA_W-1:0] fcs_output_data_2;
-logic [CTRL_W-1:0] fcs_output_data_k_0;
-logic [CTRL_W-1:0] fcs_output_data_k_1;
-logic [CTRL_W-1:0] fcs_output_data_k_2;
+logic [CTRL_W-1:0] fcs_output_valid_0;
+logic [CTRL_W-1:0] fcs_output_valid_1;
+logic [CTRL_W-1:0] fcs_output_valid_2;
 logic [7:0] ifg_offset;
-logic extra_cycle;
 
 always_comb begin
     casez (s_empty_reg)
         1'd1: begin
             fcs_output_data_0 = {~crc_state[7:0], s_tdata_reg[7:0]};
             fcs_output_data_1 = ~crc_state_reg[23:8];
-            fcs_output_data_2 = {CTRL_T, ~crc_state_reg[31:24]};
-            fcs_output_data_k_0 = 2'b00;
-            fcs_output_data_k_1 = 2'b00;
-            fcs_output_data_k_2 = 2'b10;
+            fcs_output_data_2 = {8'd0, ~crc_state_reg[31:24]};
+            fcs_output_valid_0 = 2'b11;
+            fcs_output_valid_1 = 2'b11;
+            fcs_output_valid_2 = 2'b01;
             ifg_offset = 8'd1;
-            extra_cycle = 1'b0;
         end
         1'd0: begin
             fcs_output_data_0 = s_tdata_reg;
             fcs_output_data_1 = ~crc_state_reg[15:0];
             fcs_output_data_2 = ~crc_state_reg[31:16];
-            fcs_output_data_k_0 = 2'b00;
-            fcs_output_data_k_1 = 2'b00;
-            fcs_output_data_k_2 = 2'b00;
+            fcs_output_valid_0 = 2'b11;
+            fcs_output_valid_1 = 2'b11;
+            fcs_output_valid_2 = 2'b11;
             ifg_offset = 8'd0;
-            extra_cycle = 1'b1;
         end
     endcase
 end
@@ -376,6 +384,9 @@ always_comb begin
     pre_cnt_next = pre_cnt_reg;
     ifg_cnt_next = ifg_cnt_reg;
     deficit_idle_cnt_next = deficit_idle_cnt_reg;
+    gmii_frame_next = gmii_frame_reg;
+    cext_next = cext_reg;
+    an_cfg_next = an_cfg_reg;
     an_phase_next = an_phase_reg;
     rd_next = rd_reg;
 
@@ -402,6 +413,10 @@ always_comb begin
             m_axis_tx_cpl_valid_next = 1'b1;
         end
     end
+
+    gmii_txd_next = gmii_txd_reg;
+    gmii_tx_en_next = gmii_tx_en_reg;
+    gmii_tx_er_next = gmii_tx_er_reg;
 
     encoded_tx_data_next = '0;
     encoded_tx_data_k_next = '0;
@@ -431,6 +446,18 @@ always_comb begin
         // gearbox stall - hold state
         state_next = state_reg;
         s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        gmii_txd_next = gmii_txd_reg;
+        gmii_tx_en_next = gmii_tx_en_reg;
+        gmii_tx_er_next = gmii_tx_er_reg;
+    end else if (SGMII_EN && rep_stall_reg) begin
+        // SGMII stall - replicate GMII symbol
+        state_next = state_reg;
+        s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        gmii_txd_next = gmii_txd_reg;
+        gmii_tx_en_next = gmii_tx_en_reg;
+        gmii_tx_er_next = gmii_tx_er_reg;
     end else begin
         // counter to measure frame length
         if (&frame_len_reg[15:1] == 0) begin
@@ -497,10 +524,9 @@ always_comb begin
                 frame_len_lim_check_next = 1'b0;
                 pre_cnt_next = 2'd2;
 
-                encoded_tx_data_next = rd_reg ? CTRL_I1 : CTRL_I2;
-                encoded_tx_data_k_next = 2'b01;
-                encoded_tx_data_dm_next = 2'b01;
-                encoded_tx_data_dv_next = {1'b0, rd_reg};
+                gmii_txd_next = {CTRL_W{ETH_PRE}};
+                gmii_tx_en_next = 2'b00;
+                gmii_tx_er_next = 2'b00;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -509,14 +535,10 @@ always_comb begin
 
                 if (s_axis_tx.tvalid && cfg_tx_enable) begin
                     // Preamble and SFD
-                    encoded_tx_data_next = {{1{ETH_PRE}}, CTRL_S};
-                    encoded_tx_data_k_next = 2'b01;
+                    gmii_txd_next = {CTRL_W{ETH_PRE}};
+                    gmii_tx_en_next = 2'b11;
+                    gmii_tx_er_next = 2'b00;
                     state_next = STATE_PREAMBLE;
-                end else if (AN_EN && tx_an_cfg_valid) begin
-                    // Config register
-                    encoded_tx_data_next = an_phase_reg ? CTRL_C2 : CTRL_C1;
-                    encoded_tx_data_k_next = 2'b01;
-                    state_next = STATE_AN;
                 end else begin
                     ifg_cnt_next = 8'd0;
                     deficit_idle_cnt_next = 1'd0;
@@ -537,8 +559,9 @@ always_comb begin
 
                 crc_data_next = {24'd0, s_axis_tx.tdata} ^ {8'd0, 32'hffffffff};
 
-                encoded_tx_data_next = {2{ETH_PRE}};
-                encoded_tx_data_k_next = 2'b00;
+                gmii_txd_next = {CTRL_W{ETH_PRE}};
+                gmii_tx_en_next = 2'b11;
+                gmii_tx_er_next = 2'b00;
 
                 start_packet_int_next = 1'b0;
 
@@ -552,8 +575,8 @@ always_comb begin
                         s_axis_tx_tready_next = 1'b1;
                         s_tdata_next = s_axis_tx.tdata;
                     end
-                    encoded_tx_data_next = {ETH_SFD, {1{ETH_PRE}}};
-                    encoded_tx_data_k_next = 2'b00;
+                    gmii_txd_next = {ETH_SFD, {1{ETH_PRE}}};
+                    gmii_tx_en_next = 2'b11;
                     start_packet_int_next = 1'b1;
                     state_next = STATE_PAYLOAD;
                 end else begin
@@ -566,8 +589,9 @@ always_comb begin
                 update_crc = 1'b1;
                 s_axis_tx_tready_next = 1'b1;
 
-                encoded_tx_data_next = s_tdata_reg;
-                encoded_tx_data_k_next = 2'b00;
+                gmii_txd_next = s_tdata_reg;
+                gmii_tx_en_next = 2'b11;
+                gmii_tx_er_next = 2'b00;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -607,68 +631,40 @@ always_comb begin
                 update_crc = 1'b1;
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                encoded_tx_data_next = fcs_output_data_0;
-                encoded_tx_data_k_next = fcs_output_data_k_0;
+                gmii_txd_next = fcs_output_data_0;
+                gmii_tx_en_next = fcs_output_valid_0;
+                gmii_tx_er_next = {CTRL_W{frame_error_reg}};
 
                 stat_tx_byte_next = 2'(KEEP_W);
 
-                if (frame_error_reg) begin
-                    state_next = STATE_ERR;
-                end else begin
-                    state_next = STATE_FCS_2;
-                end
+                state_next = STATE_FCS_2;
             end
             STATE_FCS_2: begin
                 // FCS
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                encoded_tx_data_next = fcs_output_data_1;
-                encoded_tx_data_k_next = fcs_output_data_k_1;
+                gmii_txd_next = fcs_output_data_1;
+                gmii_tx_en_next = fcs_output_valid_1;
+                gmii_tx_er_next = {CTRL_W{frame_error_reg}};
 
                 stat_tx_byte_next = 2'(KEEP_W);
 
-                if (frame_error_reg) begin
-                    state_next = STATE_ERR;
-                end else begin
-                    state_next = STATE_FCS_3;
-                end
+                state_next = STATE_FCS_3;
             end
             STATE_FCS_3: begin
                 // FCS
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                encoded_tx_data_next = fcs_output_data_2;
-                encoded_tx_data_k_next = fcs_output_data_k_2;
+                gmii_txd_next = fcs_output_data_2;
+                gmii_tx_en_next = fcs_output_valid_2;
+                gmii_tx_er_next = {CTRL_W{frame_error_reg}};
 
                 stat_tx_byte_next = 2-s_empty_reg;
                 frame_len_next = frame_len_reg + 16'(2-s_empty_reg);
 
                 ifg_cnt_next = (cfg_tx_ifg > 8'd2 ? cfg_tx_ifg : 8'd2) - ifg_offset + 8'(deficit_idle_cnt_reg);
 
-                if (extra_cycle) begin
-                    state_next = STATE_TR;
-                end else begin
-                    stat_tx_pkt_len_next = frame_len_next;
-                    stat_tx_pkt_good_next = !frame_error_reg;
-                    stat_tx_pkt_bad_next = frame_error_reg;
-                    stat_tx_pkt_ucast_next = !is_mcast_reg;
-                    stat_tx_pkt_mcast_next = is_mcast_reg && !is_bcast_reg;
-                    stat_tx_pkt_bcast_next = is_bcast_reg;
-                    stat_tx_pkt_vlan_next = is_8021q_reg;
-                    stat_tx_err_oversize_next = frame_oversize_reg;
-                    state_next = STATE_RR;
-                end
-            end
-            STATE_ERR: begin
-                // terminate packet with error
-                s_axis_tx_tready_next = frame_next; // drop frame
-
-                encoded_tx_data_next = {CTRL_T, CTRL_V};
-                encoded_tx_data_k_next = 2'b11;
-
-                ifg_cnt_next = cfg_tx_ifg;
-
-                stat_tx_pkt_len_next = frame_len_reg;
+                stat_tx_pkt_len_next = frame_len_next;
                 stat_tx_pkt_good_next = !frame_error_reg;
                 stat_tx_pkt_bad_next = frame_error_reg;
                 stat_tx_pkt_ucast_next = !is_mcast_reg;
@@ -676,72 +672,15 @@ always_comb begin
                 stat_tx_pkt_bcast_next = is_bcast_reg;
                 stat_tx_pkt_vlan_next = is_8021q_reg;
                 stat_tx_err_oversize_next = frame_oversize_reg;
-
-                state_next = STATE_RR;
-            end
-            STATE_TR: begin
-                // last cycle
-                s_axis_tx_tready_next = frame_next; // drop frame
-
-                encoded_tx_data_next = {CTRL_R, CTRL_T};
-                encoded_tx_data_k_next = 2'b11;
-
-                stat_tx_pkt_len_next = frame_len_reg;
-                stat_tx_pkt_good_next = !frame_error_reg;
-                stat_tx_pkt_bad_next = frame_error_reg;
-                stat_tx_pkt_ucast_next = !is_mcast_reg;
-                stat_tx_pkt_mcast_next = is_mcast_reg && !is_bcast_reg;
-                stat_tx_pkt_bcast_next = is_bcast_reg;
-                stat_tx_pkt_vlan_next = is_8021q_reg;
-                stat_tx_err_oversize_next = frame_oversize_reg;
-
-                if (DIC_EN) begin
-                    if (ifg_cnt_next > 8'd1) begin
-                        state_next = STATE_IFG;
-                    end else begin
-                        deficit_idle_cnt_next = 1'(ifg_cnt_next);
-                        ifg_cnt_next = 8'd0;
-                        state_next = STATE_IDLE;
-                    end
-                end else begin
-                    if (ifg_cnt_next > 8'd0) begin
-                        state_next = STATE_IFG;
-                    end else begin
-                        state_next = STATE_IDLE;
-                    end
-                end
-            end
-            STATE_RR: begin
-                // FCS
-                s_axis_tx_tready_next = frame_next; // drop frame
-
-                encoded_tx_data_next = {CTRL_R, CTRL_R};
-                encoded_tx_data_k_next = 2'b11;
-
-                if (DIC_EN) begin
-                    if (ifg_cnt_next > 8'd1) begin
-                        state_next = STATE_IFG;
-                    end else begin
-                        deficit_idle_cnt_next = 1'(ifg_cnt_next);
-                        ifg_cnt_next = 8'd0;
-                        state_next = STATE_IDLE;
-                    end
-                end else begin
-                    if (ifg_cnt_next > 8'd0) begin
-                        state_next = STATE_IFG;
-                    end else begin
-                        state_next = STATE_IDLE;
-                    end
-                end
+                state_next = STATE_IFG;
             end
             STATE_IFG: begin
                 // send IFG
                 s_axis_tx_tready_next = frame_next; // drop frame
 
-                encoded_tx_data_next = rd_reg ? CTRL_I1 : CTRL_I2;
-                encoded_tx_data_k_next = 2'b01;
-                encoded_tx_data_dm_next = 2'b01;
-                encoded_tx_data_dv_next = {1'b0, rd_reg};
+                gmii_txd_next = '0;
+                gmii_tx_en_next = 2'b00;
+                gmii_tx_er_next = 2'b00;
 
                 if (DIC_EN) begin
                     if (ifg_cnt_next > 8'd1 || frame_reg) begin
@@ -759,24 +698,86 @@ always_comb begin
                     end
                 end
             end
-            STATE_AN: begin
-                if (AN_EN) begin
-                    // send config register
-                    encoded_tx_data_next = tx_an_cfg;
-                    encoded_tx_data_k_next = 2'b00;
-
-                    tx_an_cfg_ready_next = 1'b1;
-
-                    an_phase_next = !an_phase_reg;
-
-                    state_next = STATE_IDLE;
-                end
-            end
             default: begin
                 // invalid state, return to idle
                 state_next = STATE_IDLE;
             end
         endcase
+    end
+
+    if (rep_en_reg) begin
+        if (rep_sel_reg) begin
+            gmii_txd_rep = {2{gmii_txd_next[15:8]}};
+            gmii_tx_en_rep = {2{gmii_tx_en_next[1]}};
+            gmii_tx_er_rep = {2{gmii_tx_er_next[1]}};
+        end else begin
+            gmii_txd_rep = {2{gmii_txd_next[7:0]}};
+            gmii_tx_en_rep = {2{gmii_tx_en_next[0]}};
+            gmii_tx_er_rep = {2{gmii_tx_er_next[0]}};
+        end
+    end else begin
+        gmii_txd_rep = gmii_txd_next;
+        gmii_tx_en_rep = gmii_tx_en_next;
+        gmii_tx_er_rep = gmii_tx_er_next;
+    end
+
+    if (GBX_IF_EN && tx_gbx_req_stall) begin
+        // gearbox stall
+    end else begin
+        if (gmii_frame_reg) begin
+            if ((gmii_tx_en_rep & gmii_tx_er_rep) != 0) begin
+                // propagate error
+                encoded_tx_data_next = {CTRL_W{CTRL_V}};
+                encoded_tx_data_k_next = 2'b11;
+            end else if (gmii_tx_en_rep == 2'b11) begin
+                // data
+                encoded_tx_data_next = gmii_txd_rep;
+                encoded_tx_data_k_next = 2'b00;
+            end else if (gmii_tx_en_rep == 2'b01) begin
+                // end of frame (lane 1)
+                gmii_frame_next = 1'b0;
+                encoded_tx_data_next = {CTRL_T, gmii_txd_rep[7:0]};
+                encoded_tx_data_k_next = 2'b10;
+                cext_next = 1'b1;
+            end else begin
+                // end of frame (lane 0)
+                gmii_frame_next = 1'b0;
+                encoded_tx_data_next = {CTRL_R, CTRL_T};
+                encoded_tx_data_k_next = 2'b11;
+            end
+        end else if (AN_EN && an_cfg_reg) begin
+            // config reg
+            encoded_tx_data_next = tx_an_cfg;
+            encoded_tx_data_k_next = 2'b00;
+            tx_an_cfg_ready_next = 1'b1;
+            an_phase_next = !an_phase_reg;
+            an_cfg_next = 1'b0;
+        end else begin
+            if (gmii_tx_en_rep != 0) begin
+                // start of frame
+                gmii_frame_next = 1'b1;
+                encoded_tx_data_next = {gmii_txd_rep[15:8], CTRL_S};
+                encoded_tx_data_k_next = 2'b01;
+            end else if (AN_EN && tx_an_cfg_valid) begin
+                // config reg
+                an_cfg_next = 1'b1;
+                encoded_tx_data_next = an_phase_reg ? CTRL_C2 : CTRL_C1;
+                encoded_tx_data_k_next = 2'b01;
+            end else begin
+                if (cext_reg) begin
+                    // carrier extend
+                    encoded_tx_data_next = {CTRL_W{CTRL_R}};
+                    encoded_tx_data_k_next = 2'b11;
+                    cext_next = 1'b0;
+                end else begin
+                    // idle
+                    encoded_tx_data_next = rd_reg ? CTRL_I1 : CTRL_I2;
+                    encoded_tx_data_k_next = 2'b01;
+                    encoded_tx_data_dm_next = 2'b01;
+                    encoded_tx_data_dv_next = {1'b0, rd_reg};
+                end
+            end
+        end
 
         // update running disparity
         rd_next = rd_reg;
@@ -803,6 +804,9 @@ always_ff @(posedge clk) begin
     pre_cnt_reg <= pre_cnt_next;
     ifg_cnt_reg <= ifg_cnt_next;
     deficit_idle_cnt_reg <= deficit_idle_cnt_next;
+    gmii_frame_reg <= gmii_frame_next;
+    cext_reg <= cext_next;
+    an_cfg_reg <= an_cfg_next;
     an_phase_reg <= an_phase_next;
     rd_reg <= rd_next;
 
@@ -838,6 +842,10 @@ always_ff @(posedge clk) begin
         // gearbox stall
         encoded_tx_data_valid_reg <= 1'b0;
     end else begin
+        gmii_txd_reg <= gmii_txd_next;
+        gmii_tx_en_reg <= gmii_tx_en_next;
+        gmii_tx_er_reg <= gmii_tx_er_next;
+
         encoded_tx_data_reg <= encoded_tx_data_next;
         encoded_tx_data_k_reg <= encoded_tx_data_k_next;
         encoded_tx_data_dm_reg <= encoded_tx_data_dm_next;
@@ -851,6 +859,33 @@ always_ff @(posedge clk) begin
         end else if (update_crc) begin
             crc_state_reg <= crc_state;
         end
+
+        if (SGMII_EN && cfg_tx_sgmii_en) begin
+            if (rep_cnt_reg == 0) begin
+                rep_stall_reg <= !rep_sel_reg;
+                rep_en_reg <= 1'b1;
+                rep_sel_reg <= !rep_sel_reg;
+                case (cfg_tx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 49; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 4; // 100 Mbps
+                    default: begin
+                        rep_cnt_reg <= 0; // 1 Gbps
+                        rep_stall_reg <= 1'b0;
+                        rep_en_reg <= 1'b0;
+                        rep_sel_reg <= 1'b0;
+                    end
+                endcase
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+                rep_en_reg <= 1'b1;
+            end
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+            rep_en_reg <= 1'b0;
+            rep_sel_reg <= 1'b0;
+        end
     end
 
     tx_gbx_sync_reg <= tx_gbx_req_sync;
@@ -860,8 +895,16 @@ always_ff @(posedge clk) begin
 
         frame_reg <= 1'b0;
         deficit_idle_cnt_reg <= 1'd0;
+        gmii_frame_reg <= 1'b0;
+        cext_reg <= 1'b0;
+        an_cfg_reg <= 1'b0;
         an_phase_reg <= 1'b0;
         rd_reg <= 1'b0;
+
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
+        rep_en_reg <= 1'b0;
+        rep_sel_reg <= 1'b0;
 
         s_axis_tx_tready_reg <= 1'b0;
 

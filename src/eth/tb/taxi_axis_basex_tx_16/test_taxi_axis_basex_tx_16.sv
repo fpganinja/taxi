@@ -22,7 +22,8 @@ module test_taxi_axis_basex_tx_16 #
     parameter CTRL_W = DATA_W / 8,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96,
@@ -58,6 +59,8 @@ logic [PTP_TS_W-1:0] ptp_ts;
 logic [15:0] cfg_tx_max_pkt_len;
 logic [7:0] cfg_tx_ifg;
 logic cfg_tx_enable;
+logic cfg_tx_sgmii_en;
+logic [1:0] cfg_tx_sgmii_speed;
 
 logic [1:0] tx_start_packet;
 logic [1:0] stat_tx_byte;
@@ -77,6 +80,7 @@ taxi_axis_basex_tx_16 #(
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(GBX_IF_EN),
     .GBX_CNT(GBX_CNT),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
@@ -123,6 +127,8 @@ uut (
     .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
     .cfg_tx_ifg(cfg_tx_ifg),
     .cfg_tx_enable(cfg_tx_enable),
+    .cfg_tx_sgmii_en(cfg_tx_sgmii_en),
+    .cfg_tx_sgmii_speed(cfg_tx_sgmii_speed),
 
     /*
      * Status

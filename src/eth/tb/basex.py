@@ -16,9 +16,6 @@ from cocotb.queue import Queue, QueueFull
 from cocotb.triggers import RisingEdge, Timer, First, Event
 from cocotb.utils import get_sim_time
 
-# from cocotbext.eth.constants import (EthPre, XgmiiCtrl, BaseRCtrl, BaseRO,
-#     BaseRSync, BaseRBlockType, xgmii_ctrl_to_baser_mapping,
-#     baser_ctrl_to_xgmii_mapping, block_type_term_lane_mapping)
 from cocotbext.eth.constants import EthPre, XgmiiCtrl
 from cocotbext.eth import GmiiFrame
 
@@ -536,6 +533,8 @@ class BaseXSerdesSink:
         self.queue_occupancy_bytes = 0
         self.queue_occupancy_frames = 0
 
+        self.gmii_rep_count = 0
+
         self.an_cfg = None
         self.an_ability_match_cnt = 0
         self.an_ack_match_cnt = 0
@@ -604,6 +603,12 @@ class BaseXSerdesSink:
             if k in self.gbx_seq_stall:
                 continue
             self.gbx_bit_cnt += in_bits
+
+    def set_gmii_rep_count(self, rep=0):
+        self.gmii_rep_count = int(rep)
+
+    def get_gmii_rep_count(self):
+        return self.gmii_rep_count
 
     def get_an_cfg(self):
         an_cfg = self.an_cfg
@@ -679,6 +684,8 @@ class BaseXSerdesSink:
 
         an_cfg = None
         last_an_cfg = 0
+
+        skip_cnt = 0
 
         while True:
             await clock_edge_event
@@ -784,7 +791,7 @@ class BaseXSerdesSink:
                         self.active_event.set()
 
                         frame = None
-                    else:
+                    elif skip_cnt == 0:
                         # normal frame data
                         if frame.sim_time_sfd is None and not in_pre:
                             frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
@@ -833,6 +840,7 @@ class BaseXSerdesSink:
                                 frame = GmiiFrame(bytearray([EthPre.PRE]), [False])
                                 frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
                                 in_pre = True
+                                skip_cnt = 0
                             else:
                                 self.log.warning("Ignoring unaligned start")
                         elif d_val == XgmiiCtrl.ERROR:
@@ -858,6 +866,11 @@ class BaseXSerdesSink:
                             self.an_ability_match_cnt = 0
                             self.an_ack_match_cnt = 0
                             self.an_idle_match_cnt += 1
+
+                if skip_cnt > 0:
+                    skip_cnt -= 1
+                elif self.gmii_rep_count:
+                    skip_cnt = self.gmii_rep_count
 
                 if an_cnt_reset:
                     self.an_ability_match_cnt = 0

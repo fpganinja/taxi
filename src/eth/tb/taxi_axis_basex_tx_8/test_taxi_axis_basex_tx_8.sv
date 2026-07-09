@@ -24,7 +24,8 @@ module test_taxi_axis_basex_tx_8 #
     parameter MIN_FRAME_LEN = 64,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
@@ -61,6 +62,8 @@ logic [PTP_TS_W-1:0] ptp_ts;
 logic [15:0] cfg_tx_max_pkt_len;
 logic [7:0] cfg_tx_ifg;
 logic cfg_tx_enable;
+logic cfg_tx_sgmii_en;
+logic [1:0] cfg_tx_sgmii_speed;
 
 logic tx_start_packet;
 logic stat_tx_byte;
@@ -82,6 +85,7 @@ taxi_axis_basex_tx_8 #(
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .GBX_IF_EN(GBX_IF_EN),
     .GBX_CNT(GBX_CNT),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
@@ -128,6 +132,8 @@ uut (
     .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
     .cfg_tx_ifg(cfg_tx_ifg),
     .cfg_tx_enable(cfg_tx_enable),
+    .cfg_tx_sgmii_en(cfg_tx_sgmii_en),
+    .cfg_tx_sgmii_speed(cfg_tx_sgmii_speed),
 
     /*
      * Status

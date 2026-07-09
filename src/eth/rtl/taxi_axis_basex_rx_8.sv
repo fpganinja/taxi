@@ -20,7 +20,8 @@ module taxi_axis_basex_rx_8 #
     parameter DATA_W = 8,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96
 )
@@ -58,7 +59,9 @@ module taxi_axis_basex_rx_8 #
      * Configuration
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
-    input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_enable = 1'b1,
+    input  wire logic                 cfg_rx_sgmii_en = 1'b1,
+    input  wire logic [1:0]           cfg_rx_sgmii_speed = 2'b10,
 
     /*
      * Status
@@ -157,6 +160,9 @@ logic [15:0] frame_len_lim_reg = '0, frame_len_lim_next;
 logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
 logic odd_reg = 1'b0, odd_next;
 
+logic [6:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
+
 logic [DATA_W-1:0] m_axis_rx_tdata_reg = '0, m_axis_rx_tdata_next;
 logic m_axis_rx_tvalid_reg = 1'b0, m_axis_rx_tvalid_next;
 logic m_axis_rx_tlast_reg = 1'b0, m_axis_rx_tlast_next;
@@ -164,6 +170,7 @@ logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
 
 logic [15:0] rx_an_cfg_reg = '0;
 logic rx_an_cfg_valid_reg = 1'b0;
+logic an_cfg_match_reg = 1'b0;
 logic [1:0] an_ability_match_reg = '0;
 logic [1:0] an_ack_match_reg = '0;
 logic [1:0] an_idle_match_reg = '0;
@@ -288,6 +295,9 @@ always_comb begin
     if (GBX_IF_EN && !encoded_rx_data_valid) begin
         // data from gearbox not valid - hold state
         state_next = state_reg;
+    end else if (SGMII_EN && rep_stall_reg) begin
+        // SGMII stall - hold state
+        state_next = state_reg;
     end else begin
 
         odd_next = !odd_reg;
@@ -341,7 +351,7 @@ always_comb begin
 
                 pre_ok_next = 1'b1;
 
-                if (encoded_rx_data_k_d0_reg && encoded_rx_data_d0_reg == CTRL_S && !encoded_rx_data_k) begin
+                if (input_start_d0_reg && !encoded_rx_data_k) begin
                     state_next = STATE_PREAMBLE;
                 end else begin
                     state_next = STATE_IDLE;
@@ -504,13 +514,15 @@ always_ff @(posedge clk) begin
             start_packet_int_reg <= 1'b1;
         end
 
-        encoded_rx_data_d0_reg <= encoded_rx_data;
-        encoded_rx_data_d1_reg <= encoded_rx_data_d0_reg;
-        encoded_rx_data_d2_reg <= encoded_rx_data_d1_reg;
-        encoded_rx_data_d3_reg <= encoded_rx_data_d2_reg;
-        encoded_rx_data_d4_reg <= encoded_rx_data_d3_reg;
+        if (!SGMII_EN || !rep_stall_reg) begin
+            encoded_rx_data_d0_reg <= encoded_rx_data;
+            encoded_rx_data_d1_reg <= encoded_rx_data_d0_reg;
+            encoded_rx_data_d2_reg <= encoded_rx_data_d1_reg;
+            encoded_rx_data_d3_reg <= encoded_rx_data_d2_reg;
+            encoded_rx_data_d4_reg <= encoded_rx_data_d3_reg;
 
-        encoded_rx_data_k_d0_reg <= encoded_rx_data_k;
+            encoded_rx_data_k_d0_reg <= encoded_rx_data_k;
+        end
 
         input_k28p5_d0_reg <= 1'b0;
         input_i_d0_reg <= 1'b0;
@@ -540,19 +552,21 @@ always_ff @(posedge clk) begin
         end
 
         if (AN_EN && input_c_d0_reg) begin
+            rx_an_cfg_reg[7:0] <= encoded_rx_data;
+            an_cfg_match_reg <= rx_an_cfg_reg[7:0] == encoded_rx_data;
             input_c_d1_reg <= encoded_rx_data_k == 1'b0;
             an_idle_match_reg <= '0;
         end
 
         if (AN_EN && input_c_d1_reg) begin
-            rx_an_cfg_reg <= {encoded_rx_data, encoded_rx_data_d0_reg};
+            rx_an_cfg_reg[15:8] <= encoded_rx_data;
             rx_an_cfg_valid_reg <= encoded_rx_data_k == 1'b0;
-            if (((rx_an_cfg_reg ^ {encoded_rx_data, encoded_rx_data_d0_reg}) & ~16'h4000) == 0) begin
+            if (an_cfg_match_reg && ((rx_an_cfg_reg[15:8] ^ encoded_rx_data) & ~8'h40) == 0) begin
                 an_ability_match_reg <= {an_ability_match_reg[0], 1'b1};
             end else begin
                 an_ability_match_reg <= '0;
             end
-            if (rx_an_cfg_reg[14] && rx_an_cfg_reg == {encoded_rx_data, encoded_rx_data_d0_reg}) begin
+            if (an_cfg_match_reg && rx_an_cfg_reg[14] && rx_an_cfg_reg[15:8] == encoded_rx_data) begin
                 an_ack_match_reg <= {an_ack_match_reg[0], 1'b1};
             end else begin
                 an_ack_match_reg <= '0;
@@ -575,6 +589,35 @@ always_ff @(posedge clk) begin
             crc_state_reg <= '1;
         end else if (update_crc) begin
             crc_state_reg <= crc_state;
+        end
+
+        if (SGMII_EN && cfg_rx_sgmii_en) begin
+            if (encoded_rx_data != encoded_rx_data_d0_reg || encoded_rx_data_k) begin
+                rep_stall_reg <= !rep_stall_reg;
+                case (cfg_rx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 98; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 8; // 100 Mbps
+                    default: begin
+                        rep_cnt_reg <= 0;
+                        rep_stall_reg <= 1'b0;
+                    end
+                endcase
+            end else if (rep_cnt_reg == 0) begin
+                case (cfg_rx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 99; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 9; // 100 Mbps
+                    2'b10: rep_cnt_reg <= 0; // 1 Gbps
+                    default: rep_cnt_reg <= 0;
+                endcase
+
+                rep_stall_reg <= 1'b0;
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+            end
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
         end
     end
 
@@ -602,6 +645,9 @@ always_ff @(posedge clk) begin
         input_c_d0_reg <= 1'b0;
         input_c_d1_reg <= 1'b0;
         input_start_d0_reg <= 1'b0;
+
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
 
         m_axis_rx_tvalid_reg <= 1'b0;
 

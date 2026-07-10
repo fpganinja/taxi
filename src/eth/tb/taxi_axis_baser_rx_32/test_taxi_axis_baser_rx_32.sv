@@ -21,6 +21,7 @@ module test_taxi_axis_baser_rx_32 #
     parameter DATA_W = 32,
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic USXGMII_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64
@@ -48,6 +49,9 @@ logic [PTP_TS_W-1:0] ptp_ts;
 
 logic [15:0] cfg_rx_max_pkt_len;
 logic cfg_rx_enable;
+logic cfg_rx_usxgmii_en;
+logic cfg_rx_usxgmii_5g;
+logic [2:0] cfg_rx_usxgmii_speed;
 
 logic rx_start_packet;
 logic [2:0] stat_rx_byte;
@@ -70,6 +74,7 @@ taxi_axis_baser_rx_32 #(
     .DATA_W(DATA_W),
     .HDR_W(HDR_W),
     .GBX_IF_EN(GBX_IF_EN),
+    .USXGMII_EN(USXGMII_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_W(PTP_TS_W)
 )
@@ -107,6 +112,9 @@ uut (
      */
     .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
     .cfg_rx_enable(cfg_rx_enable),
+    .cfg_rx_usxgmii_en(cfg_rx_usxgmii_en),
+    .cfg_rx_usxgmii_5g(cfg_rx_usxgmii_5g),
+    .cfg_rx_usxgmii_speed(cfg_rx_usxgmii_speed),
 
     /*
      * Status

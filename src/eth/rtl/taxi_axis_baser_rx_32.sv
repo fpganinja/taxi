@@ -20,6 +20,7 @@ module taxi_axis_baser_rx_32 #
     parameter DATA_W = 32,
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic PTP_TS_EN = 1'b0,
     parameter PTP_TS_W = 96
 )
@@ -57,6 +58,9 @@ module taxi_axis_baser_rx_32 #
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
     input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_usxgmii_en = 1'b1,
+    input  wire logic                 cfg_rx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]           cfg_rx_usxgmii_speed = 3'b011,
 
     /*
      * Status
@@ -155,6 +159,7 @@ state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic reset_crc;
+logic update_crc;
 
 logic term_present_alt_reg = 1'b0;
 logic term_present_reg = 1'b0;
@@ -164,6 +169,9 @@ logic [1:0] term_lane_alt_reg = 0;
 logic [1:0] term_lane_reg = 0;
 logic [1:0] term_lane_d0_reg = 0;
 logic framing_error_reg = 1'b0;
+
+logic [9:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
 
 logic [DATA_W-1:0] input_data_d0_reg = '0;
 logic [DATA_W-1:0] input_data_d1_reg = '0;
@@ -292,6 +300,7 @@ always_comb begin
     state_next = STATE_IDLE;
 
     reset_crc = 1'b0;
+    update_crc = 1'b0;
 
     frame_oversize_next = frame_oversize_reg;
     pre_ok_next = pre_ok_reg;
@@ -331,6 +340,9 @@ always_comb begin
 
     if (GBX_IF_EN && !encoded_rx_data_valid) begin
         // data from gearbox not valid - hold state
+        state_next = state_reg;
+    end else if (USXGMII_EN && rep_stall_reg) begin
+        // USXGMII stall - hold state
         state_next = state_reg;
     end else begin
         // counter to measure frame length
@@ -382,6 +394,7 @@ always_comb begin
             STATE_IDLE: begin
                 // idle state - wait for packet
                 reset_crc = 1'b1;
+                update_crc = 1'b1;
 
                 frame_oversize_next = 1'b0;
                 frame_len_next = 16'(KEEP_W);
@@ -412,6 +425,7 @@ always_comb begin
             end
             STATE_PREAMBLE: begin
                 // drop preamble
+                update_crc = 1'b1;
 
                 hdr_ptr_next = 0;
 
@@ -429,6 +443,8 @@ always_comb begin
             end
             STATE_PAYLOAD: begin
                 // read payload
+                update_crc = 1'b1;
+
                 m_axis_rx_tdata_next = input_data_d2_reg;
                 m_axis_rx_tkeep_next = {KEEP_W{1'b1}};
                 m_axis_rx_tvalid_next = 1'b1;
@@ -611,16 +627,20 @@ always_ff @(posedge clk) begin
         term_first_cycle_reg <= term_first_cycle_alt_reg;
         term_lane_alt_reg <= 0;
         term_lane_reg <= term_lane_alt_reg;
-        term_lane_d0_reg <= term_lane_reg;
-
-        input_data_d0_reg <= encoded_rx_data_reg;
-        input_data_d1_reg <= input_data_d0_reg;
-        input_data_d2_reg <= input_data_d1_reg;
 
         input_start_alt_reg <= 1'b0;
-        input_start_d0_reg <= input_start_alt_reg;
-        input_start_d1_reg <= input_start_d0_reg;
-        input_start_d2_reg <= input_start_d1_reg;
+
+        if (!USXGMII_EN || !rep_stall_reg) begin
+            term_lane_d0_reg <= term_lane_reg;
+
+            input_data_d0_reg <= encoded_rx_data_reg;
+            input_data_d1_reg <= input_data_d0_reg;
+            input_data_d2_reg <= input_data_d1_reg;
+
+            input_start_d0_reg <= input_start_alt_reg;
+            input_start_d1_reg <= input_start_d0_reg;
+            input_start_d2_reg <= input_start_d1_reg;
+        end
 
         if (encoded_rx_hdr_valid_reg) begin
             // portion with header
@@ -801,15 +821,53 @@ always_ff @(posedge clk) begin
 
         if (reset_crc) begin
             crc_state_reg <= '1;
-        end else begin
+        end else if (update_crc) begin
             crc_state_reg <= crc_state;
         end
 
-        crc_valid_reg <= crc_valid;
+        if (update_crc) begin
+            crc_valid_reg <= crc_valid;
+        end
+
+        if (USXGMII_EN && cfg_rx_usxgmii_en) begin
+            if (rep_cnt_reg == 0 || (encoded_rx_hdr_valid_reg && encoded_rx_hdr_reg[0]) || input_start_alt_reg) begin
+                if (cfg_rx_usxgmii_5g) begin
+                    case (cfg_rx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 499; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 49; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 4; // 1 Gbps
+                        3'b100: rep_cnt_reg <= 1; // 2.5 Gbps
+                        3'b101: rep_cnt_reg <= 0; // 5 Gbps
+                        default: rep_cnt_reg <= 0;
+                    endcase
+                end else begin
+                    case (cfg_rx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 999; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 99; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 9; // 1 Gbps
+                        3'b011: rep_cnt_reg <= 0; // 10 Gbps
+                        3'b100: rep_cnt_reg <= 3; // 2.5 Gbps
+                        3'b101: rep_cnt_reg <= 1; // 5 Gbps
+                        default: rep_cnt_reg <= 0;
+                    endcase
+                end
+
+                rep_stall_reg <= 1'b0;
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+            end
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+        end
     end
 
     if (rst) begin
         state_reg <= STATE_IDLE;
+
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
 
         m_axis_rx_tvalid_reg <= 1'b0;
 

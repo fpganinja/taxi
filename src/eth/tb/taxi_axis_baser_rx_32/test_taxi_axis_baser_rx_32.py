@@ -38,7 +38,7 @@ except ImportError:
 
 
 class TB:
-    def __init__(self, dut, gbx_cfg=None):
+    def __init__(self, dut, gbx_cfg=None, usxgmii_speed=None):
         self.dut = dut
 
         self.log = logging.getLogger("cocotb.tb")
@@ -66,6 +66,29 @@ class TB:
 
         dut.cfg_rx_max_pkt_len.setimmediatevalue(0)
         dut.cfg_rx_enable.setimmediatevalue(0)
+        if usxgmii_speed is not None:
+            dut.cfg_rx_usxgmii_en.setimmediatevalue(1)
+            dut.cfg_rx_usxgmii_5g.setimmediatevalue(0)
+            dut.cfg_rx_usxgmii_speed.setimmediatevalue(usxgmii_speed)
+            if usxgmii_speed == 0:
+                self.source.set_xgmii_rep_count(999) # 10 Mbps
+            elif usxgmii_speed == 1:
+                self.source.set_xgmii_rep_count(99) # 100 Mbps
+            elif usxgmii_speed == 2:
+                self.source.set_xgmii_rep_count(9) # 1 Gbps
+            elif usxgmii_speed == 3:
+                self.source.set_xgmii_rep_count(0) # 10 Gbps
+            elif usxgmii_speed == 4:
+                self.source.set_xgmii_rep_count(3) # 2.5 Gbps
+            elif usxgmii_speed == 5:
+                self.source.set_xgmii_rep_count(1) # 5 Gbps
+            else:
+                self.source.set_xgmii_rep_count(0)
+        else:
+            dut.cfg_rx_usxgmii_en.setimmediatevalue(0)
+            dut.cfg_rx_usxgmii_5g.setimmediatevalue(0)
+            dut.cfg_rx_usxgmii_speed.setimmediatevalue(0b011)
+            self.source.set_xgmii_rep_count(0)
 
         self.stats = {}
         self.stats["stat_rx_byte"] = 0
@@ -110,9 +133,9 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
-async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
+async def run_test(dut, gbx_cfg=None, usxgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, usxgmii_speed)
 
     tb.source.ifg = ifg
     tb.dut.cfg_rx_max_pkt_len.value = 9218-1
@@ -176,9 +199,9 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         await RisingEdge(dut.clk)
 
 
-async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
+async def run_test_oversize(dut, gbx_cfg=None, usxgmii_speed=None, ifg=12):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, usxgmii_speed)
 
     tb.source.ifg = ifg
     tb.dut.cfg_rx_max_pkt_len.value = 1518-1
@@ -265,9 +288,9 @@ async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
-async def run_test_os(dut, gbx_cfg=None):
+async def run_test_os(dut, gbx_cfg=None, usxgmii_speed=None):
 
-    tb = TB(dut, gbx_cfg)
+    tb = TB(dut, gbx_cfg, usxgmii_speed)
 
     await tb.reset()
 
@@ -315,16 +338,19 @@ if getattr(cocotb, 'top', None) is not None:
     factory = TestFactory(run_test)
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("ifg", list(range(0, 13)))
+    factory.add_option("ifg", [0, 1, 11, 12])
+    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
     factory = TestFactory(run_test_oversize)
-    factory.add_option("ifg", list(range(0, 13)))
+    factory.add_option("ifg", [0, 1, 11, 12])
+    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
     factory = TestFactory(run_test_os)
+    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
@@ -370,6 +396,7 @@ def test_taxi_axis_baser_rx_32(request, gbx_en):
     parameters['DATA_W'] = 32
     parameters['HDR_W'] = 2
     parameters['GBX_IF_EN'] = gbx_en
+    parameters['USXGMII_EN'] = 1
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64

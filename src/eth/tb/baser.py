@@ -71,6 +71,8 @@ class BaseRSerdesSource():
         self.queue_occupancy_limit_bytes = -1
         self.queue_occupancy_limit_frames = -1
 
+        self.xgmii_rep_count = 0
+
         self.os = None
         self.os_sig = False
 
@@ -200,6 +202,12 @@ class BaseRSerdesSource():
     async def wait(self):
         await self.idle_event.wait()
 
+    def set_xgmii_rep_count(self, rep=0):
+        self.xgmii_rep_count = int(rep)
+
+    def get_xgmii_rep_count(self):
+        return self.xgmii_rep_count
+
     def set_seq_os(self, os=None):
         self.set_os(os, False)
 
@@ -213,6 +221,7 @@ class BaseRSerdesSource():
     async def _run(self):
         frame = None
         frame_offset = 0
+        sof = False
         in_pre = False
         ifg_cnt = 0
         deficit_idle_cnt = 0
@@ -228,6 +237,8 @@ class BaseRSerdesSource():
 
         data = 0
         hdr = 0
+
+        rep_cnt = 0
 
         while True:
             await clock_edge_event
@@ -288,7 +299,7 @@ class BaseRSerdesSource():
 
                 continue
 
-            if ifg_cnt + deficit_idle_cnt > 8-1 or (not self.enable_dic and ifg_cnt > 4):
+            if ifg_cnt + deficit_idle_cnt > 8-1 or (not self.enable_dic and ifg_cnt > 4) or rep_cnt != 0:
                 # in IFG
                 ifg_cnt = ifg_cnt - 8
                 if ifg_cnt < 0:
@@ -335,7 +346,8 @@ class BaseRSerdesSource():
                         deficit_idle_cnt = max(deficit_idle_cnt+ifg_cnt, 0)
                     ifg_cnt = 0
                     self.active = True
-                    frame_offset = 0
+                    frame_offset = -1
+                    sof = True
                     in_pre = True
                 else:
                     # clear counters
@@ -349,16 +361,27 @@ class BaseRSerdesSource():
 
             for k in range(8):
                 if frame is not None:
+                    frame_offset += 1
+                    if rep_cnt == 0:
+                        pass
+                    elif k == 0 or k == 4:
+                        frame_offset = max(0, frame_offset-4)
                     d = frame.data[frame_offset]
+                    c = frame.ctrl[frame_offset]
                     if frame.sim_time_sfd is None and not in_pre:
                         frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
                     if d == EthPre.SFD:
                         in_pre = False
+                    if c and d == XgmiiCtrl.START:
+                        if sof:
+                            sof = False
+                        else:
+                            d = 0xAA
+                            c = 0
                     dl.append(d)
-                    cl.append(frame.ctrl[frame_offset])
-                    frame_offset += 1
+                    cl.append(c)
 
-                    if frame_offset >= len(frame.data):
+                    if frame_offset >= len(frame.data)-1:
                         ifg_cnt = max(self.ifg - (8-k), 0)
                         frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
                         frame.handle_tx_complete()
@@ -367,6 +390,12 @@ class BaseRSerdesSource():
                 else:
                     dl.append(XgmiiCtrl.IDLE)
                     cl.append(1)
+
+                if k == 3 or k == 7:
+                    if rep_cnt > 0:
+                        rep_cnt -= 1
+                    elif self.xgmii_rep_count:
+                        rep_cnt = self.xgmii_rep_count
 
             # replace idles with ordered sets
             if self.os is not None:

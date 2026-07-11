@@ -594,6 +594,8 @@ class BaseRSerdesSink:
 
         self.os = None
         self.os_sig = False
+        self.os_match_cnt = 0
+        self.idle_match_cnt = 0
 
         self.width = len(self.data)
         self.byte_size = 8
@@ -672,6 +674,12 @@ class BaseRSerdesSink:
         ret = (self.os, self.os_sig)
         self.os = None
         return ret
+
+    def get_os_match(self):
+        return self.os_match_cnt > 2
+
+    def get_idle_match(self):
+        return self.idle_match_cnt > 2
 
     def _recv(self, frame, compact=True):
         if self.queue.empty():
@@ -845,6 +853,8 @@ class BaseRSerdesSink:
                     # C7 C6 C5 C4 C3 C2 C1 C0 BT
                     dl = ctrl
                     cl = [1]*8
+                    self.os_match_cnt = 0
+                    self.idle_match_cnt += 1
                 elif db[0] == BaseRBlockType.OS_4:
                     # D7 D6 D5 O4 C3 C2 C1 C0 BT
                     dl = ctrl[0:4]
@@ -961,14 +971,18 @@ class BaseRSerdesSink:
             # extract ordered sets
             if os:
                 for k in [0, 4]:
-                    if cl[k] and dl[k] == XgmiiCtrl.SEQ_OS:
-                        self.os = int.from_bytes(db[k+1:k+4], 'big')
-                        self.os_sig = False
-                        self.log.info("RX sequence ordered set: 0x%06x", self.os)
-                    elif cl[k] and dl[k] == XgmiiCtrl.SIG_OS:
-                        self.os = int.from_bytes(db[k+1:k+4], 'big')
-                        self.os_sig = True
-                        self.log.info("RX signal ordered set: 0x%06x", self.os)
+                    os_sig = dl[k] == XgmiiCtrl.SIG_OS
+                    if cl[k] and (dl[k] == XgmiiCtrl.SEQ_OS or os_sig):
+                        v = int.from_bytes(db[k+1:k+4], 'big')
+                        if self.os == v and self.os_sig == os_sig:
+                            self.os_match_cnt += 1
+                        self.idle_match_cnt = 0
+                        self.os = v
+                        self.os_sig = os_sig
+                        if os_sig:
+                            self.log.info("RX signal ordered set: 0x%06x", self.os)
+                        else:
+                            self.log.info("RX sequence ordered set: 0x%06x", self.os)
 
             for k in range(8):
                 d_val = dl[k]

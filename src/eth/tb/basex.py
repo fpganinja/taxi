@@ -139,6 +139,7 @@ class BaseXSerdesSource():
 
         self.enable_dic = True
         self.ifg = 12
+        self.truncate_preamble = False
 
         self.bit_offset = 0
 
@@ -434,6 +435,11 @@ class BaseXSerdesSource():
                         # /S/
                         d_val = XgmiiCtrl.START # /K27.7/
                         k_val = True
+                        if self.truncate_preamble:
+                            if self.gmii_rep_count:
+                                rep_cnt = self.gmii_rep_count
+                            else:
+                                frame_offset += 1
                     elif frame_offset >= len(frame.data):
                         # /T/
                         d_val = XgmiiCtrl.TERM # /K29.7/
@@ -483,7 +489,7 @@ class BaseXSerdesSource():
 
                 if rep_cnt > 0:
                     rep_cnt -= 1
-                elif self.gmii_rep_count and odd:
+                elif self.gmii_rep_count and (odd or frame is not None):
                     rep_cnt = self.gmii_rep_count
 
             # if self.slip is not None and self.slip.value:

@@ -73,11 +73,12 @@ class TB:
         await RisingEdge(self.dut.clk)
 
 
-async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12, pre_len=8):
+async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12, pre_trunc=8):
 
     tb = TB(dut, gbx_cfg)
 
     tb.source.ifg = ifg
+    tb.source.truncate_preamble = pre_trunc
 
     await tb.reset()
 
@@ -85,7 +86,6 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
 
     for test_data in test_frames:
         test_frame = GmiiFrame.from_payload(test_data)
-        test_frame.data = test_frame.data[8-pre_len:]
         await tb.source.send(test_frame)
 
     for test_data in test_frames:
@@ -147,7 +147,7 @@ if getattr(cocotb, 'top', None) is not None:
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
     factory.add_option("ifg", list(range(0, 13)))
-    factory.add_option("pre_len", [8, 7])
+    factory.add_option("pre_trunc", [False, True])
     factory.generate_tests()
 
     factory = TestFactory(run_test_an)

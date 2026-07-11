@@ -109,11 +109,12 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
-async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12, pre_len=8):
+async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12, pre_trunc=False):
 
     tb = TB(dut, gbx_cfg)
 
     tb.source.ifg = ifg
+    tb.source.truncate_preamble = pre_trunc
     tb.dut.cfg_rx_max_pkt_len.value = 9218-1
     tb.dut.cfg_rx_enable.value = 1
 
@@ -127,7 +128,6 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
 
     for test_data in test_frames:
         test_frame = GmiiFrame.from_payload(test_data, tx_complete=tx_frames.append)
-        test_frame.data = test_frame.data[8-pre_len:]
         await tb.source.send(test_frame)
         total_bytes += len(test_data)+4
         total_pkts += 1
@@ -320,7 +320,7 @@ if getattr(cocotb, 'top', None) is not None:
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
     # factory.add_option("ifg", list(range(0, 13)))
-    factory.add_option("pre_len", [8, 7])
+    factory.add_option("pre_trunc", [False, True])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 

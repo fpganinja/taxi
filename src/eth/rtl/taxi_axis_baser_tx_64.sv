@@ -266,6 +266,8 @@ assign m_axis_tx_cpl.tid = m_axis_tx_cpl_tag_reg;
 assign m_axis_tx_cpl.tdest = '0;
 assign m_axis_tx_cpl.tuser = '0;
 
+assign tx_os_ready = tx_os_ready_reg;
+
 assign tx_start_packet = start_packet_reg;
 
 assign stat_tx_byte = stat_tx_byte_reg;

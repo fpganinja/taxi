@@ -414,6 +414,8 @@ if (DATA_W == 64) begin
         .rx_os(),
         .rx_os_sig(),
         .rx_os_valid(),
+        .rx_os_match(),
+        .rx_idle_match(),
 
         /*
          * PTP
@@ -546,6 +548,8 @@ end else if (DATA_W == 32) begin
         .rx_os(),
         .rx_os_sig(),
         .rx_os_valid(),
+        .rx_os_match(),
+        .rx_idle_match(),
 
         /*
          * PTP

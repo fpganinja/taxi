@@ -152,6 +152,8 @@ xgmii_baser_dec_inst (
     .rx_os(),
     .rx_os_sig(),
     .rx_os_valid(),
+    .rx_os_match(),
+    .rx_idle_match(),
 
     /*
      * Status

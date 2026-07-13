@@ -22,6 +22,7 @@ module test_taxi_eth_mac_phy_10g #
     parameter HDR_W = 2,
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
+    parameter logic USXGMII_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -75,6 +76,24 @@ logic [HDR_W-1:0] serdes_rx_hdr;
 logic serdes_rx_hdr_valid;
 logic serdes_rx_bitslip;
 logic serdes_rx_reset_req;
+
+logic an_en;
+logic an_restart;
+logic an_speedup;
+logic an_timeout_en;
+logic an_usxgmii_en;
+logic an_usxgmii_auto;
+logic an_usxgmii_5g;
+logic an_intr;
+logic an_running;
+logic an_complete;
+logic an_timeout;
+logic an_usxgmii_mode;
+logic [15:0] an_adv_ability_usxgmii;
+logic [15:0] an_lp_adv_ability;
+logic an_lp_usxgmii_link;
+logic [2:0]  an_lp_usxgmii_speed;
+logic an_res_full_duplex;
 
 logic ptp_clk;
 logic ptp_rst;
@@ -208,6 +227,7 @@ taxi_eth_mac_phy_10g #(
     .HDR_W(HDR_W),
     .TX_GBX_IF_EN(TX_GBX_IF_EN),
     .RX_GBX_IF_EN(RX_GBX_IF_EN),
+    .USXGMII_EN(USXGMII_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TD_EN(PTP_TD_EN),
@@ -265,6 +285,27 @@ uut (
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
+
+    /*
+     * USXGMII autonegotiation
+     */
+    .an_en(an_en),
+    .an_restart(an_restart),
+    .an_speedup(an_speedup),
+    .an_timeout_en(an_timeout_en),
+    .an_usxgmii_en(an_usxgmii_en),
+    .an_usxgmii_auto(an_usxgmii_auto),
+    .an_usxgmii_5g(an_usxgmii_5g),
+    .an_intr(an_intr),
+    .an_running(an_running),
+    .an_complete(an_complete),
+    .an_timeout(an_timeout),
+    .an_usxgmii_mode(an_usxgmii_mode),
+    .an_adv_ability_usxgmii(an_adv_ability_usxgmii),
+    .an_lp_adv_ability(an_lp_adv_ability),
+    .an_lp_usxgmii_link(an_lp_usxgmii_link),
+    .an_lp_usxgmii_speed(an_lp_usxgmii_speed),
+    .an_res_full_duplex(an_res_full_duplex),
 
     /*
      * PTP

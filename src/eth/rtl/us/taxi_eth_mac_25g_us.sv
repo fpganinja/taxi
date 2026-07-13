@@ -54,6 +54,7 @@ module taxi_eth_mac_25g_us #
     // MAC/PHY parameters
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter DATA_W = 64,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -132,6 +133,26 @@ module taxi_eth_mac_25g_us #
      * Receive interface (AXI stream)
      */
     taxi_axis_if.src                  m_axis_rx[CNT],
+
+    /*
+     * USXGMII autonegotiation
+     */
+    input  wire logic                 an_en[CNT] = '{CNT{1'b1}},
+    input  wire logic                 an_restart[CNT] = '{CNT{1'b0}},
+    input  wire logic                 an_speedup[CNT] = '{CNT{1'b0}},
+    input  wire logic                 an_timeout_en[CNT] = '{CNT{1'b1}},
+    input  wire logic                 an_usxgmii_en[CNT] = '{CNT{1'b0}},
+    input  wire logic                 an_usxgmii_auto[CNT] = '{CNT{1'b1}},
+    output wire logic                 an_intr[CNT],
+    output wire logic                 an_running[CNT],
+    output wire logic                 an_complete[CNT],
+    output wire logic                 an_timeout[CNT],
+    output wire logic                 an_usxgmii_mode[CNT],
+    input  wire logic [15:0]          an_adv_ability_usxgmii[CNT] = '{CNT{16'h1601}},
+    output wire logic [15:0]          an_lp_adv_ability[CNT],
+    output wire logic                 an_lp_usxgmii_link[CNT],
+    output wire logic [2:0]           an_lp_usxgmii_speed[CNT],
+    output wire logic                 an_res_full_duplex[CNT],
 
     /*
      * PTP clock
@@ -426,6 +447,7 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         // MAC/PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .DATA_W(DATA_W),
+        .USXGMII_EN(USXGMII_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TD_EN(PTP_TD_EN),
@@ -518,6 +540,26 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
          * Receive interface (AXI stream)
          */
         .m_axis_rx(m_axis_rx[n]),
+
+        /*
+         * USXGMII autonegotiation
+         */
+        .an_en(an_en[n]),
+        .an_restart(an_restart[n]),
+        .an_speedup(an_speedup[n]),
+        .an_timeout_en(an_timeout_en[n]),
+        .an_usxgmii_en(an_usxgmii_en[n]),
+        .an_usxgmii_auto(an_usxgmii_auto[n]),
+        .an_intr(an_intr[n]),
+        .an_running(an_running[n]),
+        .an_complete(an_complete[n]),
+        .an_timeout(an_timeout[n]),
+        .an_usxgmii_mode(an_usxgmii_mode[n]),
+        .an_adv_ability_usxgmii(an_adv_ability_usxgmii[n]),
+        .an_lp_adv_ability(an_lp_adv_ability[n]),
+        .an_lp_usxgmii_link(an_lp_usxgmii_link[n]),
+        .an_lp_usxgmii_speed(an_lp_usxgmii_speed[n]),
+        .an_res_full_duplex(an_res_full_duplex[n]),
 
         /*
          * PTP clock

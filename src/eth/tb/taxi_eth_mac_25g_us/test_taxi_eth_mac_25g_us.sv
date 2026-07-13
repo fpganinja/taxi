@@ -43,6 +43,7 @@ module test_taxi_eth_mac_25g_us #
     parameter logic [CNT-1:0] GT_RX_POLARITY = '0,
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter DATA_W = 64,
+    parameter logic USXGMII_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -112,6 +113,23 @@ logic tx_rst_out[CNT];
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) s_axis_tx[CNT]();
 taxi_axis_if #(.DATA_W(PTP_TS_W), .KEEP_W(1), .ID_EN(1), .ID_W(TX_TAG_W)) m_axis_tx_cpl[CNT]();
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(RX_USER_W)) m_axis_rx[CNT]();
+
+logic an_en[CNT];
+logic an_restart[CNT];
+logic an_speedup[CNT];
+logic an_timeout_en[CNT];
+logic an_usxgmii_en[CNT];
+logic an_usxgmii_auto[CNT];
+logic an_intr[CNT];
+logic an_running[CNT];
+logic an_complete[CNT];
+logic an_timeout[CNT];
+logic an_usxgmii_mode[CNT];
+logic [15:0] an_adv_ability_usxgmii[CNT];
+logic [15:0] an_lp_adv_ability[CNT];
+logic an_lp_usxgmii_link[CNT];
+logic [2:0]  an_lp_usxgmii_speed[CNT];
+logic an_res_full_duplex[CNT];
 
 logic ptp_clk;
 logic ptp_rst;
@@ -266,6 +284,7 @@ taxi_eth_mac_25g_us #(
     .GT_RX_POLARITY(GT_RX_POLARITY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .DATA_W(DATA_W),
+    .USXGMII_EN(USXGMII_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TD_EN(PTP_TD_EN),
@@ -344,6 +363,26 @@ uut (
      * Receive interface (AXI stream)
      */
     .m_axis_rx(m_axis_rx),
+
+    /*
+     * USXGMII autonegotiation
+     */
+    .an_en(an_en),
+    .an_restart(an_restart),
+    .an_speedup(an_speedup),
+    .an_timeout_en(an_timeout_en),
+    .an_usxgmii_en(an_usxgmii_en),
+    .an_usxgmii_auto(an_usxgmii_auto),
+    .an_intr(an_intr),
+    .an_running(an_running),
+    .an_complete(an_complete),
+    .an_timeout(an_timeout),
+    .an_usxgmii_mode(an_usxgmii_mode),
+    .an_adv_ability_usxgmii(an_adv_ability_usxgmii),
+    .an_lp_adv_ability(an_lp_adv_ability),
+    .an_lp_usxgmii_link(an_lp_usxgmii_link),
+    .an_lp_usxgmii_speed(an_lp_usxgmii_speed),
+    .an_res_full_duplex(an_res_full_duplex),
 
     /*
      * PTP

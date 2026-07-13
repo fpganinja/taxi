@@ -19,7 +19,7 @@ import cocotb_test.simulator
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
 from cocotb.regression import TestFactory
 
@@ -103,6 +103,15 @@ class TB:
             reset=dut.ptp_rst,
             period_ns=self.ptp_clk_period
         )
+
+        dut.an_en.setimmediatevalue(0)
+        dut.an_restart.setimmediatevalue(0)
+        dut.an_speedup.setimmediatevalue(1)
+        dut.an_timeout_en.setimmediatevalue(1)
+        dut.an_usxgmii_en.setimmediatevalue(0)
+        dut.an_usxgmii_auto.setimmediatevalue(1)
+        dut.an_usxgmii_5g.setimmediatevalue(0)
+        dut.an_adv_ability_usxgmii.setimmediatevalue(0x1601)
 
         dut.cfg_tx_pad_en.setimmediatevalue(0)
         dut.cfg_tx_min_pkt_len.setimmediatevalue(0)
@@ -405,6 +414,152 @@ async def run_test_rx_frame_sync(dut, gbx_cfg=None):
     await RisingEdge(dut.rx_clk)
 
 
+async def run_usxgmii_an(tb, cfg):
+    # link timer scaled by 1000x for faster simulation
+    link_timer = Timer(1.6, 'us')
+
+    dut = tb.dut
+
+    for k in range(10):
+        tb.log.info("AN_RESTART")
+        tb.serdes_source.set_seq_os((0x0000 << 8) | 0x03)
+
+        await link_timer
+
+        tb.log.info("ABILITY_DETECT")
+        tb.serdes_source.set_seq_os(((cfg & ~0x4000) << 8) | 0x03)
+        tb.serdes_sink.get_os()
+
+        lp_cfg = None
+        while True:
+            await RisingEdge(dut.tx_clk)
+            lp_cfg = tb.serdes_sink.get_os()[0]
+            if lp_cfg is None:
+                continue
+            if lp_cfg & 0xff != 0x03:
+                continue
+            lp_cfg = lp_cfg >> 8
+            if tb.serdes_sink.get_os_match() and lp_cfg != 0:
+                break
+
+        tb.log.info("ACKNOWLEDGE_DETECT")
+        tb.serdes_source.set_seq_os(((cfg | 0x4000) << 8) | 0x03)
+        tb.serdes_sink.get_os()
+
+        lp_cfg_ack = None
+        while True:
+            await RisingEdge(dut.tx_clk)
+            lp_cfg_ack = tb.serdes_sink.get_os()[0]
+            if lp_cfg_ack is None:
+                continue
+            if lp_cfg_ack & 0xff != 0x03:
+                continue
+            lp_cfg_ack = lp_cfg_ack >> 8
+            if tb.serdes_sink.get_os_match() and lp_cfg_ack & 0x4000:
+                break
+            elif tb.serdes_sink.get_os_match() and lp_cfg_ack == 0:
+                break
+
+        if lp_cfg | 0x4000 != lp_cfg_ack:
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg | 0x4000, lp_cfg_ack)
+            continue
+
+        if lp_cfg_ack == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("COMPLETE_ACKNOWLEDGE")
+        await link_timer
+
+        tb.log.info("IDLE_DETECT")
+        tb.serdes_source.set_seq_os(None)
+
+        await link_timer
+
+        lp_cfg_ack2 = None
+        while True:
+            await RisingEdge(dut.tx_clk)
+            if tb.serdes_sink.get_idle_match():
+                break
+            lp_cfg_ack2 = tb.serdes_sink.get_os()[0]
+            if lp_cfg_ack2 is None:
+                continue
+            if lp_cfg_ack2 & 0xff != 0x03:
+                continue
+            lp_cfg_ack2 = lp_cfg_ack2 >> 8
+            if tb.serdes_sink.get_os_match() and (lp_cfg_ack2 == 0 or lp_cfg_ack != lp_cfg_ack2):
+                break
+
+        if lp_cfg_ack2 is not None and lp_cfg_ack != lp_cfg_ack2:
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg_ack, lp_cfg_ack2)
+            continue
+
+        if lp_cfg_ack2 == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("AN done")
+        return lp_cfg_ack
+
+    tb.log.warning("AN timed out")
+    tb.serdes_source.set_seq_os(None)
+    return None
+
+
+async def run_test_usxgmii(dut, gbx_cfg=None):
+
+    tb = TB(dut, gbx_cfg)
+
+    dut.an_en.value = 1
+    dut.an_restart.value = 0
+    dut.an_speedup.value = 1
+    dut.an_timeout_en.value = 1
+    dut.an_usxgmii_en.value = 0
+    dut.an_usxgmii_auto.value = 1
+    dut.an_usxgmii_5g.value = 0
+    dut.an_adv_ability_usxgmii.value = 0x1601
+
+    await tb.reset()
+
+    for k in range(100):
+        await RisingEdge(dut.tx_clk)
+
+    if 1:
+        for x in range(6):
+            cfg1 = 0x0001 | (x << 9) | ((x & 1) << 12) | ((x & 2) << 14)
+            cfg2 = cfg1
+            dut.an_adv_ability_usxgmii.value = cfg2
+
+            lp_cfg = await run_usxgmii_an(tb, cfg1)
+
+            for k in range(2000):
+                if not dut.an_running.value:
+                    break
+                await RisingEdge(dut.tx_clk)
+
+            assert lp_cfg == cfg2 | 0x4000
+            assert not int(dut.an_running.value)
+            assert int(dut.an_complete.value)
+            assert not int(dut.an_timeout.value)
+            assert int(dut.an_usxgmii_mode.value)
+            assert int(dut.an_lp_adv_ability.value) == cfg1 | 0x4000
+            assert bool(dut.an_lp_usxgmii_link.value) == bool((cfg1 >> 15) & 1)
+            assert int(dut.an_lp_usxgmii_speed.value) == (cfg1 >> 9) & 0x7
+            assert bool(dut.an_res_full_duplex.value) == bool((cfg1 >> 12) & 1)
+    else:
+        lp_cfg = await run_usxgmii_an(tb, 0x9801)
+
+        for k in range(2000):
+            if not dut.an_running.value:
+                break
+            await RisingEdge(dut.tx_clk)
+
+        assert lp_cfg is None
+
+    for k in range(10):
+        await RisingEdge(dut.tx_clk)
+
+
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
 
@@ -444,6 +599,12 @@ if getattr(cocotb, 'top', None) is not None:
     factory = TestFactory(run_test_rx_frame_sync)
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
+
+    if cocotb.top.USXGMII_EN.value:
+        for test in [run_test_usxgmii]:
+            factory = TestFactory(test)
+            factory.add_option("gbx_cfg", gbx_cfgs)
+            factory.generate_tests()
 
 
 # cocotb-test
@@ -488,6 +649,7 @@ def test_taxi_eth_mac_phy_10g_fifo(request, data_w, gbx_en, dic_en):
     parameters['HDR_W'] = 2
     parameters['TX_GBX_IF_EN'] = gbx_en
     parameters['RX_GBX_IF_EN'] = parameters['TX_GBX_IF_EN']
+    parameters['USXGMII_EN'] = int(data_w == 32)
     parameters['AXIS_DATA_W'] = parameters['DATA_W']
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1

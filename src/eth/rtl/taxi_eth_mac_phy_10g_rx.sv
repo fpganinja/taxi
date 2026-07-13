@@ -20,6 +20,7 @@ module taxi_eth_mac_phy_10g_rx #
     parameter DATA_W = 64,
     parameter HDR_W = (DATA_W/32),
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
@@ -49,6 +50,15 @@ module taxi_eth_mac_phy_10g_rx #
     input  wire logic                 serdes_rx_hdr_valid = 1'b1,
     output wire logic                 serdes_rx_bitslip,
     output wire logic                 serdes_rx_reset_req,
+
+    /*
+     * Ordered sets
+     */
+    output wire logic [23:0]          rx_os,
+    output wire logic                 rx_os_sig,
+    output wire logic                 rx_os_valid,
+    output wire logic                 rx_os_match,
+    output wire logic                 rx_idle_match,
 
     /*
      * PTP
@@ -84,6 +94,9 @@ module taxi_eth_mac_phy_10g_rx #
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
     input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_usxgmii_en = 1'b1,
+    input  wire logic                 cfg_rx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]           cfg_rx_usxgmii_speed = 3'b011,
     input  wire logic                 cfg_rx_prbs31_enable
 );
 
@@ -144,6 +157,9 @@ eth_phy_10g_rx_if_inst (
 
 if (DATA_W == 64) begin
 
+    if (USXGMII_EN)
+        $fatal(0, "Error: USXGMII is not currently supported in 64-bit mode (instance %m)");
+
     taxi_axis_baser_rx_64 #(
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
@@ -172,11 +188,11 @@ if (DATA_W == 64) begin
         /*
          * Ordered sets
          */
-        .rx_os(),
-        .rx_os_sig(),
-        .rx_os_valid(),
-        .rx_os_match(),
-        .rx_idle_match(),
+        .rx_os(rx_os),
+        .rx_os_sig(rx_os_sig),
+        .rx_os_valid(rx_os_valid),
+        .rx_os_match(rx_os_match),
+        .rx_idle_match(rx_idle_match),
 
         /*
          * PTP
@@ -216,6 +232,7 @@ end else begin
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .USXGMII_EN(USXGMII_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W)
     )
@@ -239,11 +256,11 @@ end else begin
         /*
          * Ordered sets
          */
-        .rx_os(),
-        .rx_os_sig(),
-        .rx_os_valid(),
-        .rx_os_match(),
-        .rx_idle_match(),
+        .rx_os(rx_os),
+        .rx_os_sig(rx_os_sig),
+        .rx_os_valid(rx_os_valid),
+        .rx_os_match(rx_os_match),
+        .rx_idle_match(rx_idle_match),
 
         /*
          * PTP
@@ -255,6 +272,9 @@ end else begin
          */
         .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
         .cfg_rx_enable(cfg_rx_enable),
+        .cfg_rx_usxgmii_en(cfg_rx_usxgmii_en),
+        .cfg_rx_usxgmii_5g(cfg_rx_usxgmii_5g),
+        .cfg_rx_usxgmii_speed(cfg_rx_usxgmii_speed),
 
         /*
          * Status

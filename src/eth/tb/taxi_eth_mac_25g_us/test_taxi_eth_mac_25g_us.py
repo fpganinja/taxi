@@ -22,7 +22,7 @@ import cocotb_test.simulator
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
 from cocotb.regression import TestFactory
 
@@ -137,6 +137,14 @@ class TB:
 
         dut.rx_rst_in.setimmediatevalue([0]*4)
         dut.tx_rst_in.setimmediatevalue([0]*4)
+
+        dut.an_en.setimmediatevalue([0]*4)
+        dut.an_restart.setimmediatevalue([0]*4)
+        dut.an_speedup.setimmediatevalue([1]*4)
+        dut.an_timeout_en.setimmediatevalue([1]*4)
+        dut.an_usxgmii_en.setimmediatevalue([0]*4)
+        dut.an_usxgmii_auto.setimmediatevalue([1]*4)
+        dut.an_adv_ability_usxgmii.setimmediatevalue([0x1601]*4)
 
         dut.stat_rx_fifo_drop.setimmediatevalue([0]*4)
 
@@ -956,6 +964,159 @@ async def run_test_pfc(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+async def run_usxgmii_an(tb, port=0, cfg=0x0001):
+    # link timer scaled by 1000x for faster simulation
+    link_timer = Timer(1.6, 'us')
+
+    dut = tb.dut
+
+    for k in range(10):
+        tb.log.info("AN_RESTART")
+        tb.serdes_sources[port].set_seq_os((0x0000 << 8) | 0x03)
+
+        await link_timer
+
+        tb.log.info("ABILITY_DETECT")
+        tb.serdes_sources[port].set_seq_os(((cfg & ~0x4000) << 8) | 0x03)
+        tb.serdes_sinks[port].get_os()
+
+        lp_cfg = None
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            lp_cfg = tb.serdes_sinks[port].get_os()[0]
+            if lp_cfg is None:
+                continue
+            if lp_cfg & 0xff != 0x03:
+                continue
+            lp_cfg = lp_cfg >> 8
+            if tb.serdes_sinks[port].get_os_match() and lp_cfg != 0:
+                break
+
+        tb.log.info("ACKNOWLEDGE_DETECT")
+        tb.serdes_sources[port].set_seq_os(((cfg | 0x4000) << 8) | 0x03)
+        tb.serdes_sinks[port].get_os()
+
+        lp_cfg_ack = None
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            lp_cfg_ack = tb.serdes_sinks[port].get_os()[0]
+            if lp_cfg_ack is None:
+                continue
+            if lp_cfg_ack & 0xff != 0x03:
+                continue
+            lp_cfg_ack = lp_cfg_ack >> 8
+            if tb.serdes_sinks[port].get_os_match() and lp_cfg_ack & 0x4000:
+                break
+            elif tb.serdes_sinks[port].get_os_match() and lp_cfg_ack == 0:
+                break
+
+        if lp_cfg | 0x4000 != lp_cfg_ack:
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg | 0x4000, lp_cfg_ack)
+            continue
+
+        if lp_cfg_ack == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("COMPLETE_ACKNOWLEDGE")
+        await link_timer
+
+        tb.log.info("IDLE_DETECT")
+        tb.serdes_sources[port].set_seq_os(None)
+
+        await link_timer
+
+        lp_cfg_ack2 = None
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            if tb.serdes_sinks[port].get_idle_match():
+                break
+            lp_cfg_ack2 = tb.serdes_sinks[port].get_os()[0]
+            if lp_cfg_ack2 is None:
+                continue
+            if lp_cfg_ack2 & 0xff != 0x03:
+                continue
+            lp_cfg_ack2 = lp_cfg_ack2 >> 8
+            if tb.serdes_sinks[port].get_os_match() and (lp_cfg_ack2 == 0 or lp_cfg_ack != lp_cfg_ack2):
+                break
+
+        if lp_cfg_ack2 is not None and lp_cfg_ack != lp_cfg_ack2:
+            tb.log.warning("AN inconsistent, restarting (0x%04x != 0x%04x)", lp_cfg_ack, lp_cfg_ack2)
+            continue
+
+        if lp_cfg_ack2 == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("AN done")
+        return lp_cfg_ack
+
+    tb.log.warning("AN timed out")
+    tb.serdes_sources[port].set_seq_os(None)
+    return None
+
+
+async def run_test_usxgmii(dut, port=0):
+
+    tb = TB(dut)
+
+    dut.an_en[port].value = 1
+    dut.an_restart[port].value = 0
+    dut.an_speedup[port].value = 1
+    dut.an_timeout_en[port].value = 1
+    dut.an_usxgmii_en[port].value = 0
+    dut.an_usxgmii_auto[port].value = 1
+    dut.an_adv_ability_usxgmii[port].value = 0x1601
+
+    await tb.reset()
+
+    tb.log.info("Wait for reset")
+    while int(dut.rx_rst_out[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    tb.log.info("Wait for block lock")
+    while not int(dut.rx_block_lock[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    for k in range(100):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
+    if 1:
+        for x in range(6):
+            cfg1 = 0x0001 | (x << 9) | ((x & 1) << 12) | ((x & 2) << 14)
+            cfg2 = cfg1
+            dut.an_adv_ability_usxgmii[port].value = cfg2
+
+            lp_cfg = await run_usxgmii_an(tb, port, cfg1)
+
+            for k in range(2000):
+                if not dut.an_running[port].value:
+                    break
+                await RisingEdge(dut.tx_clk[port])
+
+            assert lp_cfg == cfg2 | 0x4000
+            assert not int(dut.an_running[port].value)
+            assert int(dut.an_complete[port].value)
+            assert not int(dut.an_timeout[port].value)
+            assert int(dut.an_usxgmii_mode[port].value)
+            assert int(dut.an_lp_adv_ability[port].value) == cfg1 | 0x4000
+            assert bool(dut.an_lp_usxgmii_link[port].value) == bool((cfg1 >> 15) & 1)
+            assert int(dut.an_lp_usxgmii_speed[port].value) == (cfg1 >> 9) & 0x7
+            assert bool(dut.an_res_full_duplex[port].value) == bool((cfg1 >> 12) & 1)
+    else:
+        lp_cfg = await run_usxgmii_an(tb, port, 0x9801)
+
+        for k in range(2000):
+            if not dut.an_running[port].value:
+                break
+            await RisingEdge(dut.tx_clk[port])
+
+        assert lp_cfg is None
+
+    for k in range(10):
+        await RisingEdge(dut.tx_clk[port])
+
+
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
 
@@ -1000,6 +1161,11 @@ if getattr(cocotb, 'top', None) is not None:
         for test in [run_test_lfc, run_test_pfc]:
             factory = TestFactory(test)
             factory.add_option("ifg", [12])
+            factory.generate_tests()
+
+    if cocotb.top.USXGMII_EN.value:
+        for test in [run_test_usxgmii]:
+            factory = TestFactory(test)
             factory.generate_tests()
 
 
@@ -1054,6 +1220,7 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['QPLL1_EXT_CTRL'] = 0
     parameters['COMBINED_MAC_PCS'] = combined_mac_pcs
     parameters['DATA_W'] = data_w
+    parameters['USXGMII_EN'] = int(data_w == 32)
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']

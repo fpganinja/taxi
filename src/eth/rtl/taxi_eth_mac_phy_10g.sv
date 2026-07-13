@@ -21,6 +21,7 @@ module taxi_eth_mac_phy_10g #
     parameter HDR_W = (DATA_W/32),
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -78,6 +79,27 @@ module taxi_eth_mac_phy_10g #
     input  wire logic                 serdes_rx_hdr_valid = 1'b1,
     output wire logic                 serdes_rx_bitslip,
     output wire logic                 serdes_rx_reset_req,
+
+    /*
+     * USXGMII autonegotiation
+     */
+    input  wire logic                 an_en = 1'b1,
+    input  wire logic                 an_restart = 1'b0,
+    input  wire logic                 an_speedup = 1'b0,
+    input  wire logic                 an_timeout_en = 1'b1,
+    input  wire logic                 an_usxgmii_en = 1'b0,
+    input  wire logic                 an_usxgmii_auto = 1'b1,
+    input  wire logic                 an_usxgmii_5g = 1'b0,
+    output wire logic                 an_intr,
+    output wire logic                 an_running,
+    output wire logic                 an_complete,
+    output wire logic                 an_timeout,
+    output wire logic                 an_usxgmii_mode,
+    input  wire logic [15:0]          an_adv_ability_usxgmii = 16'h1601,
+    output wire logic [15:0]          an_lp_adv_ability,
+    output wire logic                 an_lp_usxgmii_link,
+    output wire logic [2:0]           an_lp_usxgmii_speed,
+    output wire logic                 an_res_full_duplex,
 
     /*
      * PTP
@@ -356,10 +378,149 @@ end else begin
 
 end
 
+// USXGMII autonegotiation
+wire [23:0] rx_os;
+wire        rx_os_sig;
+wire        rx_os_valid;
+wire        rx_os_match;
+wire        rx_idle_match;
+
+wire [23:0] tx_os;
+wire        tx_os_sig;
+wire        tx_os_valid;
+wire        tx_os_ready;
+
+wire        cfg_rx_usxgmii_en;
+wire        cfg_rx_usxgmii_5g;
+wire [2:0]  cfg_rx_usxgmii_speed;
+
+wire        cfg_tx_usxgmii_en;
+wire        cfg_tx_usxgmii_5g;
+wire [2:0]  cfg_tx_usxgmii_speed;
+
+if (USXGMII_EN) begin : an
+
+    // synchronize RX signals to TX
+    wire [23:0]  sync_rx_os;
+    wire         sync_rx_os_sig;
+    wire         sync_rx_os_valid;
+    wire         sync_rx_os_match;
+    wire         sync_rx_idle_match;
+    wire         sync_rx_block_lock;
+
+    taxi_sync_signal #(
+        .WIDTH(24+5),
+        .N(2)
+    )
+    rx_sync_inst (
+        .clk(tx_clk),
+
+        .in({
+            rx_os,
+            rx_os_sig,
+            rx_os_valid,
+            rx_os_match,
+            rx_idle_match,
+            rx_block_lock
+        }),
+        .out({
+            sync_rx_os,
+            sync_rx_os_sig,
+            sync_rx_os_valid,
+            sync_rx_os_match,
+            sync_rx_idle_match,
+            sync_rx_block_lock
+        })
+    );
+
+    taxi_sync_signal #(
+        .WIDTH(1+1+3),
+        .N(2)
+    )
+    rx_sync_ctrl_inst (
+        .clk(rx_clk),
+
+        .in({
+            cfg_tx_usxgmii_en,
+            cfg_tx_usxgmii_5g,
+            cfg_tx_usxgmii_speed
+        }),
+        .out({
+            cfg_rx_usxgmii_en,
+            cfg_rx_usxgmii_5g,
+            cfg_rx_usxgmii_speed
+        })
+    );
+
+    taxi_eth_phy_10g_usxgmii_an #(
+        .DATA_W(DATA_W)
+    )
+    an_inst (
+        .clk(tx_clk),
+        .rst(tx_rst),
+
+        /*
+         * Ordered sets
+         */
+        .rx_os(sync_rx_os),
+        .rx_os_sig(sync_rx_os_sig),
+        .rx_os_valid(sync_rx_os_valid),
+        .rx_os_match(sync_rx_os_match),
+        .rx_idle_match(sync_rx_idle_match),
+        .rx_block_lock(sync_rx_block_lock),
+
+        .tx_os(tx_os),
+        .tx_os_sig(tx_os_sig),
+        .tx_os_valid(tx_os_valid),
+        .tx_os_ready(tx_os_ready),
+
+        /*
+         * USXGMII Autonegotiation
+         */
+        .an_en(an_en),
+        .an_restart(an_restart),
+        .an_speedup(an_speedup),
+        .an_timeout_en(an_timeout_en),
+        .an_usxgmii_en(an_usxgmii_en),
+        .an_usxgmii_auto(an_usxgmii_auto),
+        .an_usxgmii_5g(an_usxgmii_5g),
+        .an_intr(an_intr),
+        .an_running(an_running),
+        .an_complete(an_complete),
+        .an_timeout(an_timeout),
+        .an_usxgmii_mode(an_usxgmii_mode),
+        .an_adv_ability_usxgmii(an_adv_ability_usxgmii),
+        .an_lp_adv_ability(an_lp_adv_ability),
+        .an_lp_usxgmii_link(an_lp_usxgmii_link),
+        .an_lp_usxgmii_speed(an_lp_usxgmii_speed),
+        .an_res_full_duplex(an_res_full_duplex)
+    );
+
+    assign cfg_tx_usxgmii_en = an_usxgmii_mode;
+    assign cfg_tx_usxgmii_5g = an_usxgmii_5g;
+    assign cfg_tx_usxgmii_speed = an_lp_usxgmii_speed;
+
+end else begin : an
+
+    wire [23:0] tx_os = '0;
+    wire        tx_os_sig = 1'b0;
+    wire        tx_os_valid = 1'b0;
+
+    wire        cfg_rx_usxgmii_en = 1'b0;
+    wire        cfg_rx_usxgmii_5g = 1'b0;
+    wire [2:0]  cfg_rx_usxgmii_speed = 3'b011;
+
+    wire        cfg_tx_usxgmii_en = 1'b0;
+    wire        cfg_tx_usxgmii_5g = 1'b0;
+    wire [2:0]  cfg_tx_usxgmii_speed = 3'b011;
+
+end
+
 taxi_eth_mac_phy_10g_rx #(
     .DATA_W(DATA_W),
     .HDR_W(HDR_W),
     .GBX_IF_EN(RX_GBX_IF_EN),
+    .USXGMII_EN(USXGMII_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
@@ -389,6 +550,15 @@ eth_mac_phy_10g_rx_inst (
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
+
+    /*
+     * Ordered sets
+     */
+    .rx_os(rx_os),
+    .rx_os_sig(rx_os_sig),
+    .rx_os_valid(rx_os_valid),
+    .rx_os_match(rx_os_match),
+    .rx_idle_match(rx_idle_match),
 
     /*
      * PTP
@@ -424,6 +594,9 @@ eth_mac_phy_10g_rx_inst (
      */
     .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
     .cfg_rx_enable(cfg_rx_enable),
+    .cfg_rx_usxgmii_en(cfg_rx_usxgmii_en),
+    .cfg_rx_usxgmii_5g(cfg_rx_usxgmii_5g),
+    .cfg_rx_usxgmii_speed(cfg_rx_usxgmii_speed),
     .cfg_rx_prbs31_enable(cfg_rx_prbs31_enable)
 );
 
@@ -431,6 +604,7 @@ taxi_eth_mac_phy_10g_tx #(
     .DATA_W(DATA_W),
     .HDR_W(HDR_W),
     .GBX_IF_EN(TX_GBX_IF_EN),
+    .USXGMII_EN(USXGMII_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
@@ -463,6 +637,14 @@ eth_mac_phy_10g_tx_inst (
     .serdes_tx_gbx_sync(serdes_tx_gbx_sync),
 
     /*
+     * Ordered sets
+     */
+    .tx_os(tx_os),
+    .tx_os_sig(tx_os_sig),
+    .tx_os_valid(tx_os_valid),
+    .tx_os_ready(tx_os_ready),
+
+    /*
      * PTP
      */
     .ptp_ts(tx_ptp_ts_out),
@@ -492,6 +674,9 @@ eth_mac_phy_10g_tx_inst (
     .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
     .cfg_tx_ifg(cfg_tx_ifg),
     .cfg_tx_enable(cfg_tx_enable),
+    .cfg_tx_usxgmii_en(cfg_tx_usxgmii_en),
+    .cfg_tx_usxgmii_5g(cfg_tx_usxgmii_5g),
+    .cfg_tx_usxgmii_speed(cfg_tx_usxgmii_speed),
     .cfg_tx_prbs31_enable(cfg_tx_prbs31_enable)
 );
 

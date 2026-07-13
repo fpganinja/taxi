@@ -21,6 +21,7 @@ module taxi_eth_mac_phy_10g_fifo #
     parameter HDR_W = (DATA_W/32),
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -91,6 +92,27 @@ module taxi_eth_mac_phy_10g_fifo #
     input  wire logic                 serdes_rx_hdr_valid = 1'b1,
     output wire logic                 serdes_rx_bitslip,
     output wire logic                 serdes_rx_reset_req,
+
+    /*
+     * USXGMII autonegotiation
+     */
+    input  wire logic                 an_en = 1'b1,
+    input  wire logic                 an_restart = 1'b0,
+    input  wire logic                 an_speedup = 1'b0,
+    input  wire logic                 an_timeout_en = 1'b1,
+    input  wire logic                 an_usxgmii_en = 1'b0,
+    input  wire logic                 an_usxgmii_auto = 1'b1,
+    input  wire logic                 an_usxgmii_5g = 1'b0,
+    output wire logic                 an_intr,
+    output wire logic                 an_running,
+    output wire logic                 an_complete,
+    output wire logic                 an_timeout,
+    output wire logic                 an_usxgmii_mode,
+    input  wire logic [15:0]          an_adv_ability_usxgmii = 16'h1601,
+    output wire logic [15:0]          an_lp_adv_ability,
+    output wire logic                 an_lp_usxgmii_link,
+    output wire logic [2:0]           an_lp_usxgmii_speed,
+    output wire logic                 an_res_full_duplex,
 
     /*
      * PTP clock
@@ -300,6 +322,7 @@ taxi_eth_mac_phy_10g #(
     .HDR_W(HDR_W),
     .TX_GBX_IF_EN(TX_GBX_IF_EN),
     .RX_GBX_IF_EN(RX_GBX_IF_EN),
+    .USXGMII_EN(USXGMII_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TD_EN(PTP_TD_EN),
@@ -355,6 +378,27 @@ eth_mac_phy_10g_inst (
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
+
+    /*
+     * USXGMII autonegotiation
+     */
+    .an_en(an_en),
+    .an_restart(an_restart),
+    .an_speedup(an_speedup),
+    .an_timeout_en(an_timeout_en),
+    .an_usxgmii_en(an_usxgmii_en),
+    .an_usxgmii_auto(an_usxgmii_auto),
+    .an_usxgmii_5g(an_usxgmii_5g),
+    .an_intr(an_intr),
+    .an_running(an_running),
+    .an_complete(an_complete),
+    .an_timeout(an_timeout),
+    .an_usxgmii_mode(an_usxgmii_mode),
+    .an_adv_ability_usxgmii(an_adv_ability_usxgmii),
+    .an_lp_adv_ability(an_lp_adv_ability),
+    .an_lp_usxgmii_link(an_lp_usxgmii_link),
+    .an_lp_usxgmii_speed(an_lp_usxgmii_speed),
+    .an_res_full_duplex(an_res_full_duplex),
 
     /*
      * PTP

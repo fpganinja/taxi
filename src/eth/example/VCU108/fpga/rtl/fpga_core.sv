@@ -397,7 +397,8 @@ taxi_eth_mac_25g_us #(
 
     // MAC/PHY config
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
-    .DATA_W(MAC_DATA_W),
+    .DATA_W(axis_qsfp_tx[0].DATA_W),
+    .USXGMII_EN(COMBINED_MAC_PCS && axis_qsfp_tx[0].DATA_W == 32),
     .DIC_EN(1'b1),
     .PTP_TS_EN(1'b0),
     .PTP_TD_EN(1'b0),
@@ -472,6 +473,26 @@ qsfp_mac_inst (
      * Receive interface (AXI stream)
      */
     .m_axis_rx(axis_qsfp_rx),
+
+    /*
+     * USXGMII autonegotiation
+     */
+    .an_en('{4{1'b1}}),
+    .an_restart('{4{1'b0}}),
+    .an_speedup('{4{1'b0}}),
+    .an_timeout_en('{4{1'b1}}),
+    .an_usxgmii_en('{4{1'b0}}),
+    .an_usxgmii_auto('{4{1'b1}}),
+    .an_intr(),
+    .an_running(),
+    .an_complete(),
+    .an_timeout(),
+    .an_usxgmii_mode(),
+    .an_adv_ability_usxgmii('{4{16'h1601}}),
+    .an_lp_adv_ability(),
+    .an_lp_usxgmii_link(),
+    .an_lp_usxgmii_speed(),
+    .an_res_full_duplex(),
 
     /*
      * PTP clock

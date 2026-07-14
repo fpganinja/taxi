@@ -547,7 +547,7 @@ end else begin : sfp_mac
         // PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .DATA_W(axis_sfp_tx[0].DATA_W),
-        .USXGMII_EN(1'b1),
+        .USXGMII_EN(COMBINED_MAC_PCS && axis_sfp_tx[0].DATA_W == 32),
         .DIC_EN(1'b1),
         .PTP_TS_EN(1'b0),
         .PTP_TD_EN(1'b0),

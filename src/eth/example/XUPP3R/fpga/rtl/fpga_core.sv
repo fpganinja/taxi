@@ -321,8 +321,8 @@ for (genvar n = 0; n < GTY_QUAD_CNT; n = n + 1) begin : gt_quad
 
         // MAC/PHY config
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
-        .DATA_W(MAC_DATA_W),
-        .USXGMII_EN(1'b0),
+        .DATA_W(eth_gty_axis_tx[0].DATA_W),
+        .USXGMII_EN(COMBINED_MAC_PCS && eth_gty_axis_tx[0].DATA_W == 32),
         .DIC_EN(1'b1),
         .PTP_TS_EN(1'b0),
         .PTP_TD_EN(1'b0),

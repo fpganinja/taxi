@@ -151,14 +151,14 @@ The Taxi transport library contains many smaller components that can be composed
     *  1000BASE-X MAC/PHY + FIFO
     *  10G/25G MAC
     *  10G/25G MAC + FIFO
-    *  10GBASE-R/25GBASE-R MAC/PHY
-    *  10GBASE-R/25GBASE-R MAC/PHY + FIFO
+    *  10GBASE-R/25GBASE-R/USXGMII MAC/PHY
+    *  10GBASE-R/25GBASE-R/USXGMII MAC/PHY + FIFO
     *  10GBASE-R/25GBASE-R PHY
     *  MII PHY interface
     *  GMII PHY interface
     *  RGMII PHY interface
     *  1000BASE-X MAC/PHY/GT wrapper for UltraScale/UltraScale+
-    *  10G/25G MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+
+    *  10G/25G/USXGMII MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+
 *  General input/output
     *  Switch debouncer
     *  LED shift register driver

@@ -299,7 +299,10 @@ class BaseRSerdesSource():
 
                 continue
 
-            if ifg_cnt + deficit_idle_cnt > 8-1 or (not self.enable_dic and ifg_cnt > 4) or rep_cnt != 0:
+            if rep_cnt != 0:
+                # scale IFG
+                pass
+            elif ifg_cnt + deficit_idle_cnt > 8-1 or (not self.enable_dic and ifg_cnt > 4):
                 # in IFG
                 ifg_cnt = ifg_cnt - 8
                 if ifg_cnt < 0:

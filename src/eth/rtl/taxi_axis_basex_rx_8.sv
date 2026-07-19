@@ -493,21 +493,9 @@ always_ff @(posedge clk) begin
 
     rx_an_cfg_valid_reg <= 1'b0;
 
-    start_packet_int_reg <= 1'b0;
     start_packet_reg <= 1'b0;
 
-    if (start_packet_int_reg) begin
-        ptp_ts_out_reg <= ptp_ts;
-        start_packet_reg <= 1'b1;
-    end
-
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
-        if (in_frame_reg) begin
-            in_frame_reg <= encoded_rx_data_k == 0;
-        end else if (encoded_rx_data_k == 0 && encoded_rx_data == ETH_SFD) begin
-            in_frame_reg <= 1'b1;
-            start_packet_int_reg <= 1'b1;
-        end
 
         if (!SGMII_EN || !rep_stall_reg) begin
             encoded_rx_data_d0_reg <= encoded_rx_data;
@@ -517,6 +505,21 @@ always_ff @(posedge clk) begin
             encoded_rx_data_d4_reg <= encoded_rx_data_d3_reg;
 
             encoded_rx_data_k_d0_reg <= encoded_rx_data_k;
+        end
+
+        if (start_packet_int_reg) begin
+            ptp_ts_out_reg <= ptp_ts;
+            if (!SGMII_EN || ((rep_cnt_reg == 0 || rep_cnt_reg[0]) && !rep_stall_reg)) begin
+                start_packet_int_reg <= 1'b0;
+                start_packet_reg <= 1'b1;
+            end
+        end
+
+        if (in_frame_reg) begin
+            in_frame_reg <= encoded_rx_data_k == 0;
+        end else if (encoded_rx_data_k == 0 && encoded_rx_data == ETH_SFD) begin
+            in_frame_reg <= 1'b1;
+            start_packet_int_reg <= 1'b1;
         end
 
         input_k28p5_d0_reg <= 1'b0;

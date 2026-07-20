@@ -373,7 +373,7 @@ class BaseRSerdesSource():
                     c = frame.ctrl[frame_offset]
                     if frame.sim_time_sfd is None and not in_pre:
                         frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
-                    if d == EthPre.SFD:
+                    if d == EthPre.SFD and (not self.xgmii_rep_count or rep_cnt == 1):
                         in_pre = False
                     if c and d == XgmiiCtrl.START:
                         if sof:

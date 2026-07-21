@@ -55,9 +55,9 @@ The 10G/25G MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+ supports GTX,
 
 The 10G/25G MAC and PCS logic is also highly optimized for both size and timing performance, with 60 instances fitting comfortably on an XCVU9P -2 on the HTG9200 board, fully utilizing 15 QSFP28 (9 on the board plus 6 via FMC+, 60 lanes total).  With the low-latency MACs, statistics collection, loopback FIFOs, and XFCP, the footprint is about 14% of the device LUTs at 25G (about 2700 LUTs and 2500 FFs per channel) and about 10% of the device LUTs at 10G (about 2000 LUTs and 2100 FFs per channel).  The 10G configuration closes timing on the KC705 (single SFP+, 1 lane total) with an XC7K325T -2 at 322.265625 MHz, and the 25G configuration closes timing on the XUSP3S (quad QSFP28, 16 lanes total) with an XCVU095 -2 at 402.83203125 MHz.
 
-The 1G MAC/PHY/GT wrapper for UltraScale/UltraScale+ supports GTH and GTY transceivers.  TCL scripts for generating the GT cores are provided for several common reference clocks.  The core supports operation in either a normal latency mode or a low latency mode via the CFG_LOW_LATENCY paremter, which affects the transceiver configuration (buffer bypass).  The wrapper also provides an APB interface for configuring the transceivers and QPLLs.
+The 1G MAC/PHY/GT wrapper for UltraScale/UltraScale+ supports GTH and GTY transceivers.  The core supports 1000BASE-X autonegotiation as well as SGMII for operation with tri-mode PHYs and SGMII SFP modules (10M/100M/1G), including dynamic detection of AN and SGMII support.  TCL scripts for generating the GT cores are provided for several common reference clocks.  The core supports operation in either a normal latency mode or a low latency mode via the CFG_LOW_LATENCY paremter, which affects the transceiver configuration (buffer bypass).  The wrapper also provides an APB interface for configuring the transceivers and QPLLs.
 
-Planned features include SGMII, dynamic rate switching, AN, better integration of the PTP TD subsystem, and white rabbit/IEEE 1588 HA support.
+Planned features include support for more device families, SGMII, 5G USXGMII, dynamic rate switching, AN, better integration of the PTP TD subsystem, and white rabbit/IEEE 1588 HA support.
 
 ## Statistics collection subsystem
 
@@ -147,8 +147,8 @@ The Taxi transport library contains many smaller components that can be composed
     *  10/100/1000 RGMII MAC + FIFO
     *  1G MAC
     *  1G MAC + FIFO
-    *  1000BASE-X MAC/PHY
-    *  1000BASE-X MAC/PHY + FIFO
+    *  1000BASE-X/SGMII MAC/PHY
+    *  1000BASE-X/SGMII MAC/PHY + FIFO
     *  10G/25G MAC
     *  10G/25G MAC + FIFO
     *  10GBASE-R/25GBASE-R/USXGMII MAC/PHY
@@ -157,7 +157,7 @@ The Taxi transport library contains many smaller components that can be composed
     *  MII PHY interface
     *  GMII PHY interface
     *  RGMII PHY interface
-    *  1000BASE-X MAC/PHY/GT wrapper for UltraScale/UltraScale+
+    *  1000BASE-X/SGMII MAC/PHY/GT wrapper for UltraScale/UltraScale+
     *  10G/25G/USXGMII MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+
 *  General input/output
     *  Switch debouncer

@@ -20,7 +20,8 @@ module taxi_axis_basex_rx_16 #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = 96
@@ -59,7 +60,9 @@ module taxi_axis_basex_rx_16 #
      * Configuration
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
-    input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_enable = 1'b1,
+    input  wire logic                 cfg_rx_sgmii_en = 1'b1,
+    input  wire logic [1:0]           cfg_rx_sgmii_speed = 2'b10,
 
     /*
      * Status
@@ -138,6 +141,7 @@ state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic reset_crc;
+logic update_crc;
 
 logic [DATA_W-1:0] input_data_d0_reg = '0;
 logic [DATA_W-1:0] input_data_d1_reg = '0;
@@ -146,6 +150,7 @@ logic [DATA_W-1:0] input_data_d2_reg = '0;
 logic input_k28p5_d0_reg = 1'b0;
 logic input_i_d0_reg = 1'b0;
 logic input_c_d0_reg = 1'b0;
+logic input_start_int_reg = 1'b0;
 logic input_start_d0_reg = 1'b0;
 
 logic frame_oversize_reg = 1'b0, frame_oversize_next;
@@ -158,6 +163,12 @@ logic [15:0] frame_len_reg = '0, frame_len_next;
 logic [14:0] frame_len_lim_cyc_reg = '0, frame_len_lim_cyc_next;
 logic frame_len_lim_last_reg = '0, frame_len_lim_last_next;
 logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
+
+logic [5:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
+logic rep_en_reg = 1'b0;
+logic rep_sel_reg = 1'b0;
+logic rep_store_reg = 1'b0;
 
 logic [DATA_W-1:0] m_axis_rx_tdata_reg = '0, m_axis_rx_tdata_next;
 logic [KEEP_W-1:0] m_axis_rx_tkeep_reg = '0, m_axis_rx_tkeep_next;
@@ -251,8 +262,28 @@ logic lanes_swapped_reg = 1'b0;
 logic [7:0] swap_data_reg = '0;
 logic swap_data_k_reg = '0;
 
-wire [DATA_W-1:0] swap_rx_data   = lanes_swapped_reg ? {encoded_rx_data[7:0], swap_data_reg} : encoded_rx_data;
-wire [CTRL_W-1:0] swap_rx_data_k = lanes_swapped_reg ? {encoded_rx_data_k[0], swap_data_k_reg} : encoded_rx_data_k;
+logic [DATA_W-1:0] swap_rx_data;
+logic [CTRL_W-1:0] swap_rx_data_k;
+
+always_comb begin
+    swap_rx_data = encoded_rx_data;
+    swap_rx_data_k = encoded_rx_data_k;
+
+    if (SGMII_EN && rep_en_reg) begin
+        if (lanes_swapped_reg) begin
+            swap_rx_data   = {encoded_rx_data[15:8], swap_data_reg};
+            swap_rx_data_k = {encoded_rx_data_k[1], swap_data_k_reg};
+        end else begin
+            swap_rx_data   = {encoded_rx_data[7:0], swap_data_reg};
+            swap_rx_data_k = {encoded_rx_data_k[0], swap_data_k_reg};
+        end
+    end else begin
+        if (lanes_swapped_reg) begin
+            swap_rx_data   = {encoded_rx_data[7:0], swap_data_reg};
+            swap_rx_data_k = {encoded_rx_data_k[0], swap_data_k_reg};
+        end
+    end
+end
 
 // Mask input data
 wire [DATA_W-1:0] swap_rx_data_masked;
@@ -284,6 +315,7 @@ always_comb begin
     state_next = STATE_IDLE;
 
     reset_crc = 1'b0;
+    update_crc = 1'b0;
 
     frame_oversize_next = frame_oversize_reg;
     pre_ok_next = pre_ok_reg;
@@ -321,6 +353,9 @@ always_comb begin
 
     if (GBX_IF_EN && !encoded_rx_data_valid) begin
         // data from gearbox not valid - hold state
+        state_next = state_reg;
+    end else if (SGMII_EN && rep_stall_reg) begin
+        // SGMII stall - hold state
         state_next = state_reg;
     end else begin
         // counter to measure frame length
@@ -426,6 +461,7 @@ always_comb begin
             end
             STATE_PIPE: begin
                 // wait for pipeline to fill
+                update_crc = 1'b1;
 
                 hdr_ptr_next = 0;
 
@@ -449,6 +485,8 @@ always_comb begin
             end
             STATE_PAYLOAD: begin
                 // read payload
+                update_crc = 1'b1;
+
                 m_axis_rx_tdata_next = input_data_d2_reg;
                 m_axis_rx_tkeep_next = {KEEP_W{1'b1}};
                 m_axis_rx_tvalid_next = 1'b1;
@@ -636,17 +674,38 @@ always_ff @(posedge clk) begin
 
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
 
-        swap_data_reg <= encoded_rx_data[15:8];
-        swap_data_k_reg <= encoded_rx_data_k[1];
+        if (!SGMII_EN || !rep_en_reg) begin
+            swap_data_reg <= encoded_rx_data[15:8];
+            swap_data_k_reg <= encoded_rx_data_k[1];
 
-        input_data_d0_reg <= swap_rx_data_masked;
-        input_data_d1_reg <= input_data_d0_reg;
-        input_data_d2_reg <= input_data_d1_reg;
+            input_data_d0_reg <= swap_rx_data_masked;
+            input_data_d1_reg <= input_data_d0_reg;
+            input_data_d2_reg <= input_data_d1_reg;
+        end else begin
+            if (rep_store_reg || encoded_rx_data_k != 0) begin
+                if (!encoded_rx_data_k[0]) begin
+                    swap_data_reg <= encoded_rx_data[15:8];
+                    swap_data_k_reg <= encoded_rx_data_k[1];
+                end else begin
+                    swap_data_reg <= encoded_rx_data[7:0];
+                    swap_data_k_reg <= encoded_rx_data_k[0];
+                end
+            end
+
+            if (!rep_stall_reg) begin
+                input_data_d0_reg <= swap_rx_data_masked;
+                input_data_d1_reg <= input_data_d0_reg;
+                input_data_d2_reg <= input_data_d1_reg;
+            end
+        end
 
         input_k28p5_d0_reg <= 1'b0;
         input_i_d0_reg <= 1'b0;
         input_c_d0_reg <= 1'b0;
-        input_start_d0_reg <= 1'b0;
+        if (!SGMII_EN || !rep_stall_reg) begin
+            input_start_int_reg <= 1'b0;
+            input_start_d0_reg <= input_start_int_reg;
+        end
 
         if (PTP_TS_EN && PTP_TS_FMT_TOD) begin
             // ns field rollover
@@ -698,7 +757,11 @@ always_ff @(posedge clk) begin
 
         // start control character detection
         if (encoded_rx_data_k[0] && encoded_rx_data[7:0] == CTRL_S) begin
-            input_start_d0_reg <= 1'b1;
+            if (rep_en_reg) begin
+                input_start_int_reg <= 1'b1;
+            end else begin
+                input_start_d0_reg <= 1'b1;
+            end
             in_pre_reg <= 1'b1;
             lanes_swapped_reg <= 1'b0;
         end
@@ -710,43 +773,148 @@ always_ff @(posedge clk) begin
         end
 
         // SFD detection
-        start_packet_int_reg <= 1'b0;
         if (in_pre_reg) begin
-            if (encoded_rx_data[7]) begin
-                // truncated preamble
-                in_pre_reg <= 1'b0;
-                lanes_swapped_reg <= 1'b1;
-                input_data_d0_reg <= {ETH_SFD, ETH_PRE};
-                start_packet_reg <= 2'b10;
-                if (PTP_TS_FMT_TOD) begin
-                    // workaround for verilator lint bug: unreachable by parameter value
-                    /* verilator lint_off SELRANGE */
-                    ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
-                    ptp_ts_reg[95:48] <= ptp_ts[95:48];
-                    /* verilator lint_on SELRANGE */
-                end else begin
-                    ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+            lanes_swapped_reg <= 1'b0;
+            if (SGMII_EN && rep_en_reg) begin
+                // SGMII repeated symbols
+                if (encoded_rx_data[7]) begin
+                    // normal
+                    in_pre_reg <= 1'b0;
+                    start_packet_int_reg <= 1'b1;
+                end else if (encoded_rx_data[15]) begin
+                    // truncated start
+                    in_pre_reg <= 1'b0;
+                    lanes_swapped_reg <= 1'b1;
+                    start_packet_int_reg <= 1'b1;
                 end
-            end else if (encoded_rx_data[15]) begin
-                // normal preamble
-                in_pre_reg <= 1'b0;
-                lanes_swapped_reg <= 1'b0;
-                start_packet_int_reg <= 1'b1;
+            end else begin
+                // full rate
+                if (encoded_rx_data[7]) begin
+                    // truncated preamble
+                    in_pre_reg <= 1'b0;
+                    lanes_swapped_reg <= 1'b1;
+                    input_data_d0_reg <= {ETH_SFD, ETH_PRE};
+                    start_packet_reg <= 2'b10;
+                    if (PTP_TS_FMT_TOD) begin
+                        // workaround for verilator lint bug: unreachable by parameter value
+                        /* verilator lint_off SELRANGE */
+                        ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                        ptp_ts_reg[95:48] <= ptp_ts[95:48];
+                        /* verilator lint_on SELRANGE */
+                    end else begin
+                        ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+                    end
+                end else if (encoded_rx_data[15]) begin
+                    // normal preamble
+                    in_pre_reg <= 1'b0;
+                    start_packet_int_reg <= 1'b1;
+                end
             end
         end
 
         if (start_packet_int_reg) begin
-            start_packet_reg <= 2'b01;
-            ptp_ts_reg <= ptp_ts;
+            if (SGMII_EN && rep_en_reg) begin
+                if (lanes_swapped_reg) begin
+                    if (rep_store_reg) begin
+                        start_packet_int_reg <= 1'b0;
+                        start_packet_reg <= 2'b10;
+                    end
+                    if (PTP_TS_FMT_TOD) begin
+                        // workaround for verilator lint bug: unreachable by parameter value
+                        /* verilator lint_off SELRANGE */
+                        ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                        ptp_ts_reg[95:48] <= ptp_ts[95:48];
+                        /* verilator lint_on SELRANGE */
+                    end else begin
+                        ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+                    end
+                end else begin
+                    if (rep_store_reg) begin
+                        start_packet_int_reg <= 1'b0;
+                        start_packet_reg <= 2'b01;
+                    end
+                    ptp_ts_reg <= ptp_ts;
+                end
+            end else begin
+                start_packet_int_reg <= 1'b0;
+                start_packet_reg <= 2'b01;
+                ptp_ts_reg <= ptp_ts;
+            end
         end
 
         if (reset_crc) begin
             crc_state_reg <= '1;
-        end else begin
+        end else if (update_crc) begin
             crc_state_reg <= crc_state;
         end
 
         crc_valid_reg <= crc_valid;
+
+        if (SGMII_EN && cfg_rx_sgmii_en) begin
+            if (in_pre_reg && encoded_rx_data[15] && !encoded_rx_data[7]) begin
+                // truncated repetition
+                rep_stall_reg <= 1'b0;
+                rep_en_reg <= 1'b1;
+                rep_sel_reg <= 1'b1;
+                rep_store_reg <= 1'b0;
+                case (cfg_rx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 48; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 3; // 100 Mbps
+                    default: begin
+                        rep_cnt_reg <= 0; // 1 Gbps
+                        rep_stall_reg <= 1'b0;
+                        rep_en_reg <= 1'b0;
+                        rep_sel_reg <= 1'b0;
+                    end
+                endcase
+            end else if (encoded_rx_data_k != 0) begin
+                // align to start (control character)
+                rep_stall_reg <= 1'b1;
+                rep_en_reg <= 1'b1;
+                rep_sel_reg <= 1'b0;
+                rep_store_reg <= 1'b0;
+                case (cfg_rx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 48; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 3; // 100 Mbps
+                    default: begin
+                        rep_cnt_reg <= 0; // 1 Gbps
+                        rep_stall_reg <= 1'b0;
+                        rep_en_reg <= 1'b0;
+                        rep_sel_reg <= 1'b0;
+                    end
+                endcase
+                if (encoded_rx_data_k != 0 && !(encoded_rx_data_k[0] && encoded_rx_data[7:0] == CTRL_S)) begin
+                    // have stored control character that isn't start, skip stall
+                    rep_stall_reg <= 1'b0;
+                end
+            end else if (rep_cnt_reg == 0) begin
+                rep_stall_reg <= rep_sel_reg;
+                rep_en_reg <= 1'b1;
+                rep_sel_reg <= !rep_sel_reg;
+                rep_store_reg <= rep_sel_reg;
+                case (cfg_rx_sgmii_speed)
+                    2'b00: rep_cnt_reg <= 49; // 10 Mbps
+                    2'b01: rep_cnt_reg <= 4; // 100 Mbps
+                    default: begin
+                        rep_cnt_reg <= 0; // 1 Gbps
+                        rep_stall_reg <= 1'b0;
+                        rep_en_reg <= 1'b0;
+                        rep_sel_reg <= 1'b0;
+                    end
+                endcase
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+                rep_en_reg <= 1'b1;
+                rep_store_reg <= 1'b0;
+            end
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+            rep_en_reg <= 1'b0;
+            rep_sel_reg <= 1'b0;
+            rep_store_reg <= 1'b0;
+        end
     end
 
     last_ts_reg <= (5+16)'(ptp_ts);
@@ -761,6 +929,12 @@ always_ff @(posedge clk) begin
         an_ability_match_reg <= '0;
         an_ack_match_reg <= '0;
         an_idle_match_reg <= '0;
+
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
+        rep_en_reg <= 1'b0;
+        rep_sel_reg <= 1'b0;
+        rep_store_reg <= 1'b0;
 
         start_packet_int_reg <= 1'b0;
         start_packet_reg <= '0;

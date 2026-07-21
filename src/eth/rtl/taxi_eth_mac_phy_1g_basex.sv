@@ -380,15 +380,20 @@ end else begin
 end
 
 // Autonegotiation
-wire logic [15:0]  rx_an_cfg;
-wire logic         rx_an_cfg_valid;
-wire logic         rx_an_ability_match;
-wire logic         rx_an_ack_match;
-wire logic         rx_an_idle_match;
+wire [15:0]  rx_an_cfg;
+wire         rx_an_cfg_valid;
+wire         rx_an_ability_match;
+wire         rx_an_ack_match;
+wire         rx_an_idle_match;
 
-wire logic [15:0]  tx_an_cfg;
-wire logic         tx_an_cfg_valid;
-wire logic         tx_an_cfg_ready;
+wire [15:0]  tx_an_cfg;
+wire         tx_an_cfg_valid;
+wire         tx_an_cfg_ready;
+
+wire         cfg_tx_sgmii_en;
+wire [1:0]   cfg_tx_sgmii_speed;
+wire         cfg_rx_sgmii_en;
+wire [1:0]   cfg_rx_sgmii_speed;
 
 if (AN_EN) begin : an
 
@@ -403,7 +408,7 @@ if (AN_EN) begin : an
         .WIDTH(16+4),
         .N(2)
     )
-    sync_inst (
+    rx_sync_inst (
         .clk(tx_clk),
 
         .in({
@@ -419,6 +424,23 @@ if (AN_EN) begin : an
             sync_rx_an_ability_match,
             sync_rx_an_ack_match,
             sync_rx_an_idle_match
+        })
+    );
+
+    taxi_sync_signal #(
+        .WIDTH(1+2),
+        .N(2)
+    )
+    rx_sync_ctrl_inst (
+        .clk(rx_clk),
+
+        .in({
+            cfg_tx_sgmii_en,
+            cfg_tx_sgmii_speed
+        }),
+        .out({
+            cfg_rx_sgmii_en,
+            cfg_rx_sgmii_speed
         })
     );
 
@@ -468,6 +490,9 @@ if (AN_EN) begin : an
         .an_res_rx_pause(an_res_rx_pause)
     );
 
+    assign cfg_tx_sgmii_en = an_sgmii_mode;
+    assign cfg_tx_sgmii_speed = an_lp_sgmii_speed;
+
 end else begin : an
 
     assign tx_an_cfg = '0;
@@ -477,12 +502,18 @@ end else begin : an
     assign an_complete = 1'b0;
     assign an_lp_adv_ability = '0;
 
+    assign cfg_tx_sgmii_en = 1'b0;
+    assign cfg_tx_sgmii_speed = 2'b10;
+    assign cfg_rx_sgmii_en = 1'b0;
+    assign cfg_rx_sgmii_speed = 2'b10;
+
 end
 
 taxi_eth_mac_phy_1g_basex_rx #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(RX_GBX_IF_EN),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
@@ -552,6 +583,8 @@ rx_inst (
      */
     .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
     .cfg_rx_enable(cfg_rx_enable),
+    .cfg_rx_sgmii_en(cfg_rx_sgmii_en),
+    .cfg_rx_sgmii_speed(cfg_rx_sgmii_speed),
     .cfg_rx_prbs31_enable(cfg_rx_prbs31_enable)
 );
 
@@ -559,6 +592,7 @@ taxi_eth_mac_phy_1g_basex_tx #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(TX_GBX_IF_EN),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
@@ -629,6 +663,8 @@ tx_inst (
     .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
     .cfg_tx_ifg(cfg_tx_ifg),
     .cfg_tx_enable(cfg_tx_enable),
+    .cfg_tx_sgmii_en(cfg_tx_sgmii_en),
+    .cfg_tx_sgmii_speed(cfg_tx_sgmii_speed),
     .cfg_tx_prbs31_enable(cfg_tx_prbs31_enable)
 );
 

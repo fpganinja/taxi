@@ -20,7 +20,8 @@ module taxi_eth_mac_phy_1g_basex_rx #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
@@ -89,6 +90,8 @@ module taxi_eth_mac_phy_1g_basex_rx #
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
     input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_sgmii_en = 1'b1,
+    input  wire logic [1:0]           cfg_rx_sgmii_speed = 2'b10,
     input  wire logic                 cfg_rx_prbs31_enable
 );
 
@@ -146,6 +149,7 @@ if (DATA_W == 16) begin
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .SGMII_EN(SGMII_EN),
         .AN_EN(AN_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
@@ -186,6 +190,8 @@ if (DATA_W == 16) begin
          */
         .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
         .cfg_rx_enable(cfg_rx_enable),
+        .cfg_rx_sgmii_en(cfg_rx_sgmii_en),
+        .cfg_rx_sgmii_speed(cfg_rx_sgmii_speed),
 
         /*
          * Status
@@ -214,6 +220,7 @@ end else begin
         .DATA_W(DATA_W),
         .CTRL_W(CTRL_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .SGMII_EN(SGMII_EN),
         .AN_EN(AN_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W)
@@ -253,6 +260,8 @@ end else begin
          */
         .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
         .cfg_rx_enable(cfg_rx_enable),
+        .cfg_rx_sgmii_en(cfg_rx_sgmii_en),
+        .cfg_rx_sgmii_speed(cfg_rx_sgmii_speed),
 
         /*
          * Status

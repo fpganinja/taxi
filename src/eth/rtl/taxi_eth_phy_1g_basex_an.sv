@@ -198,6 +198,7 @@ always_comb begin
                 end
             end else begin
                 // AN disabled
+                an_sgmii_mode_next = 1'b0;
                 state_next = STATE_START;
             end
         end

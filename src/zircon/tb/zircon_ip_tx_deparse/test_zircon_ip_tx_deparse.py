@@ -381,3 +381,135 @@ def test_zircon_ip_tx_deparse(request):
         sim_build=sim_build,
         extra_env=extra_env,
     )
+
+
+@cocotb.test()
+async def run_test_l4_cksum_endaround_carry(dut):
+    """L4 checksum with maximal header field values.
+
+    The metadata L4 checksum accumulator is 21 bits wide. With maximal header
+    field values (all-ones addresses, ports, sequence and acknowledge numbers,
+    window and urgent pointer) the accumulated sum grows well past 17 bits, so
+    more than one end-around carry fold is required before the checksum is
+    truncated to 16 bits. The payload is selected to place the accumulated sum
+    at the boundary of the carry fold.
+
+    Verify the generated TCP/UDP checksum matches the reference packet for
+    TCP and UDP over IPv4 and IPv6.
+    """
+
+    tb = TB(dut)
+
+    await tb.reset()
+
+    # two byte payloads selected so the accumulated checksum sum requires a
+    # second end-around carry fold
+    tcp_payload = b'\xae\xeb'
+    udp_payload = b'\xff\xdb'
+
+    test_pkts = []
+
+    eth = Ether(src='5A:51:52:53:54:55', dst='DA:D1:D2:D3:D4:D5')
+
+    l3hdrs = []
+
+    # IPv4 with maximal field values
+    ip = IP(src='255.255.255.255', dst='255.255.255.255', ttl=255, id=0xffff)
+    l3hdrs.append(ip)
+
+    # IPv6 with maximal field values
+    ip6 = IPv6(src='ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
+        dst='ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', hlim=255, fl=0xfffff)
+    l3hdrs.append(ip6)
+
+    for l3hdr in l3hdrs:
+
+        # TCP with maximal field values
+        tcp = TCP(sport=0xffff, dport=0xffff, seq=0xffffffff, ack=0xffffffff,
+            window=0xffff, urgptr=0xffff, flags=0xff)
+        test_pkts.append(eth / l3hdr / tcp / tcp_payload)
+
+        # UDP with maximal field values
+        udp = UDP(sport=0xffff, dport=0xffff)
+        test_pkts.append(eth / l3hdr / udp / udp_payload)
+
+    for pkt in test_pkts:
+        tb.log.info("Packet: %r", pkt)
+
+        pkt_b = pkt.build()
+
+        payload = bytes(pkt[TCP].payload if TCP in pkt else pkt[UDP].payload)
+
+        # assemble metadata
+        flags = ParserFlags.FLG_EN
+        meta = bytearray(8*16)
+
+        eth_type = pkt[Ether].type
+
+        # Ethernet header
+        meta[24:30] = scapy.utils.mac2str(pkt[Ether].dst)
+        meta[32:38] = scapy.utils.mac2str(pkt[Ether].src)
+        struct.pack_into('>H', meta, 38, eth_type)
+
+        # IPv4
+        if IP in pkt:
+            flags |= ParserFlags.FLG_IPV4
+
+            meta[64:68] = scapy.utils.inet_aton(pkt[IP].dst)
+            meta[80:84] = scapy.utils.inet_aton(pkt[IP].src)
+
+            struct.pack_into('BB', meta, 56, pkt[IP].proto, pkt[IP].ttl)
+            struct.pack_into('<L', meta, 60, pkt[IP].id)
+
+        # IPv6
+        if IPv6 in pkt:
+            flags |= ParserFlags.FLG_IPV6
+
+            meta[64:80] = scapy.pton_ntop.inet_pton(socket.AF_INET6, pkt[IPv6].dst)
+            meta[80:96] = scapy.pton_ntop.inet_pton(socket.AF_INET6, pkt[IPv6].src)
+
+            struct.pack_into('BB', meta, 56, pkt[IPv6].nh, pkt[IPv6].hlim)
+            struct.pack_into('<L', meta, 60, pkt[IPv6].fl)
+
+        # TCP
+        if TCP in pkt:
+            flags |= ParserFlags.FLG_TCP
+
+            struct.pack_into('<HHB', meta, 96, pkt[TCP].dport, pkt[TCP].sport, int(pkt[TCP].flags))
+            struct.pack_into('<HH', meta, 104, pkt[TCP].window, pkt[TCP].urgptr)
+            struct.pack_into('<LL', meta, 112, pkt[TCP].seq, pkt[TCP].ack)
+
+        # UDP
+        if UDP in pkt:
+            flags |= ParserFlags.FLG_UDP
+
+            struct.pack_into('<HH', meta, 96, pkt[UDP].dport, pkt[UDP].sport)
+
+        payload_sum = ~scapy.utils.checksum(payload) & 0xffff
+
+        struct.pack_into('<LHH', meta, 0, flags, len(payload), payload_sum)
+
+        tb.log.info("Metadata: %r", meta)
+
+        await tb.source.send(AxiStreamFrame(meta))
+
+        hdr = await tb.sink.recv()
+
+        tb.log.info("Header: %r", hdr)
+
+        rx_pkt = Ether(bytes(hdr)+payload)
+        ref_pkt = Ether(pkt_b)
+
+        tb.log.info("Header (decoded): %r", rx_pkt)
+        tb.log.info("Packet (decoded): %r", Ether(bytes(hdr)+payload))
+        tb.log.info("Reference (decoded): %r", ref_pkt)
+
+        if TCP in pkt:
+            assert rx_pkt[TCP].chksum == ref_pkt[TCP].chksum, \
+                f"TCP checksum mismatch: got {rx_pkt[TCP].chksum:#06x}, expected {ref_pkt[TCP].chksum:#06x}"
+        else:
+            assert rx_pkt[UDP].chksum == ref_pkt[UDP].chksum, \
+                f"UDP checksum mismatch: got {rx_pkt[UDP].chksum:#06x}, expected {ref_pkt[UDP].chksum:#06x}"
+
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)

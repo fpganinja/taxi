@@ -225,6 +225,9 @@ logic [16:0] meta_cksum_1_reg = '0, meta_cksum_1_next;
 logic [16:0] meta_cksum_2_reg = '0, meta_cksum_2_next;
 logic [17:0] meta_cksum_3_reg = '0, meta_cksum_3_next;
 
+logic [16:0] meta_l3_cksum_fold;
+logic [16:0] meta_l4_cksum_fold;
+
 assign s_axis_meta.tready = s_axis_meta_tready_reg;
 
 assign m_axis_pkt.tdata = m_axis_pkt_tdata_reg;
@@ -249,6 +252,12 @@ always_comb begin
     meta_cksum_1_next = meta_cksum_1_reg;
     meta_cksum_2_next = meta_cksum_2_reg;
     meta_cksum_3_next = meta_cksum_3_reg;
+
+    // fold end-around carries back into the checksums; the accumulators can
+    // grow beyond 17 bits, so a single fold can still produce a carry, which
+    // would be lost when the checksums are truncated to 16 bits
+    meta_l3_cksum_fold = meta_l3_cksum_reg[15:0] + 16'(meta_l3_cksum_reg[20:16]);
+    meta_l4_cksum_fold = meta_l4_cksum_reg[15:0] + 16'(meta_l4_cksum_reg[20:16]);
 
     pkt_flag_next = pkt_flag_reg;
     pkt_l3_len_next = pkt_l3_len_reg;
@@ -492,8 +501,8 @@ always_comb begin
                 data_valid_next = meta_valid_reg && !meta_empty;
 
                 pkt_flag_next = meta_flag_reg;
-                pkt_l3_cksum_next = ~meta_l3_cksum_reg;
-                pkt_l4_cksum_next = ~21'(meta_l4_cksum_reg[15:0] + 16'(meta_l4_cksum_reg[20:16]));
+                pkt_l3_cksum_next = ~21'(meta_l3_cksum_fold[15:0] + {16'd0, meta_l3_cksum_fold[16]});
+                pkt_l4_cksum_next = ~21'(meta_l4_cksum_fold[15:0] + {16'd0, meta_l4_cksum_fold[16]});
 
                 meta_ram_b_rd_addr = {meta_rd_slot_reg[0], 4'd0};
                 pkt_l4_len_next = meta_ram_b_rd_data[15:0];

@@ -19,7 +19,7 @@ module taxi_mii_phy_if #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter VENDOR = "XILINX",
     // device family
     parameter FAMILY = "virtex7"
@@ -95,6 +95,7 @@ if (!SIM && VENDOR == "XILINX") begin
 
 end else begin
     // generic/simulation implementation (no vendor primitives)
+    // also used for LATTICE (ecp5): no clock buffer primitive is needed
 
     assign mac_mii_tx_clk = phy_mii_tx_clk;
 

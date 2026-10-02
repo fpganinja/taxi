@@ -19,7 +19,7 @@ module taxi_oddr #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",
@@ -108,6 +108,21 @@ end else if (!SIM && VENDOR == "ALTERA") begin
         .aclr(1'b0),
         .dataout(q)
     );
+
+end else if (!SIM && VENDOR == "LATTICE") begin
+    // Lattice device support
+    // ecp5: ODDRX1F in the I/O logic; D0 is driven while SCLK is high, D1 while low
+
+    for (genvar n = 0; n < WIDTH; n = n + 1) begin : oddr
+        ODDRX1F
+        oddr_inst (
+            .D0(d1[n]),
+            .D1(d2[n]),
+            .SCLK(clk),
+            .RST(1'b0),
+            .Q(q[n])
+        );
+    end
 
 end else begin
     // generic/simulation implementation (no vendor primitives)

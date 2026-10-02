@@ -19,7 +19,7 @@ module taxi_ssio_ddr_in #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",
@@ -88,6 +88,7 @@ if (!SIM && VENDOR == "XILINX") begin
 
 end else begin
     // generic/simulation implementation (no vendor primitives)
+    // also used for LATTICE (ecp5): no I/O clock buffer primitive is needed
 
     // pass through RX clock to input buffers
     assign clk_io = input_clk;

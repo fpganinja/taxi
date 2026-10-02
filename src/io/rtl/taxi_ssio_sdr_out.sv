@@ -19,7 +19,7 @@ module taxi_ssio_sdr_out #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",
@@ -48,13 +48,33 @@ clk_oddr_inst (
     .q(output_clk)
 );
 
-(* IOB = "TRUE" *)
-logic [WIDTH-1:0] output_q_reg = '0;
+if (!SIM && VENDOR == "LATTICE") begin
+    // Lattice device support
+    // ecp5: OFS1P3DX output register in the I/O logic
 
-assign output_q = output_q_reg;
+    for (genvar n = 0; n < WIDTH; n = n + 1) begin : oreg
+        OFS1P3DX
+        oreg_inst (
+            .D(input_d[n]),
+            .SP(1'b1),
+            .SCLK(clk),
+            .CD(1'b0),
+            .Q(output_q[n])
+        );
+    end
 
-always_ff @(posedge clk) begin
-    output_q_reg <= input_d;
+end else begin
+    // generic/simulation implementation (no vendor primitives)
+
+    (* IOB = "TRUE" *)
+    logic [WIDTH-1:0] output_q_reg = '0;
+
+    assign output_q = output_q_reg;
+
+    always_ff @(posedge clk) begin
+        output_q_reg <= input_d;
+    end
+
 end
 
 endmodule

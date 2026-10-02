@@ -19,7 +19,7 @@ module taxi_iddr #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",
@@ -124,6 +124,22 @@ end else if (!SIM && VENDOR == "ALTERA") begin
     end
 
     assign q1 = q1_delay;
+
+end else if (!SIM && VENDOR == "LATTICE") begin
+    // Lattice device support
+    // ecp5: IDDRX1F in the I/O logic; Q0 = data captured on the rising edge,
+    // Q1 = data captured on the following falling edge, both on SCLK rising
+
+    for (genvar n = 0; n < WIDTH; n = n + 1) begin : iddr
+        IDDRX1F
+        iddr_inst (
+            .D(d[n]),
+            .SCLK(clk),
+            .RST(1'b0),
+            .Q0(q1[n]),
+            .Q1(q2[n])
+        );
+    end
 
 end else begin
     // generic/simulation implementation (no vendor primitives)

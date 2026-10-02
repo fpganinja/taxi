@@ -19,7 +19,7 @@ module taxi_ssio_ddr_out #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",

@@ -19,7 +19,7 @@ module taxi_rgmii_phy_if #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter VENDOR = "XILINX",
     // device family
     parameter FAMILY = "virtex7",

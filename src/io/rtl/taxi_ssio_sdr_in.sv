@@ -19,7 +19,7 @@ module taxi_ssio_sdr_in #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtex7",
@@ -110,6 +110,7 @@ if (!SIM && VENDOR == "XILINX") begin
 
 end else begin
     // generic/simulation implementation (no vendor primitives)
+    // also used for LATTICE (ecp5): no I/O clock buffer primitive is needed
 
     // pass through RX clock to input buffers
     assign clk_io = input_clk;
@@ -120,13 +121,33 @@ end else begin
 
 end
 
-(* IOB = "TRUE" *)
-logic [WIDTH-1:0] output_q_reg = '0;
+if (!SIM && VENDOR == "LATTICE") begin
+    // Lattice device support
+    // ecp5: IFS1P3DX input register in the I/O logic
 
-assign output_q = output_q_reg;
+    for (genvar n = 0; n < WIDTH; n = n + 1) begin : ireg
+        IFS1P3DX
+        ireg_inst (
+            .D(input_d[n]),
+            .SP(1'b1),
+            .SCLK(clk_io),
+            .CD(1'b0),
+            .Q(output_q[n])
+        );
+    end
 
-always_ff @(posedge clk_io) begin
-    output_q_reg <= input_d;
+end else begin
+    // generic/simulation implementation (no vendor primitives)
+
+    (* IOB = "TRUE" *)
+    logic [WIDTH-1:0] output_q_reg = '0;
+
+    assign output_q = output_q_reg;
+
+    always_ff @(posedge clk_io) begin
+        output_q_reg <= input_d;
+    end
+
 end
 
 endmodule

@@ -19,7 +19,7 @@ module taxi_gmii_phy_if #
 (
     // simulation (set to avoid vendor primitives)
     parameter logic SIM = 1'b0,
-    // vendor ("GENERIC", "XILINX", "ALTERA")
+    // vendor ("GENERIC", "XILINX", "ALTERA", "LATTICE")
     parameter VENDOR = "XILINX",
     // device family
     parameter FAMILY = "virtex7"
@@ -158,6 +158,22 @@ if (!SIM && VENDOR == "XILINX") begin
         .I1(gtx_clk),
         .S(link_speed_reg[1]),
         .O(mac_gmii_tx_clk)
+    );
+
+end else if (!SIM && VENDOR == "LATTICE") begin
+    // Lattice device support
+    // ecp5: DCSC in glitchless mode; SEL is one-hot (01 = CLK0, 10 = CLK1)
+
+    DCSC #(
+        .DCSMODE("POS")
+    )
+    gmii_dcsc_inst (
+        .CLK0(phy_mii_tx_clk),
+        .CLK1(gtx_clk),
+        .SEL0(!link_speed_reg[1]),
+        .SEL1(link_speed_reg[1]),
+        .MODESEL(1'b0),
+        .DCSOUT(mac_gmii_tx_clk)
     );
 
 end else begin

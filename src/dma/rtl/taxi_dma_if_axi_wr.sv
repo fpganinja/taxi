@@ -388,7 +388,7 @@ always_comb begin
     stat_wr_req_start_len_next = stat_wr_req_start_len_reg;
     stat_wr_req_start_valid_next = 1'b0;
     stat_wr_op_tbl_full_next = !(!op_tbl_active[op_tbl_start_ptr_reg[OP_TAG_W-1:0]] && ($unsigned(op_tbl_start_ptr_reg - op_tbl_finish_ptr_reg) < 2**OP_TAG_W));
-    stat_wr_tx_stall_next = (m_axi.awvalid && !m_axi.awready) || (m_axi.wvalid && !m_axi.wready);
+    stat_wr_tx_stall_next = (m_axi_wr.awvalid && !m_axi_wr.awready) || (m_axi_wr.wvalid && !m_axi_wr.wready);
 
     tag_next = tag_reg;
     req_axi_addr_next = req_axi_addr_reg;

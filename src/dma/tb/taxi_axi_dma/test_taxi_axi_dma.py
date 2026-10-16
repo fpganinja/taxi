@@ -19,7 +19,7 @@ import pytest
 import cocotb
 
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, with_timeout
 
 from cocotbext.axi import AxiBus, AxiRam
 from cocotbext.axi import AxiStreamBus, AxiStreamFrame, AxiStreamSource, AxiStreamSink
@@ -208,6 +208,62 @@ async def run_test_read(dut, idle_inserter=None, backpressure_inserter=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
+async def run_test_read_long(dut, idle_inserter=None, backpressure_inserter=None):
+
+    tb = TB(dut)
+
+    byte_lanes = tb.axi_ram.read_if.byte_lanes
+    max_length = (1 << len(tb.read_desc_source.bus.req_len)) - 1
+    lengths = [8191, 8192, 8193, 8192+byte_lanes, 16384]
+    # Exercise the descriptor length limit when it fits in the test RAM.
+    if max_length < 32768:
+        lengths.append(max_length)
+    lengths = sorted(set(length for length in lengths if length <= max_length))
+    offsets = [0, byte_lanes, 4096-byte_lanes]
+    if int(dut.UNALIGNED_EN.value):
+        offsets.extend([1, byte_lanes-1, 4095])
+
+    await tb.cycle_reset()
+
+    tb.set_idle_generator(idle_inserter)
+    tb.set_backpressure_generator(backpressure_inserter)
+
+    dut.read_enable.value = 1
+
+    cur_tag = 1
+
+    for length in lengths:
+        for offset in sorted(set(offsets)):
+            tb.log.info("length %d, offset %d", length, offset)
+            addr = 0x1000+offset
+            test_data = bytearray((x ^ (x >> 8) ^ cur_tag) & 0xff for x in range(length))
+            tb.axi_ram.write(addr, test_data)
+
+            desc = DescTransaction(req_src_addr=addr, req_len=length, req_tag=cur_tag, req_id=cur_tag)
+            await tb.read_desc_source.send(desc)
+
+            status = await with_timeout(tb.read_desc_status_sink.recv(), 5, "ms")
+            read_data = await with_timeout(tb.read_data_sink.recv(), 5, "ms")
+
+            assert int(status.sts_tag) == cur_tag
+            assert int(status.sts_error) == 0
+            assert len(read_data.tdata) == length
+            assert read_data.tdata == test_data
+            assert read_data.tid == cur_tag
+            assert tb.read_desc_status_sink.empty()
+            assert tb.read_data_sink.empty()
+
+            cur_tag = (cur_tag + 1) % (1 << len(tb.read_desc_source.bus.req_tag))
+
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+
+
 # cocotb-test
 
 tests_dir = os.path.dirname(__file__)
@@ -232,6 +288,17 @@ def process_f_files(files):
 @pytest.mark.parametrize("axi_data_w", [8, 16, 32])
 @pytest.mark.parametrize("unaligned", [0, 1])
 def test_taxi_axi_dma(request, axi_data_w, unaligned):
+    run_sim(request, axi_data_w, unaligned)
+
+
+@pytest.mark.parametrize("axi_data_w", [8, 32, 128])
+@pytest.mark.parametrize("unaligned", [0, 1])
+@pytest.mark.parametrize("len_w", [14, 20])
+def test_taxi_axi_dma_long(request, axi_data_w, unaligned, len_w):
+    run_sim(request, axi_data_w, unaligned, len_w, "run_test_read_long")
+
+
+def run_sim(request, axi_data_w, unaligned, len_w=20, test_filter=None):
     dut = "taxi_axi_dma"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
@@ -262,11 +329,13 @@ def test_taxi_axi_dma(request, axi_data_w, unaligned):
     parameters['AXIS_DEST_W'] = 8
     parameters['AXIS_USER_EN'] = 1
     parameters['AXIS_USER_W'] = 1
-    parameters['LEN_W'] = 20
+    parameters['LEN_W'] = len_w
     parameters['TAG_W'] = 8
     parameters['UNALIGNED_EN'] = unaligned
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}
+    if test_filter:
+        extra_env['COCOTB_TEST_FILTER'] = test_filter
 
     sim_build = os.path.join(tests_dir, "sim_build",
         request.node.name.replace('[', '-').replace(']', ''))

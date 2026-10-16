@@ -81,7 +81,8 @@ localparam AXIS_BYTE_SIZE = AXIS_DATA_W/AXIS_BYTE_LANES;
 localparam OFFSET_W = AXI_STRB_W > 1 ? $clog2(AXI_STRB_W) : 1;
 localparam OFFSET_MASK = AXI_STRB_W > 1 ? {OFFSET_W{1'b1}} : 0;
 localparam ADDR_MASK = {AXI_ADDR_W{1'b1}} << $clog2(AXI_STRB_W);
-localparam CYCLE_COUNT_W = 13 - AXI_BURST_SIZE;
+// Count the entire descriptor, including an extra input beat for an unaligned address.
+localparam CYCLE_COUNT_W = LEN_W - AXI_BURST_SIZE + 1;
 
 localparam OUTPUT_FIFO_AW = 5;
 
@@ -273,7 +274,7 @@ always_comb begin
                 axis_cmd_axis_user_next = rd_desc_req.req_user;
 
                 if (UNALIGNED_EN) begin
-                    axis_cmd_input_cycle_count_next = CYCLE_COUNT_W'((op_count_next + LEN_W'(rd_desc_req.req_src_addr & OFFSET_MASK) - LEN_W'(1)) >> AXI_BURST_SIZE);
+                    axis_cmd_input_cycle_count_next = CYCLE_COUNT_W'(((LEN_W+1)'(op_count_next) + (LEN_W+1)'(rd_desc_req.req_src_addr & OFFSET_MASK) - (LEN_W+1)'(1)) >> AXI_BURST_SIZE);
                 end else begin
                     axis_cmd_input_cycle_count_next = CYCLE_COUNT_W'((op_count_next - LEN_W'(1)) >> AXI_BURST_SIZE);
                 end

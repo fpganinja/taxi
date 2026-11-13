@@ -22,7 +22,7 @@ import cocotb_test.simulator
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, ReadOnly
 from cocotb.utils import get_time_from_sim_steps
 
 from cocotbext.eth import XgmiiFrame, XgmiiSource, XgmiiSink, PtpClockSimTime
@@ -61,6 +61,9 @@ class TB:
         self.axis_source = AxiStreamSource(AxiStreamBus.from_entity(dut.s_axis_tx), dut.tx_clk, dut.tx_rst)
         self.tx_cpl_sink = AxiStreamSink(AxiStreamBus.from_entity(dut.m_axis_tx_cpl), dut.tx_clk, dut.tx_rst)
         self.axis_sink = AxiStreamSink(AxiStreamBus.from_entity(dut.m_axis_rx), dut.rx_clk, dut.rx_rst)
+
+        self.rx_bad_count = 0
+        cocotb.start_soon(self._sample_rx_bad())
 
         self.stat_sink = AxiStreamSink(AxiStreamBus.from_entity(dut.m_axis_stat), dut.stat_clk, dut.stat_rst)
 
@@ -156,6 +159,15 @@ class TB:
         self.ptp_td_source.set_ts_tod_sim_time()
         self.ptp_td_source.set_ts_rel_sim_time()
 
+    async def _sample_rx_bad(self):
+        while True:
+            await RisingEdge(self.dut.rx_clk)
+            await ReadOnly()
+            if self.dut.rx_rst.value:
+                self.rx_bad_count = 0
+            else:
+                self.rx_bad_count += int(self.dut.stat_rx_pkt_bad.value)
+
 
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
@@ -229,6 +241,9 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
 
     await RisingEdge(dut.rx_clk)
     await RisingEdge(dut.rx_clk)
+    await RisingEdge(dut.rx_clk)
+    await ReadOnly()
+    assert tb.rx_bad_count == 0
 
 
 @cocotb.test()
@@ -782,6 +797,8 @@ async def run_test_pfc(dut, ifg=12):
 
     await RisingEdge(dut.tx_clk)
     await RisingEdge(dut.tx_clk)
+
+
 
 
 # cocotb-test
